@@ -1,9 +1,0 @@
-{
-    "python.analysis.extraPaths": [
-        "./backend/backendfirst"
-    ],
-    "cursorpyright.analysis.extraPaths": [
-        "./backend/backendfirst"
-    ],
-    "claudeCodeChat.permissions.yoloMode": false
-}
