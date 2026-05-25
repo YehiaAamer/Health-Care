@@ -1,0 +1,29 @@
+[
+  {
+    "name": "Medium Risk",
+    "result": {
+      "probability": 78.0,
+      "risk_level": "high",
+      "message": "يُظهر هذا المريض عوامل خطر عالية لمرض السكري من النوع الثاني",
+      "model_used": "MedAIBase/MedGemma1.5:4b"
+    }
+  },
+  {
+    "name": "Low Risk",
+    "result": {
+      "probability": 65.0,
+      "risk_level": "moderate",
+      "message": "الاحتمالية مرتفعة قليلاً، يرجى استشارة طبيب",
+      "model_used": "MedAIBase/MedGemma1.5:4b"
+    }
+  },
+  {
+    "name": "High Risk",
+    "result": {
+      "probability": 85.0,
+      "risk_level": "very_high",
+      "message": "يُظهر هذا المريض مؤشرات عالية على خطر الإصابة بالسكري من النوع الثاني",
+      "model_used": "MedAIBase/MedGemma1.5:4b"
+    }
+  }
+]

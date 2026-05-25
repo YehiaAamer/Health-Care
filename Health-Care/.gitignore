@@ -1,0 +1,5 @@
+node_modules/
+Health-Care-main/react_first/node_modules/
+Health-Care-main/backend/env/
+Health-Care-main/backend/venv/
+Health-Care-main/react_first/.vite/

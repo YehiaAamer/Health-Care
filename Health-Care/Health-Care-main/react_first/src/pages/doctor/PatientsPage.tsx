@@ -1,0 +1,992 @@
+import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import { patientsApi } from "@/api/patients";
+import type { User, Prediction } from "@/types/api";
+
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+import {
+  Search,
+  ChevronRight,
+  ChevronLeft,
+  User as UserIcon,
+  Mail,
+  Phone,
+  X,
+  Plus,
+  Calendar,
+  Activity,
+  Users,
+  ShieldAlert,
+  Gauge,
+  ShieldCheck,
+  Flame,
+  SlidersHorizontal,
+} from "lucide-react";
+
+import LoadingDots from "@/components/shared/LoadingDots";
+import { cn } from "@/lib/utils";
+
+type PatientWithExtras = User & {
+  risk_level?: string;
+  latest_risk_level?: string;
+  review_status?: string;
+  latest_review_status?: string;
+  status?: string;
+  latest_prediction?: {
+    risk_level?: string;
+    review_status?: string;
+    status?: string;
+  };
+};
+
+type PatientDetails = User & {
+  predictions?: Prediction[];
+};
+
+const emptyPatientForm = {
+  first_name: "",
+  last_name: "",
+  email: "",
+  phone: "",
+};
+
+const PAGE_SIZE = 8;
+
+export default function PatientsPage() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === "ar";
+
+  const [patients, setPatients] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+
+  const [openCreate, setOpenCreate] = useState(false);
+  const [newPatient, setNewPatient] = useState(emptyPatientForm);
+
+  const [openDetails, setOpenDetails] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<PatientDetails | null>(
+    null
+  );
+
+  const normalizeRisk = (risk?: string) =>
+    risk?.toLowerCase().replace(/\s|_/g, "") || "";
+
+  const normalizeStatus = (status?: string) =>
+    status?.toLowerCase().replace(/\s/g, "_") || "";
+
+  const getFullName = (user?: Partial<User> | null) => {
+    if (!user) return "";
+
+    return `${user.first_name || ""} ${user.last_name || ""}`.trim();
+  };
+
+  const getDisplayName = (user?: Partial<User> | null) => {
+    return getFullName(user) || user?.email || "";
+  };
+
+  const fetchPatients = async () => {
+    try {
+      setLoading(true);
+      const data = await patientsApi.getPatients();
+      setPatients(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to fetch patients", error);
+      toast.error(isArabic ? "فشل تحميل المرضى" : "Failed to load patients");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPatients();
+  }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
+
+  const getPatientRisk = (patient: PatientWithExtras) => {
+    return normalizeRisk(
+      patient.risk_level ||
+        patient.latest_risk_level ||
+        patient.latest_prediction?.risk_level ||
+        ""
+    );
+  };
+
+  const getPatientStatus = (patient: PatientWithExtras) => {
+    return normalizeStatus(
+      patient.review_status ||
+        patient.latest_review_status ||
+        patient.status ||
+        patient.latest_prediction?.review_status ||
+        patient.latest_prediction?.status ||
+        ""
+    );
+  };
+
+  const getRiskBadgeClass = (risk: string) => {
+    const normalizedRisk = normalizeRisk(risk);
+
+    if (normalizedRisk === "veryhigh") {
+      return "border-red-100 bg-red-50 text-red-600 hover:border-red-100 hover:bg-red-50 hover:text-red-600";
+    }
+
+    if (normalizedRisk === "high") {
+      return "border-orange-100 bg-orange-50 text-orange-600 hover:border-orange-100 hover:bg-orange-50 hover:text-orange-600";
+    }
+
+    if (normalizedRisk === "medium") {
+      return "border-yellow-100 bg-yellow-50 text-yellow-600 hover:border-yellow-100 hover:bg-yellow-50 hover:text-yellow-600";
+    }
+
+    if (normalizedRisk === "low") {
+      return "border-green-100 bg-green-50 text-green-600 hover:border-green-100 hover:bg-green-50 hover:text-green-600";
+    }
+
+    return "border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-50 hover:text-slate-500";
+  };
+
+  const getRiskLabel = (risk: string) => {
+    const normalizedRisk = normalizeRisk(risk);
+
+    if (normalizedRisk === "veryhigh") {
+      return isArabic ? "عالية جدًا" : "Very High";
+    }
+
+    if (normalizedRisk === "high") return t("dashboard.riskHigh");
+    if (normalizedRisk === "medium") return t("dashboard.riskMedium");
+    if (normalizedRisk === "low") return t("dashboard.riskLow");
+
+    return isArabic ? "غير محدد" : "Unknown";
+  };
+
+  const getStatusLabel = (status: string) => {
+    const normalizedStatus = normalizeStatus(status);
+
+    switch (normalizedStatus) {
+      case "pending":
+        return isArabic ? "قيد المراجعة" : "Pending";
+      case "reviewed":
+        return isArabic ? "تمت المراجعة" : "Reviewed";
+      case "approved":
+        return isArabic ? "معتمد" : "Approved";
+      case "rejected":
+        return isArabic ? "مرفوض" : "Rejected";
+      case "needs_followup":
+        return isArabic ? "يحتاج متابعة" : "Needs Follow-up";
+      default:
+        return isArabic ? "لا توجد حالة" : "No Status";
+    }
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    const normalizedStatus = normalizeStatus(status);
+
+    switch (normalizedStatus) {
+      case "pending":
+        return "border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-100 hover:text-slate-600";
+      case "reviewed":
+        return "border-primary/15 bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary";
+      case "approved":
+        return "border-emerald-100 bg-emerald-50 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-600";
+      case "rejected":
+        return "border-red-100 bg-red-50 text-red-600 hover:bg-red-50 hover:text-red-600";
+      case "needs_followup":
+        return "border-amber-100 bg-amber-50 text-amber-600 hover:bg-amber-50 hover:text-amber-600";
+      default:
+        return "border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-50 hover:text-slate-500";
+    }
+  };
+
+  const patientStats = useMemo(() => {
+    const veryHigh = patients.filter(
+      (patient) => getPatientRisk(patient as PatientWithExtras) === "veryhigh"
+    ).length;
+
+    const high = patients.filter(
+      (patient) => getPatientRisk(patient as PatientWithExtras) === "high"
+    ).length;
+
+    const medium = patients.filter(
+      (patient) => getPatientRisk(patient as PatientWithExtras) === "medium"
+    ).length;
+
+    const low = patients.filter(
+      (patient) => getPatientRisk(patient as PatientWithExtras) === "low"
+    ).length;
+
+    return {
+      total: patients.length,
+      veryHigh,
+      high,
+      medium,
+      low,
+    };
+  }, [patients]);
+
+  const filteredPatients = useMemo(() => {
+    const searchValue = search.trim().toLowerCase();
+
+    return patients.filter((patient) => {
+      const p = patient as PatientWithExtras;
+
+      const fullName = getFullName(p).toLowerCase();
+      const email = p.email?.toLowerCase() || "";
+      const risk = getPatientRisk(p);
+
+      const matchesSearch =
+        !searchValue ||
+        fullName.includes(searchValue) ||
+        email.includes(searchValue);
+
+      const matchesRisk =
+        statusFilter === "all" || risk === normalizeRisk(statusFilter);
+
+      return matchesSearch && matchesRisk;
+    });
+  }, [patients, search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPatients.length / PAGE_SIZE));
+
+  const paginatedPatients = useMemo(() => {
+    const safePage = Math.min(page, totalPages);
+    const start = (safePage - 1) * PAGE_SIZE;
+    return filteredPatients.slice(start, start + PAGE_SIZE);
+  }, [filteredPatients, page, totalPages]);
+
+  const handleCreatePatient = async () => {
+    const firstName = newPatient.first_name.trim();
+    const lastName = newPatient.last_name.trim();
+    const email = newPatient.email.trim();
+    const phone = newPatient.phone.trim();
+
+    if (!firstName || !lastName || !email) {
+      toast.error(
+        isArabic
+          ? "من فضلك املأ الاسم الأول واسم العائلة والبريد الإلكتروني"
+          : "Please fill first name, last name, and email"
+      );
+      return;
+    }
+
+    try {
+      setCreating(true);
+
+      await patientsApi.createPatient({
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        phone,
+      });
+
+      toast.success(
+        isArabic ? "تم إضافة المريض بنجاح" : "Patient created successfully"
+      );
+
+      setOpenCreate(false);
+      setNewPatient(emptyPatientForm);
+      await fetchPatients();
+    } catch (error) {
+      console.error("Failed to create patient", error);
+      toast.error(isArabic ? "فشل إضافة المريض" : "Failed to create patient");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleViewDetails = async (patient: User) => {
+    try {
+      setOpenDetails(true);
+      setDetailsLoading(true);
+      setSelectedPatient(patient as PatientDetails);
+
+      const data = await patientsApi.getPatientProfile(patient.id);
+      setSelectedPatient(data);
+    } catch (error) {
+      console.error("Failed to load patient details", error);
+      toast.error(
+        isArabic
+          ? "تم عرض البيانات الأساسية فقط"
+          : "Showing basic patient details only"
+      );
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const goPrev = () => setPage((prev) => Math.max(1, prev - 1));
+  const goNext = () => setPage((prev) => Math.min(totalPages, prev + 1));
+
+  const statsCards = [
+    {
+      title: isArabic ? "إجمالي المرضى" : "Total Patients",
+      value: patientStats.total,
+      icon: Users,
+      color: "text-primary",
+      bgColor: "bg-primary/10",
+    },
+    {
+      title: isArabic ? "حالات عالية جدًا" : "Very High Risk",
+      value: patientStats.veryHigh,
+      icon: Flame,
+      color: "text-red-600",
+      bgColor: "bg-red-50",
+    },
+    {
+      title: isArabic ? "حالات عالية الخطورة" : "High Risk",
+      value: patientStats.high,
+      icon: ShieldAlert,
+      color: "text-orange-600",
+      bgColor: "bg-orange-50",
+    },
+    {
+      title: isArabic ? "حالات متوسطة" : "Medium Risk",
+      value: patientStats.medium,
+      icon: Gauge,
+      color: "text-amber-600",
+      bgColor: "bg-amber-50",
+    },
+    {
+      title: isArabic ? "حالات منخفضة" : "Low Risk",
+      value: patientStats.low,
+      icon: ShieldCheck,
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50",
+    },
+  ];
+
+  const riskFilterOptions = [
+    {
+      value: "veryhigh",
+      label: isArabic ? "عالية جدًا" : "Very High",
+    },
+    {
+      value: "high",
+      label: t("dashboard.riskHigh"),
+    },
+    {
+      value: "medium",
+      label: t("dashboard.riskMedium"),
+    },
+    {
+      value: "low",
+      label: t("dashboard.riskLow"),
+    },
+  ];
+
+  return (
+    <div
+      dir={isArabic ? "rtl" : "ltr"}
+      className="min-h-full pb-8 pt-8 animate-in fade-in duration-700 md:pt-0"
+    >
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 sm:gap-7">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            {t("doctorDashboard.patients.title")}
+          </h1>
+
+          <p className="mt-1 text-sm font-medium leading-6 text-slate-500">
+            {isArabic
+              ? "إدارة ومتابعة سجلات المرضى الخاصة بك."
+              : "Manage and monitor your patient records."}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+          {statsCards.map((card, index) => (
+            <Card
+              key={index}
+              className="group overflow-hidden rounded-[1.75rem] border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <CardContent className="relative flex min-h-[160px] flex-col justify-between p-5 sm:min-h-[170px]">
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="max-w-[150px] text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                    {card.title}
+                  </h3>
+
+                  <div
+                    className={cn(
+                      "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all duration-300 group-hover:scale-105",
+                      card.bgColor,
+                      card.color
+                    )}
+                  >
+                    <card.icon className="h-5 w-5" strokeWidth={2.3} />
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-3xl font-bold tracking-tight text-slate-900">
+                    {card.value}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <Card className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+          <div className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-5">
+            <div className="flex flex-col gap-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <SlidersHorizontal className="h-4 w-4" strokeWidth={2.3} />
+                </div>
+
+                <div className="min-w-0">
+                  <h2 className="truncate text-base font-bold tracking-tight text-slate-900">
+                    {isArabic ? "قائمة المرضى" : "Patient Directory"}
+                  </h2>
+
+                  <p className="mt-1 text-xs font-semibold text-slate-400">
+                    {isArabic
+                      ? `${filteredPatients.length} نتيجة`
+                      : `${filteredPatients.length} result${
+                          filteredPatients.length === 1 ? "" : "s"
+                        } found`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div className="w-full overflow-x-auto pb-1 xl:w-auto xl:pb-0">
+                  <div className="flex h-12 w-fit items-center gap-1 rounded-full border border-primary/20 bg-white p-1 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => setStatusFilter("all")}
+                      className={cn(
+                        "h-10 rounded-full px-5 text-sm font-semibold transition-none",
+                        statusFilter === "all"
+                          ? "bg-primary text-primary-foreground"
+                          : "text-primary hover:bg-primary/10"
+                      )}
+                    >
+                      {t("doctorDashboard.appointments.filterAll")}
+                    </button>
+
+                    <Select
+                      value={statusFilter === "all" ? undefined : statusFilter}
+                      onValueChange={setStatusFilter}
+                      dir={isArabic ? "rtl" : "ltr"}
+                    >
+                      <SelectTrigger
+                        className={cn(
+                          "h-10 w-fit min-w-[110px] rounded-full border-0 px-5 text-sm font-semibold shadow-none transition-none focus:ring-0 focus:ring-offset-0",
+                          statusFilter !== "all"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-transparent text-primary hover:bg-primary/10"
+                        )}
+                      >
+                        <SelectValue
+                          placeholder={isArabic ? "الخطورة" : "Risk"}
+                        />
+                      </SelectTrigger>
+
+                      <SelectContent className="rounded-2xl border-slate-100 bg-white p-1 shadow-xl">
+                        {riskFilterOptions.map((option) => (
+                          <SelectItem
+                            key={option.value}
+                            value={option.value}
+                            className="cursor-pointer rounded-xl text-sm font-semibold"
+                          >
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center xl:w-auto">
+                  <div className="relative w-full sm:min-w-[320px] xl:w-96">
+                    <Search
+                      className={cn(
+                        "absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400",
+                        isArabic ? "right-4" : "left-4"
+                      )}
+                    />
+
+                    <Input
+                      placeholder={
+                        isArabic
+                          ? "ابحث بالاسم أو الإيميل..."
+                          : "Search by name or email..."
+                      }
+                      className={cn(
+                        "h-12 rounded-full border border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm placeholder:text-slate-400 focus-visible:ring-4 focus-visible:ring-primary/10",
+                        isArabic
+                          ? "pr-11 pl-9 text-right"
+                          : "pl-11 pr-9 text-left"
+                      )}
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+
+                    {search && (
+                      <button
+                        type="button"
+                        onClick={() => setSearch("")}
+                        className={cn(
+                          "absolute top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary",
+                          isArabic ? "left-3" : "right-3"
+                        )}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  <Button
+                    onClick={() => setOpenCreate(true)}
+                    className="h-12 w-full rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:w-auto"
+                  >
+                    <Plus
+                      className={cn("h-4 w-4", isArabic ? "ml-2" : "mr-2")}
+                    />
+                    {isArabic ? "مريض جديد" : "New Patient"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="hidden grid-cols-[1.8fr_1fr_1fr_1fr] border-b border-slate-100 bg-slate-50/70 px-5 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 lg:grid">
+            <div>{isArabic ? "المريض" : "Patient"}</div>
+            <div>{isArabic ? "مستوى الخطورة" : "Risk Level"}</div>
+            <div>{isArabic ? "الحالة" : "Status"}</div>
+            <div>{isArabic ? "الإجراء" : "Action"}</div>
+          </div>
+
+          {loading ? (
+            <div className="flex min-h-[360px] items-center justify-center">
+              <LoadingDots />
+            </div>
+          ) : paginatedPatients.length > 0 ? (
+            <div className="space-y-4 p-3 lg:space-y-0 lg:p-0 lg:divide-y lg:divide-slate-100">
+              {paginatedPatients.map((patient) => {
+                const p = patient as PatientWithExtras;
+                const risk = getPatientRisk(p);
+                const patientStatus = getPatientStatus(p);
+                const patientName = getDisplayName(patient);
+
+                return (
+                  <div
+                    key={patient.id}
+                    className="grid gap-4 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-300 hover:bg-slate-50/60 sm:p-5 lg:grid-cols-[1.8fr_1fr_1fr_1fr] lg:items-center lg:rounded-none lg:border-0 lg:shadow-none"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Avatar className="h-12 w-12 shrink-0 border border-primary/20 bg-primary/5">
+                        <AvatarFallback className="bg-primary/10 text-primary">
+                          <UserIcon className="h-5 w-5" />
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="min-w-0">
+                        <h3 className="truncate text-[15px] font-bold text-slate-900">
+                          {patientName}
+                        </h3>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 lg:block">
+                      <span className="text-xs font-bold text-slate-400 lg:hidden">
+                        {isArabic ? "مستوى الخطورة" : "Risk Level"}
+                      </span>
+
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "rounded-full px-3 py-1 text-xs font-bold shadow-none transition-none",
+                          getRiskBadgeClass(risk)
+                        )}
+                      >
+                        {getRiskLabel(risk)}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 lg:block">
+                      <span className="text-xs font-bold text-slate-400 lg:hidden">
+                        {isArabic ? "الحالة" : "Status"}
+                      </span>
+
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "rounded-full px-3 py-1 text-xs font-bold shadow-none transition-none",
+                          getStatusBadgeClass(patientStatus)
+                        )}
+                      >
+                        {getStatusLabel(patientStatus)}
+                      </Badge>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      onClick={() => handleViewDetails(patient)}
+                      className="h-10 w-full rounded-full border-primary/30 bg-transparent px-5 text-sm font-semibold text-primary hover:bg-primary/10 hover:text-primary lg:w-fit"
+                    >
+                      {t("doctorDashboard.patients.viewDetails")}
+
+                      {isArabic ? (
+                        <ChevronLeft className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex min-h-[360px] flex-col items-center justify-center p-8 text-center">
+              <UserIcon className="mb-4 h-10 w-10 text-primary" />
+
+              <h3 className="text-base font-bold text-slate-900">
+                {t("doctorDashboard.noPatientsFound")}
+              </h3>
+
+              <p className="mt-1 text-sm font-medium text-slate-500">
+                {t("doctorDashboard.patients.noPatientsFound")}
+              </p>
+            </div>
+          )}
+        </Card>
+
+        <div className="flex items-center justify-center gap-3">
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={page === 1}
+            onClick={isArabic ? goNext : goPrev}
+            className="h-10 w-10 rounded-full border-primary/30 bg-white text-primary hover:bg-primary/10 disabled:opacity-40"
+          >
+            {isArabic ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </Button>
+
+          <div className="rounded-full border border-slate-100 bg-white px-4 py-2 text-sm font-bold text-slate-500 shadow-sm">
+            {isArabic
+              ? `صفحة ${page} من ${totalPages}`
+              : `Page ${page} of ${totalPages}`}
+          </div>
+
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={page === totalPages}
+            onClick={isArabic ? goPrev : goNext}
+            className="h-10 w-10 rounded-full border-primary/30 bg-white text-primary hover:bg-primary/10 disabled:opacity-40"
+          >
+            {isArabic ? (
+              <ChevronLeft className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </div>
+
+      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+        <DialogContent
+          dir={isArabic ? "rtl" : "ltr"}
+          className="max-h-[90vh] w-[92vw] overflow-y-auto rounded-3xl border border-slate-100 bg-white sm:max-w-xl"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900">
+              {isArabic ? "إضافة مريض جديد" : "Add New Patient"}
+            </DialogTitle>
+
+            <DialogDescription className="text-sm font-medium text-slate-500">
+              {isArabic
+                ? "أدخل بيانات المريض وسيتم ربطه بحساب الدكتور الحالي."
+                : "Enter patient details and the patient will be assigned to the current doctor."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input
+                placeholder={isArabic ? "الاسم الأول" : "First name"}
+                value={newPatient.first_name}
+                onChange={(e) =>
+                  setNewPatient((prev) => ({
+                    ...prev,
+                    first_name: e.target.value,
+                  }))
+                }
+                className={cn(
+                  "h-12 rounded-xl bg-white",
+                  isArabic ? "text-right" : "text-left"
+                )}
+              />
+
+              <Input
+                placeholder={isArabic ? "اسم العائلة" : "Last name"}
+                value={newPatient.last_name}
+                onChange={(e) =>
+                  setNewPatient((prev) => ({
+                    ...prev,
+                    last_name: e.target.value,
+                  }))
+                }
+                className={cn(
+                  "h-12 rounded-xl bg-white",
+                  isArabic ? "text-right" : "text-left"
+                )}
+              />
+            </div>
+
+            <Input
+              type="email"
+              placeholder={isArabic ? "البريد الإلكتروني" : "Email address"}
+              value={newPatient.email}
+              onChange={(e) =>
+                setNewPatient((prev) => ({
+                  ...prev,
+                  email: e.target.value,
+                }))
+              }
+              dir="ltr"
+              className="h-12 rounded-xl bg-white text-left"
+            />
+
+            <Input
+              placeholder={
+                isArabic ? "رقم الهاتف اختياري" : "Phone number optional"
+              }
+              value={newPatient.phone}
+              onChange={(e) =>
+                setNewPatient((prev) => ({
+                  ...prev,
+                  phone: e.target.value,
+                }))
+              }
+              dir="ltr"
+              className="h-12 rounded-xl bg-white text-left"
+            />
+          </div>
+
+          <DialogFooter className="gap-3 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setOpenCreate(false);
+                setNewPatient(emptyPatientForm);
+              }}
+              className="h-11 w-full rounded-full border-primary/30 bg-transparent px-5 text-primary hover:bg-primary/10 sm:w-auto"
+              disabled={creating}
+            >
+              {isArabic ? "إلغاء" : "Cancel"}
+            </Button>
+
+            <Button
+              onClick={handleCreatePatient}
+              disabled={creating}
+              className="h-11 w-full rounded-full bg-primary px-5 text-primary-foreground hover:bg-primary/90 sm:w-auto"
+            >
+              {creating
+                ? isArabic
+                  ? "جاري الإضافة..."
+                  : "Creating..."
+                : isArabic
+                ? "إضافة المريض"
+                : "Create Patient"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openDetails} onOpenChange={setOpenDetails}>
+        <DialogContent
+          dir={isArabic ? "rtl" : "ltr"}
+          className="max-h-[90vh] w-[92vw] overflow-y-auto rounded-3xl border border-slate-100 bg-white sm:max-w-2xl"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900">
+              {isArabic ? "تفاصيل المريض" : "Patient Details"}
+            </DialogTitle>
+
+            <DialogDescription className="text-sm font-medium text-slate-500">
+              {isArabic
+                ? "بيانات المريض وآخر نتائج التحاليل المتاحة."
+                : "Patient information and latest available predictions."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {detailsLoading ? (
+            <div className="flex min-h-[240px] items-center justify-center">
+              <LoadingDots />
+            </div>
+          ) : selectedPatient ? (
+            <div className="space-y-5 py-3">
+              <div className="flex items-center gap-4 rounded-2xl bg-primary/[0.03] p-4">
+                <Avatar className="h-14 w-14 shrink-0 border border-primary/20 bg-primary/5">
+                  <AvatarFallback className="bg-primary/10 text-primary">
+                    <UserIcon className="h-6 w-6" />
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="min-w-0">
+                  <h3 className="truncate text-base font-bold text-slate-900">
+                    {getDisplayName(selectedPatient)}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-2xl border border-slate-100 p-4">
+                  <div className="mb-2 flex items-center gap-2 text-primary">
+                    <Mail className="h-4 w-4" />
+                    <span className="text-xs font-bold">
+                      {isArabic ? "البريد الإلكتروني" : "Email"}
+                    </span>
+                  </div>
+
+                  <p className="truncate text-sm font-semibold text-slate-900">
+                    {selectedPatient.email || "No email"}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-100 p-4">
+                  <div className="mb-2 flex items-center gap-2 text-primary">
+                    <Phone className="h-4 w-4" />
+                    <span className="text-xs font-bold">
+                      {isArabic ? "رقم الهاتف" : "Phone"}
+                    </span>
+                  </div>
+
+                  <p className="text-sm font-semibold text-slate-900">
+                    {selectedPatient.profile?.phone ||
+                      (isArabic ? "لا يوجد رقم هاتف" : "No phone number")}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-primary" />
+
+                    <h4 className="text-sm font-bold text-slate-900">
+                      {isArabic ? "آخر التحاليل" : "Latest Predictions"}
+                    </h4>
+                  </div>
+
+                  <Badge className="rounded-full bg-primary/10 text-primary shadow-none hover:bg-primary/10 hover:text-primary">
+                    {selectedPatient.predictions?.length || 0}
+                  </Badge>
+                </div>
+
+                {selectedPatient.predictions?.length ? (
+                  <div className="space-y-3">
+                    {selectedPatient.predictions
+                      .slice(0, 3)
+                      .map((prediction) => {
+                        const predictionRisk = normalizeRisk(
+                          prediction.risk_level
+                        );
+
+                        return (
+                          <div
+                            key={prediction.id}
+                            className="flex flex-col gap-3 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <div>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "rounded-full px-3 py-1 text-xs font-bold shadow-none transition-none",
+                                  getRiskBadgeClass(predictionRisk)
+                                )}
+                              >
+                                {getRiskLabel(predictionRisk)}
+                              </Badge>
+
+                              <p className="mt-2 flex items-center gap-1 text-xs font-medium text-slate-500">
+                                <Calendar className="h-3.5 w-3.5" />
+                                {new Date(
+                                  prediction.created_at
+                                ).toLocaleDateString(
+                                  isArabic ? "ar-EG" : "en-US"
+                                )}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "rounded-full px-3 py-1 text-xs font-bold shadow-none transition-none",
+                                  getStatusBadgeClass(
+                                    (prediction as any).review_status
+                                  )
+                                )}
+                              >
+                                {getStatusLabel(
+                                  (prediction as any).review_status
+                                )}
+                              </Badge>
+
+                              <div className="w-fit rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                                {prediction.probability}%
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <p className="text-sm font-medium text-slate-500">
+                    {isArabic
+                      ? "لا توجد تحاليل متاحة"
+                      : "No predictions available"}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setOpenDetails(false)}
+              className="h-11 w-full rounded-full border-primary/30 bg-transparent px-5 text-primary hover:bg-primary/10 sm:w-auto"
+            >
+              {isArabic ? "إغلاق" : "Close"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
