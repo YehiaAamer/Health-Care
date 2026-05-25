@@ -42,35 +42,189 @@ import Footer from "@/components/shared/Footer";
 const formSchema = z.object({
   gender: z.enum(["male", "female"]),
 
-  pregnancies: z.coerce.number().min(0, "يجب أن يكون 0 أو أكثر").max(20, "الحد الأقصى 20"),
+  pregnancies: z.coerce
+    .number()
+    .min(0, "يجب أن يكون 0 أو أكثر")
+    .max(20, "الحد الأقصى 20"),
 
-  glucose: z.coerce.number().min(0, "يجب أن يكون 0 أو أكثر").max(300, "الحد الأقصى 300 mg/dL"),
+  glucose: z.coerce
+    .number()
+    .min(0, "يجب أن يكون 0 أو أكثر")
+    .max(300, "الحد الأقصى 300 mg/dL"),
 
-  bloodPressure: z.coerce.number().min(0, "يجب أن يكون 0 أو أكثر").max(220, "الحد الأقصى 220 mmHg"),
+  systolicBloodPressure: z.coerce
+    .number()
+    .min(0, "يجب أن يكون 0 أو أكثر")
+    .max(260, "الحد الأقصى 260 mmHg"),
 
-  skinThickness: z.coerce.number().min(0, "يجب أن يكون 0 أو أكثر").max(99, "الحد الأقصى 99 mm"),
+  diastolicBloodPressure: z.coerce
+    .number()
+    .min(0, "يجب أن يكون 0 أو أكثر")
+    .max(180, "الحد الأقصى 180 mmHg"),
 
-  insulin: z.coerce.number().min(0, "يجب أن يكون 0 أو أكثر").max(846, "الحد الأقصى 846 mu U/ml"),
+  skinThickness: z.coerce
+    .number()
+    .min(0, "يجب أن يكون 0 أو أكثر")
+    .max(99, "الحد الأقصى 99 mm"),
 
-  weight: z.coerce.number().min(1, "يجب إدخال الوزن").max(300, "الحد الأقصى 300 kg"),
+  insulin: z.coerce
+    .number()
+    .min(0, "يجب أن يكون 0 أو أكثر")
+    .max(846, "الحد الأقصى 846 mu U/ml"),
 
-  height: z.coerce.number().min(80, "يجب إدخال الطول بالسنتيمتر").max(250, "الحد الأقصى 250 cm"),
+  weight: z.coerce
+    .number()
+    .min(1, "يجب إدخال الوزن")
+    .max(300, "الحد الأقصى 300 kg"),
 
-  cholesterol: z.coerce.number().min(0, "يجب أن يكون 0 أو أكثر").max(500, "الحد الأقصى 500 mg/dL"),
+  height: z.coerce
+    .number()
+    .min(80, "يجب إدخال الطول بالسنتيمتر")
+    .max(250, "الحد الأقصى 250 cm"),
 
-  smoke: z.enum(["yes", "no"]),
+  cholesterol: z.coerce
+    .number()
+    .min(0, "يجب أن يكون 0 أو أكثر")
+    .max(500, "الحد الأقصى 500 mg/dL"),
 
-  physicalActivity: z.enum(["yes", "no"]),
+  diabetesPedigreeFunction: z.coerce
+    .number()
+    .min(0.078, "يجب أن يكون 0.078 أو أكثر")
+    .max(2.42, "الحد الأقصى 2.42"),
 
-  diabetesPedigreeFunction: z.coerce.number().min(0.078, "يجب أن يكون 0.078 أو أكثر").max(2.42, "الحد الأقصى 2.42"),
-
-  age: z.coerce.number().min(21, "يجب أن يكون 21 أو أكثر").max(81, "الحد الأقصى 81 سنة"),
+  age: z.coerce
+    .number()
+    .min(21, "يجب أن يكون 21 أو أكثر")
+    .max(81, "الحد الأقصى 81 سنة"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 type StepKey = "basic" | "vitals" | "risk";
 
+type CardiovascularRiskLevel = "low" | "medium" | "high" | "very_high";
+
+type CardiovascularPrediction = {
+  probability: number;
+  percentage: number;
+  risk_level: CardiovascularRiskLevel;
+  message: string;
+  z_score: number;
+};
+
 const DESKTOP_HEADER_HEIGHT = 72;
+
+const CARDIO_COEFFICIENTS = {
+  intercept: -9.85,
+  age: 0.058,
+  gender: 0.42,
+  bmi: 0.065,
+  ap_hi: 0.052,
+  ap_lo: 0.028,
+  cholesterol: 0.48,
+  gluc: 0.32,
+};
+
+const sigmoid = (z: number) => {
+  return 1 / (1 + Math.exp(-z));
+};
+
+const getCardioRiskLevel = (percentage: number): CardiovascularRiskLevel => {
+  if (percentage >= 80) return "very_high";
+  if (percentage >= 60) return "high";
+  if (percentage >= 30) return "medium";
+  return "low";
+};
+
+const getCardioRiskMessage = (
+  riskLevel: CardiovascularRiskLevel,
+  isArabic: boolean
+) => {
+  if (isArabic) {
+    switch (riskLevel) {
+      case "very_high":
+        return "يشير النموذج إلى وجود خطورة عالية جدًا للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة.";
+      case "high":
+        return "يشير النموذج إلى وجود خطورة عالية للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة.";
+      case "medium":
+        return "يشير النموذج إلى وجود خطورة متوسطة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة.";
+      case "low":
+        return "يشير النموذج إلى وجود خطورة منخفضة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة.";
+      default:
+        return "تم إنشاء توقع خطورة القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة.";
+    }
+  }
+
+  switch (riskLevel) {
+    case "very_high":
+      return "The model indicates a very high cardiovascular risk based on the provided clinical indicators.";
+    case "high":
+      return "The model indicates a high cardiovascular risk based on the provided clinical indicators.";
+    case "medium":
+      return "The model indicates a moderate cardiovascular risk based on the provided clinical indicators.";
+    case "low":
+      return "The model indicates a low cardiovascular risk based on the provided clinical indicators.";
+    default:
+      return "The model generated a cardiovascular risk prediction based on the provided clinical indicators.";
+  }
+};
+
+const normalizeCholesterolForCardio = (cholesterol: number) => {
+  if (cholesterol >= 240) return 3;
+  if (cholesterol >= 200) return 2;
+  return 1;
+};
+
+const normalizeGlucoseForCardio = (glucose: number) => {
+  if (glucose >= 126) return 3;
+  if (glucose >= 100) return 2;
+  return 1;
+};
+
+const calculateCardiovascularPrediction = ({
+  age,
+  gender,
+  bmi,
+  systolicBloodPressure,
+  diastolicBloodPressure,
+  cholesterol,
+  glucose,
+  isArabic,
+}: {
+  age: number;
+  gender: "male" | "female";
+  bmi: number;
+  systolicBloodPressure: number;
+  diastolicBloodPressure: number;
+  cholesterol: number;
+  glucose: number;
+  isArabic: boolean;
+}): CardiovascularPrediction => {
+  const genderValue = gender === "male" ? 1 : 0;
+  const cholesterolValue = normalizeCholesterolForCardio(cholesterol);
+  const glucoseValue = normalizeGlucoseForCardio(glucose);
+
+  const z =
+    CARDIO_COEFFICIENTS.intercept +
+    CARDIO_COEFFICIENTS.age * age +
+    CARDIO_COEFFICIENTS.gender * genderValue +
+    CARDIO_COEFFICIENTS.bmi * bmi +
+    CARDIO_COEFFICIENTS.ap_hi * systolicBloodPressure +
+    CARDIO_COEFFICIENTS.ap_lo * diastolicBloodPressure +
+    CARDIO_COEFFICIENTS.cholesterol * cholesterolValue +
+    CARDIO_COEFFICIENTS.gluc * glucoseValue;
+
+  const probability = sigmoid(z);
+  const percentage = Number((probability * 100).toFixed(2));
+  const riskLevel = getCardioRiskLevel(percentage);
+
+  return {
+    probability: Number(probability.toFixed(4)),
+    percentage,
+    risk_level: riskLevel,
+    message: getCardioRiskMessage(riskLevel, isArabic),
+    z_score: Number(z.toFixed(4)),
+  };
+};
 
 export default function DiagnosisWizard() {
   const navigate = useNavigate();
@@ -87,14 +241,13 @@ export default function DiagnosisWizard() {
       gender: "male",
       pregnancies: 0,
       glucose: 85,
-      bloodPressure: 70,
+      systolicBloodPressure: 120,
+      diastolicBloodPressure: 70,
       skinThickness: 20,
       insulin: 0,
       weight: 70,
       height: 170,
       cholesterol: 180,
-      smoke: "no",
-      physicalActivity: "yes",
       diabetesPedigreeFunction: 0.5,
       age: 35,
     },
@@ -118,14 +271,19 @@ export default function DiagnosisWizard() {
   const validateCurrentStep = async () => {
     if (activeStep === "basic") {
       const fields: Array<keyof FormValues> = ["gender", "age"];
-      if (gender === "female") fields.push("pregnancies");
+
+      if (gender === "female") {
+        fields.push("pregnancies");
+      }
+
       return await trigger(fields);
     }
 
     if (activeStep === "vitals") {
       return await trigger([
         "glucose",
-        "bloodPressure",
+        "systolicBloodPressure",
+        "diastolicBloodPressure",
         "skinThickness",
         "insulin",
         "weight",
@@ -134,12 +292,7 @@ export default function DiagnosisWizard() {
     }
 
     if (activeStep === "risk") {
-      return await trigger([
-        "cholesterol",
-        "smoke",
-        "physicalActivity",
-        "diabetesPedigreeFunction",
-      ]);
+      return await trigger(["cholesterol", "diabetesPedigreeFunction"]);
     }
 
     return false;
@@ -155,19 +308,38 @@ export default function DiagnosisWizard() {
         (values.weight / (heightInMeters * heightInMeters)).toFixed(1)
       );
 
+      const cardiovascularPrediction = calculateCardiovascularPrediction({
+        age: values.age,
+        gender: values.gender,
+        bmi: calculatedBmi,
+        systolicBloodPressure: values.systolicBloodPressure,
+        diastolicBloodPressure: values.diastolicBloodPressure,
+        cholesterol: values.cholesterol,
+        glucose: values.glucose,
+        isArabic,
+      });
+
       const backendData = {
         gender: values.gender,
         pregnancies: values.gender === "female" ? values.pregnancies : 0,
         glucose: values.glucose,
-        blood_pressure: values.bloodPressure,
+
+        // Diabetes model field.
+        // Pima Diabetes BloodPressure is usually diastolic.
+        blood_pressure: values.diastolicBloodPressure,
+
         skin_thickness: values.skinThickness,
         insulin: values.insulin,
+
+        // BMI is calculated internally from height + weight,
+        // then sent to the diabetes model as the normal bmi feature.
         bmi: calculatedBmi,
+
+        // Extra clinical fields for display/reporting if backend accepts them.
         weight: values.weight,
         height: values.height,
         cholesterol: values.cholesterol,
-        smoke: values.smoke === "yes",
-        physical_activity: values.physicalActivity === "yes",
+
         diabetes_pedigree_function: values.diabetesPedigreeFunction,
         age: values.age,
       };
@@ -187,14 +359,37 @@ export default function DiagnosisWizard() {
       navigate("/report", {
         state: {
           formData: {
-            ...values,
+            gender: values.gender,
             pregnancies: values.gender === "female" ? values.pregnancies : 0,
+            glucose: values.glucose,
+            systolicBloodPressure: values.systolicBloodPressure,
+            diastolicBloodPressure: values.diastolicBloodPressure,
+            skinThickness: values.skinThickness,
+            insulin: values.insulin,
+            weight: values.weight,
+            height: values.height,
+            cholesterol: values.cholesterol,
+            diabetesPedigreeFunction: values.diabetesPedigreeFunction,
+            age: values.age,
+
+            // Keep it available for internal/report compatibility,
+            // but hide it in the Report table.
             bmi: calculatedBmi,
           },
+
           probability: result.probability,
           riskLevel: result.risk_level,
           message: result.message,
           predictionId: result.prediction_id,
+
+          diabetesPrediction: {
+            probability: result.probability,
+            risk_level: result.risk_level,
+            message: result.message,
+            prediction_id: result.prediction_id,
+          },
+
+          cardiovascularPrediction,
         },
       });
     } catch (error) {
@@ -220,13 +415,19 @@ export default function DiagnosisWizard() {
     const isStepValid = await validateCurrentStep();
     if (!isStepValid) return;
 
-    if (activeStep === "basic") setActiveStep("vitals");
-    else if (activeStep === "vitals") setActiveStep("risk");
+    if (activeStep === "basic") {
+      setActiveStep("vitals");
+    } else if (activeStep === "vitals") {
+      setActiveStep("risk");
+    }
   };
 
   const goPrevious = () => {
-    if (activeStep === "risk") setActiveStep("vitals");
-    else if (activeStep === "vitals") setActiveStep("basic");
+    if (activeStep === "risk") {
+      setActiveStep("vitals");
+    } else if (activeStep === "vitals") {
+      setActiveStep("basic");
+    }
   };
 
   const handleStepClick = async (targetStep: StepKey) => {
@@ -242,7 +443,9 @@ export default function DiagnosisWizard() {
     const isStepValid = await validateCurrentStep();
     if (!isStepValid) return;
 
-    if (targetIndex === currentIndex + 1) setActiveStep(targetStep);
+    if (targetIndex === currentIndex + 1) {
+      setActiveStep(targetStep);
+    }
   };
 
   const sectionTitleClass = isArabic ? "text-right" : "text-left";
@@ -369,10 +572,12 @@ export default function DiagnosisWizard() {
                           }`}
                         >
                           <UserRound className="mt-1 h-4 w-4 shrink-0 text-primary sm:mt-0" />
+
                           <div className={sectionTitleClass}>
                             <CardTitle className="text-base sm:text-lg">
                               {t("diagnosisWizard.section1")}
                             </CardTitle>
+
                             <CardDescription className="mt-1 text-xs leading-5 sm:text-sm">
                               {t("diagnosisWizard.section1Desc")}
                             </CardDescription>
@@ -390,6 +595,7 @@ export default function DiagnosisWizard() {
                                 <FormLabel>
                                   {isArabic ? "النوع" : "Gender"}
                                 </FormLabel>
+
                                 <FormControl>
                                   <select
                                     value={field.value}
@@ -399,16 +605,19 @@ export default function DiagnosisWizard() {
                                     <option value="male">
                                       {isArabic ? "ذكر" : "Male"}
                                     </option>
+
                                     <option value="female">
                                       {isArabic ? "أنثى" : "Female"}
                                     </option>
                                   </select>
                                 </FormControl>
+
                                 <FormDescription className="text-xs">
                                   {isArabic
                                     ? "اختيار النوع يحدد ظهور خانة الحمل"
                                     : "Pregnancy field appears for females only"}
                                 </FormDescription>
+
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -422,6 +631,7 @@ export default function DiagnosisWizard() {
                                 <FormLabel>
                                   {t("diagnosisWizard.age")}
                                 </FormLabel>
+
                                 <FormControl>
                                   <Input
                                     type="number"
@@ -431,9 +641,11 @@ export default function DiagnosisWizard() {
                                     className="h-11 rounded-lg sm:h-10"
                                   />
                                 </FormControl>
+
                                 <FormDescription className="text-xs">
                                   {t("diagnosisWizard.ageDesc")}
                                 </FormDescription>
+
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -448,6 +660,7 @@ export default function DiagnosisWizard() {
                                   <FormLabel>
                                     {t("diagnosisWizard.pregnancies")}
                                   </FormLabel>
+
                                   <FormControl>
                                     <Input
                                       type="number"
@@ -457,9 +670,11 @@ export default function DiagnosisWizard() {
                                       className="h-11 rounded-lg sm:h-10"
                                     />
                                   </FormControl>
+
                                   <FormDescription className="text-xs">
                                     {t("diagnosisWizard.pregnanciesDesc")}
                                   </FormDescription>
+
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -479,10 +694,12 @@ export default function DiagnosisWizard() {
                           }`}
                         >
                           <HeartPulse className="mt-1 h-4 w-4 shrink-0 text-primary sm:mt-0" />
+
                           <div className={sectionTitleClass}>
                             <CardTitle className="text-base sm:text-lg">
                               {t("diagnosisWizard.section2")}
                             </CardTitle>
+
                             <CardDescription className="mt-1 text-xs leading-5 sm:text-sm">
                               {t("diagnosisWizard.section2Desc")}
                             </CardDescription>
@@ -492,59 +709,215 @@ export default function DiagnosisWizard() {
 
                       <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5">
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
-                          <FormField name="glucose" control={form.control} render={({ field }) => (
-                            <FormItem className={fieldTextClass}>
-                              <FormLabel>{t("diagnosisWizard.glucose")}</FormLabel>
-                              <FormControl><Input type="number" min={0} max={300} {...field} className="h-11 rounded-lg sm:h-10" /></FormControl>
-                              <FormDescription className="text-xs">{t("diagnosisWizard.glucoseDesc")}</FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )} />
+                          <FormField
+                            name="glucose"
+                            control={form.control}
+                            render={({ field }) => (
+                              <FormItem className={fieldTextClass}>
+                                <FormLabel>
+                                  {t("diagnosisWizard.glucose")}
+                                </FormLabel>
 
-                          <FormField name="bloodPressure" control={form.control} render={({ field }) => (
-                            <FormItem className={fieldTextClass}>
-                              <FormLabel>{t("diagnosisWizard.bloodPressure")}</FormLabel>
-                              <FormControl><Input type="number" min={0} max={220} {...field} className="h-11 rounded-lg sm:h-10" /></FormControl>
-                              <FormDescription className="text-xs">{t("diagnosisWizard.bloodPressureDesc")}</FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )} />
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={300}
+                                    {...field}
+                                    className="h-11 rounded-lg sm:h-10"
+                                  />
+                                </FormControl>
 
-                          <FormField name="skinThickness" control={form.control} render={({ field }) => (
-                            <FormItem className={fieldTextClass}>
-                              <FormLabel>{t("diagnosisWizard.skinThickness")}</FormLabel>
-                              <FormControl><Input type="number" min={0} max={99} {...field} className="h-11 rounded-lg sm:h-10" /></FormControl>
-                              <FormDescription className="text-xs">{t("diagnosisWizard.skinThicknessDesc")}</FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )} />
+                                <FormDescription className="text-xs">
+                                  {t("diagnosisWizard.glucoseDesc")}
+                                </FormDescription>
 
-                          <FormField name="insulin" control={form.control} render={({ field }) => (
-                            <FormItem className={fieldTextClass}>
-                              <FormLabel>{t("diagnosisWizard.insulin")}</FormLabel>
-                              <FormControl><Input type="number" min={0} max={846} {...field} className="h-11 rounded-lg sm:h-10" /></FormControl>
-                              <FormDescription className="text-xs">{t("diagnosisWizard.insulinDesc")}</FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )} />
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
 
-                          <FormField name="weight" control={form.control} render={({ field }) => (
-                            <FormItem className={fieldTextClass}>
-                              <FormLabel>{isArabic ? "الوزن (كجم)" : "Weight (kg)"}</FormLabel>
-                              <FormControl><Input type="number" step="0.1" min={1} max={300} {...field} className="h-11 rounded-lg sm:h-10" /></FormControl>
-                              <FormDescription className="text-xs">{isArabic ? "أدخل الوزن بالكيلوجرام" : "Enter weight in kilograms"}</FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )} />
+                          <FormField
+                            name="systolicBloodPressure"
+                            control={form.control}
+                            render={({ field }) => (
+                              <FormItem className={fieldTextClass}>
+                                <FormLabel>
+                                  {isArabic
+                                    ? "ضغط الدم الانقباضي"
+                                    : "Systolic Blood Pressure"}
+                                </FormLabel>
 
-                          <FormField name="height" control={form.control} render={({ field }) => (
-                            <FormItem className={fieldTextClass}>
-                              <FormLabel>{isArabic ? "الطول (سم)" : "Height (cm)"}</FormLabel>
-                              <FormControl><Input type="number" step="1" min={80} max={250} {...field} className="h-11 rounded-lg sm:h-10" /></FormControl>
-                              <FormDescription className="text-xs">{isArabic ? "أدخل الطول بالسنتيمتر مثل 170" : "Enter height in centimeters, e.g. 170"}</FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )} />
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={260}
+                                    {...field}
+                                    className="h-11 rounded-lg sm:h-10"
+                                  />
+                                </FormControl>
+
+                                <FormDescription className="text-xs">
+                                  {isArabic
+                                    ? "القيمة العليا لضغط الدم مثل 120"
+                                    : "Upper blood pressure value, e.g. 120"}
+                                </FormDescription>
+
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            name="diastolicBloodPressure"
+                            control={form.control}
+                            render={({ field }) => (
+                              <FormItem className={fieldTextClass}>
+                                <FormLabel>
+                                  {isArabic
+                                    ? "ضغط الدم الانبساطي"
+                                    : "Diastolic Blood Pressure"}
+                                </FormLabel>
+
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={180}
+                                    {...field}
+                                    className="h-11 rounded-lg sm:h-10"
+                                  />
+                                </FormControl>
+
+                                <FormDescription className="text-xs">
+                                  {isArabic
+                                    ? "القيمة السفلى لضغط الدم مثل 80"
+                                    : "Lower blood pressure value, e.g. 80"}
+                                </FormDescription>
+
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            name="skinThickness"
+                            control={form.control}
+                            render={({ field }) => (
+                              <FormItem className={fieldTextClass}>
+                                <FormLabel>
+                                  {t("diagnosisWizard.skinThickness")}
+                                </FormLabel>
+
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={99}
+                                    {...field}
+                                    className="h-11 rounded-lg sm:h-10"
+                                  />
+                                </FormControl>
+
+                                <FormDescription className="text-xs">
+                                  {t("diagnosisWizard.skinThicknessDesc")}
+                                </FormDescription>
+
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            name="insulin"
+                            control={form.control}
+                            render={({ field }) => (
+                              <FormItem className={fieldTextClass}>
+                                <FormLabel>
+                                  {t("diagnosisWizard.insulin")}
+                                </FormLabel>
+
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={846}
+                                    {...field}
+                                    className="h-11 rounded-lg sm:h-10"
+                                  />
+                                </FormControl>
+
+                                <FormDescription className="text-xs">
+                                  {t("diagnosisWizard.insulinDesc")}
+                                </FormDescription>
+
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            name="weight"
+                            control={form.control}
+                            render={({ field }) => (
+                              <FormItem className={fieldTextClass}>
+                                <FormLabel>
+                                  {isArabic ? "الوزن (كجم)" : "Weight (kg)"}
+                                </FormLabel>
+
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    min={1}
+                                    max={300}
+                                    {...field}
+                                    className="h-11 rounded-lg sm:h-10"
+                                  />
+                                </FormControl>
+
+                                <FormDescription className="text-xs">
+                                  {isArabic
+                                    ? "أدخل الوزن بالكيلوجرام"
+                                    : "Enter weight in kilograms"}
+                                </FormDescription>
+
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            name="height"
+                            control={form.control}
+                            render={({ field }) => (
+                              <FormItem className={fieldTextClass}>
+                                <FormLabel>
+                                  {isArabic ? "الطول (سم)" : "Height (cm)"}
+                                </FormLabel>
+
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="1"
+                                    min={80}
+                                    max={250}
+                                    {...field}
+                                    className="h-11 rounded-lg sm:h-10"
+                                  />
+                                </FormControl>
+
+                                <FormDescription className="text-xs">
+                                  {isArabic
+                                    ? "أدخل الطول بالسنتيمتر مثل 170"
+                                    : "Enter height in centimeters, e.g. 170"}
+                                </FormDescription>
+
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
                         </div>
                       </CardContent>
                     </Card>
@@ -559,10 +932,12 @@ export default function DiagnosisWizard() {
                           }`}
                         >
                           <FlaskConical className="mt-1 h-4 w-4 shrink-0 text-primary sm:mt-0" />
+
                           <div className={sectionTitleClass}>
                             <CardTitle className="text-base sm:text-lg">
                               {t("diagnosisWizard.section3")}
                             </CardTitle>
+
                             <CardDescription className="mt-1 text-xs leading-5 sm:text-sm">
                               {t("diagnosisWizard.section3Desc")}
                             </CardDescription>
@@ -577,55 +952,28 @@ export default function DiagnosisWizard() {
                             control={form.control}
                             render={({ field }) => (
                               <FormItem className={fieldTextClass}>
-                                <FormLabel>{isArabic ? "الكوليسترول (mg/dL)" : "Cholesterol (mg/dL)"}</FormLabel>
-                                <FormControl><Input type="number" min={0} max={500} {...field} className="h-11 rounded-lg sm:h-10" /></FormControl>
-                                <FormDescription className="text-xs">{isArabic ? "أدخل نسبة الكوليسترول الكلي" : "Enter total cholesterol value"}</FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                                <FormLabel>
+                                  {isArabic
+                                    ? "الكوليسترول (mg/dL)"
+                                    : "Cholesterol (mg/dL)"}
+                                </FormLabel>
 
-                          <FormField
-                            name="smoke"
-                            control={form.control}
-                            render={({ field }) => (
-                              <FormItem className={fieldTextClass}>
-                                <FormLabel>{isArabic ? "التدخين" : "Smoking"}</FormLabel>
                                 <FormControl>
-                                  <select
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                    className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring sm:h-10"
-                                  >
-                                    <option value="no">{isArabic ? "لا" : "No"}</option>
-                                    <option value="yes">{isArabic ? "نعم" : "Yes"}</option>
-                                  </select>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={500}
+                                    {...field}
+                                    className="h-11 rounded-lg sm:h-10"
+                                  />
                                 </FormControl>
-                                <FormDescription className="text-xs">{isArabic ? "اختيار نعم أو لا" : "Choose yes or no"}</FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
 
-                          <FormField
-                            name="physicalActivity"
-                            control={form.control}
-                            render={({ field }) => (
-                              <FormItem className={fieldTextClass}>
-                                <FormLabel>{isArabic ? "النشاط البدني" : "Physical Activity"}</FormLabel>
-                                <FormControl>
-                                  <select
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                    className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring sm:h-10"
-                                  >
-                                    <option value="yes">{isArabic ? "نعم" : "Yes"}</option>
-                                    <option value="no">{isArabic ? "لا" : "No"}</option>
-                                  </select>
-                                </FormControl>
                                 <FormDescription className="text-xs">
-                                  {isArabic ? "هل يمارس المريض نشاطًا بدنيًا؟" : "Does the patient perform physical activity?"}
+                                  {isArabic
+                                    ? "أدخل نسبة الكوليسترول الكلي"
+                                    : "Enter total cholesterol value"}
                                 </FormDescription>
+
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -636,9 +984,25 @@ export default function DiagnosisWizard() {
                             control={form.control}
                             render={({ field }) => (
                               <FormItem className={fieldTextClass}>
-                                <FormLabel>{t("diagnosisWizard.pedigree")}</FormLabel>
-                                <FormControl><Input type="number" step="0.001" min={0.078} max={2.42} {...field} className="h-11 rounded-lg sm:h-10" /></FormControl>
-                                <FormDescription className="text-xs">{t("diagnosisWizard.pedigreeDesc")}</FormDescription>
+                                <FormLabel>
+                                  {t("diagnosisWizard.pedigree")}
+                                </FormLabel>
+
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.001"
+                                    min={0.078}
+                                    max={2.42}
+                                    {...field}
+                                    className="h-11 rounded-lg sm:h-10"
+                                  />
+                                </FormControl>
+
+                                <FormDescription className="text-xs">
+                                  {t("diagnosisWizard.pedigreeDesc")}
+                                </FormDescription>
+
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -671,6 +1035,7 @@ export default function DiagnosisWizard() {
                         ) : (
                           <ArrowLeft className="mr-2 h-4 w-4" />
                         )}
+
                         {t("diagnosisWizard.previous")}
                       </Button>
                     ) : (
@@ -686,6 +1051,7 @@ export default function DiagnosisWizard() {
                         }`}
                       >
                         {t("diagnosisWizard.next")}
+
                         {isArabic ? (
                           <ArrowLeft className="mr-2 h-4 w-4" />
                         ) : (
@@ -707,6 +1073,7 @@ export default function DiagnosisWizard() {
                                 isArabic ? "ml-2" : "mr-2"
                               } h-4 w-4 animate-spin`}
                             />
+
                             {t("diagnosisWizard.loading")}
                           </>
                         ) : (

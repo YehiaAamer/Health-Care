@@ -47,22 +47,54 @@ import {
 import LoadingDots from "@/components/shared/LoadingDots";
 import { cn } from "@/lib/utils";
 
+type PredictionWithExtras = Prediction & {
+  review_status?: string;
+  status?: string;
+};
+
 type PatientWithExtras = User & {
   risk_level?: string;
   latest_risk_level?: string;
   review_status?: string;
   latest_review_status?: string;
   status?: string;
-  latest_prediction?: {
-    risk_level?: string;
-    review_status?: string;
-    status?: string;
+  phone?: string;
+  profile?: {
+    phone?: string;
   };
+  predictions?: PredictionWithExtras[];
+  latest_prediction?: PredictionWithExtras;
 };
 
 type PatientDetails = User & {
-  predictions?: Prediction[];
+  phone?: string;
+  profile?: {
+    phone?: string;
+  };
+  predictions?: PredictionWithExtras[];
+  latest_prediction?: PredictionWithExtras;
 };
+
+type ApiListResponse<T> =
+  | T[]
+  | {
+      data?: T[] | { results?: T[]; patients?: T[]; items?: T[] };
+      results?: T[];
+      patients?: T[];
+      items?: T[];
+      count?: number;
+      next?: string | null;
+      previous?: string | null;
+    };
+
+type ApiSingleResponse<T> =
+  | T
+  | {
+      data?: T;
+      patient?: T;
+      user?: T;
+      profile?: T;
+    };
 
 const emptyPatientForm = {
   first_name: "",
@@ -77,7 +109,7 @@ export default function PatientsPage() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
 
-  const [patients, setPatients] = useState<User[]>([]);
+  const [patients, setPatients] = useState<PatientWithExtras[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
@@ -94,15 +126,110 @@ export default function PatientsPage() {
     null
   );
 
-  const normalizeRisk = (risk?: string) =>
-    risk?.toLowerCase().replace(/\s|_/g, "") || "";
+  const normalizeText = (value?: string | null) => {
+    return (
+      value
+        ?.toString()
+        .toLowerCase()
+        .trim()
+        .replace(/[ًٌٍَُِّْ]/g, "")
+        .replace(/[إأآا]/g, "ا")
+        .replace(/ة/g, "ه")
+        .replace(/ى/g, "ي")
+        .replace(/\s|_/g, "") || ""
+    );
+  };
 
-  const normalizeStatus = (status?: string) =>
-    status?.toLowerCase().replace(/\s/g, "_") || "";
+  const normalizeRisk = (risk?: string | null) => {
+    const value = normalizeText(risk);
+
+    const riskMap: Record<string, string> = {
+      low: "low",
+      medium: "medium",
+      high: "high",
+      veryhigh: "veryhigh",
+
+      منخفض: "low",
+      متوسط: "medium",
+      مرتفع: "high",
+      مرتفعجدا: "veryhigh",
+      مرتفعجده: "veryhigh",
+    };
+
+    return riskMap[value] || "";
+  };
+
+  const normalizeStatus = (status?: string | null) => {
+    const value = normalizeText(status);
+
+    const statusMap: Record<string, string> = {
+      pending: "pending",
+      reviewed: "reviewed",
+      approved: "approved",
+      rejected: "rejected",
+      needsfollowup: "needs_followup",
+      needs_followup: "needs_followup",
+
+      قيدالمراجعه: "pending",
+      تمتالمراجعه: "reviewed",
+      معتمد: "approved",
+      مرفوض: "rejected",
+      يحتاجمتابعه: "needs_followup",
+    };
+
+    return statusMap[value] || "";
+  };
+
+  const extractPatients = (response: ApiListResponse<PatientWithExtras>) => {
+    if (Array.isArray(response)) return response;
+
+    if (Array.isArray(response?.data)) return response.data;
+    if (Array.isArray(response?.results)) return response.results;
+    if (Array.isArray(response?.patients)) return response.patients;
+    if (Array.isArray(response?.items)) return response.items;
+
+    if (
+      response?.data &&
+      typeof response.data === "object" &&
+      Array.isArray(response.data.results)
+    ) {
+      return response.data.results;
+    }
+
+    if (
+      response?.data &&
+      typeof response.data === "object" &&
+      Array.isArray(response.data.patients)
+    ) {
+      return response.data.patients;
+    }
+
+    if (
+      response?.data &&
+      typeof response.data === "object" &&
+      Array.isArray(response.data.items)
+    ) {
+      return response.data.items;
+    }
+
+    return [];
+  };
+
+  const extractPatientDetails = (
+    response: ApiSingleResponse<PatientDetails>
+  ): PatientDetails | null => {
+    if (!response) return null;
+
+    if ("data" in response && response.data) return response.data;
+    if ("patient" in response && response.patient) return response.patient;
+    if ("user" in response && response.user) return response.user;
+    if ("profile" in response && response.profile) return response.profile;
+
+    return response as PatientDetails;
+  };
 
   const getFullName = (user?: Partial<User> | null) => {
     if (!user) return "";
-
     return `${user.first_name || ""} ${user.last_name || ""}`.trim();
   };
 
@@ -110,14 +237,102 @@ export default function PatientsPage() {
     return getFullName(user) || user?.email || "";
   };
 
+  const getSortedPredictions = (patient?: PatientWithExtras | PatientDetails) => {
+    const predictions = patient?.predictions || [];
+
+    return [...predictions].sort((a, b) => {
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      return dateB - dateA;
+    });
+  };
+
+  const getLatestPrediction = (patient: PatientWithExtras | PatientDetails) => {
+    return patient.latest_prediction || getSortedPredictions(patient)[0];
+  };
+
+  const needsPatientDetails = (patient: PatientWithExtras) => {
+    const hasDirectRisk =
+      patient.risk_level ||
+      patient.latest_risk_level ||
+      patient.latest_prediction?.risk_level;
+
+    const hasPredictions = Array.isArray(patient.predictions);
+
+    return !hasDirectRisk && !hasPredictions;
+  };
+
+  const enrichPatientWithDetails = async (
+    patient: PatientWithExtras
+  ): Promise<PatientWithExtras> => {
+    if (!needsPatientDetails(patient)) return patient;
+
+    try {
+      const response = await patientsApi.getPatientProfile(patient.id);
+      const details = extractPatientDetails(
+        response as ApiSingleResponse<PatientDetails>
+      );
+
+      if (!details) return patient;
+
+      const mergedPatient: PatientWithExtras = {
+        ...patient,
+        ...details,
+        latest_prediction:
+          details.latest_prediction ||
+          patient.latest_prediction ||
+          getSortedPredictions(details)[0],
+      };
+
+      return mergedPatient;
+    } catch (error) {
+      console.error(`Failed to enrich patient ${patient.id}`, error);
+      return patient;
+    }
+  };
+
+  const getPatientRisk = (patient: PatientWithExtras | PatientDetails) => {
+    const latestPrediction = getLatestPrediction(patient);
+
+    return normalizeRisk(
+      patient.risk_level ||
+        patient.latest_risk_level ||
+        latestPrediction?.risk_level ||
+        ""
+    );
+  };
+
+  const getPatientStatus = (patient: PatientWithExtras | PatientDetails) => {
+    const latestPrediction = getLatestPrediction(patient);
+
+    return normalizeStatus(
+      patient.review_status ||
+        patient.latest_review_status ||
+        patient.status ||
+        latestPrediction?.review_status ||
+        latestPrediction?.status ||
+        ""
+    );
+  };
+
   const fetchPatients = async () => {
     try {
       setLoading(true);
-      const data = await patientsApi.getPatients();
-      setPatients(Array.isArray(data) ? data : []);
+
+      const response = await patientsApi.getPatients();
+      const patientsList = extractPatients(
+        response as ApiListResponse<PatientWithExtras>
+      );
+
+      const enrichedPatients = await Promise.all(
+        patientsList.map((patient) => enrichPatientWithDetails(patient))
+      );
+
+      setPatients(enrichedPatients);
     } catch (error) {
       console.error("Failed to fetch patients", error);
       toast.error(isArabic ? "فشل تحميل المرضى" : "Failed to load patients");
+      setPatients([]);
     } finally {
       setLoading(false);
     }
@@ -130,26 +345,6 @@ export default function PatientsPage() {
   useEffect(() => {
     setPage(1);
   }, [search, statusFilter]);
-
-  const getPatientRisk = (patient: PatientWithExtras) => {
-    return normalizeRisk(
-      patient.risk_level ||
-        patient.latest_risk_level ||
-        patient.latest_prediction?.risk_level ||
-        ""
-    );
-  };
-
-  const getPatientStatus = (patient: PatientWithExtras) => {
-    return normalizeStatus(
-      patient.review_status ||
-        patient.latest_review_status ||
-        patient.status ||
-        patient.latest_prediction?.review_status ||
-        patient.latest_prediction?.status ||
-        ""
-    );
-  };
 
   const getRiskBadgeClass = (risk: string) => {
     const normalizedRisk = normalizeRisk(risk);
@@ -227,19 +422,19 @@ export default function PatientsPage() {
 
   const patientStats = useMemo(() => {
     const veryHigh = patients.filter(
-      (patient) => getPatientRisk(patient as PatientWithExtras) === "veryhigh"
+      (patient) => getPatientRisk(patient) === "veryhigh"
     ).length;
 
     const high = patients.filter(
-      (patient) => getPatientRisk(patient as PatientWithExtras) === "high"
+      (patient) => getPatientRisk(patient) === "high"
     ).length;
 
     const medium = patients.filter(
-      (patient) => getPatientRisk(patient as PatientWithExtras) === "medium"
+      (patient) => getPatientRisk(patient) === "medium"
     ).length;
 
     const low = patients.filter(
-      (patient) => getPatientRisk(patient as PatientWithExtras) === "low"
+      (patient) => getPatientRisk(patient) === "low"
     ).length;
 
     return {
@@ -255,11 +450,9 @@ export default function PatientsPage() {
     const searchValue = search.trim().toLowerCase();
 
     return patients.filter((patient) => {
-      const p = patient as PatientWithExtras;
-
-      const fullName = getFullName(p).toLowerCase();
-      const email = p.email?.toLowerCase() || "";
-      const risk = getPatientRisk(p);
+      const fullName = getFullName(patient).toLowerCase();
+      const email = patient.email?.toLowerCase() || "";
+      const risk = getPatientRisk(patient);
 
       const matchesSearch =
         !searchValue ||
@@ -321,14 +514,18 @@ export default function PatientsPage() {
     }
   };
 
-  const handleViewDetails = async (patient: User) => {
+  const handleViewDetails = async (patient: PatientWithExtras) => {
     try {
       setOpenDetails(true);
       setDetailsLoading(true);
-      setSelectedPatient(patient as PatientDetails);
+      setSelectedPatient(patient);
 
-      const data = await patientsApi.getPatientProfile(patient.id);
-      setSelectedPatient(data);
+      const response = await patientsApi.getPatientProfile(patient.id);
+      const details = extractPatientDetails(
+        response as ApiSingleResponse<PatientDetails>
+      );
+
+      setSelectedPatient(details || patient);
     } catch (error) {
       console.error("Failed to load patient details", error);
       toast.error(
@@ -336,6 +533,7 @@ export default function PatientsPage() {
           ? "تم عرض البيانات الأساسية فقط"
           : "Showing basic patient details only"
       );
+      setSelectedPatient(patient);
     } finally {
       setDetailsLoading(false);
     }
@@ -591,9 +789,8 @@ export default function PatientsPage() {
           ) : paginatedPatients.length > 0 ? (
             <div className="space-y-4 p-3 lg:space-y-0 lg:p-0 lg:divide-y lg:divide-slate-100">
               {paginatedPatients.map((patient) => {
-                const p = patient as PatientWithExtras;
-                const risk = getPatientRisk(p);
-                const patientStatus = getPatientStatus(p);
+                const risk = getPatientRisk(patient);
+                const patientStatus = getPatientStatus(patient);
                 const patientName = getDisplayName(patient);
 
                 return (
@@ -612,6 +809,12 @@ export default function PatientsPage() {
                         <h3 className="truncate text-[15px] font-bold text-slate-900">
                           {patientName}
                         </h3>
+
+                        {patient.email && (
+                          <p className="mt-1 truncate text-xs font-medium text-slate-400">
+                            {patient.email}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -860,6 +1063,12 @@ export default function PatientsPage() {
                   <h3 className="truncate text-base font-bold text-slate-900">
                     {getDisplayName(selectedPatient)}
                   </h3>
+
+                  {selectedPatient.email && (
+                    <p className="mt-1 truncate text-xs font-medium text-slate-400">
+                      {selectedPatient.email}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -873,7 +1082,8 @@ export default function PatientsPage() {
                   </div>
 
                   <p className="truncate text-sm font-semibold text-slate-900">
-                    {selectedPatient.email || "No email"}
+                    {selectedPatient.email ||
+                      (isArabic ? "لا يوجد بريد إلكتروني" : "No email")}
                   </p>
                 </div>
 
@@ -886,7 +1096,8 @@ export default function PatientsPage() {
                   </div>
 
                   <p className="text-sm font-semibold text-slate-900">
-                    {selectedPatient.profile?.phone ||
+                    {selectedPatient.phone ||
+                      selectedPatient.profile?.phone ||
                       (isArabic ? "لا يوجد رقم هاتف" : "No phone number")}
                   </p>
                 </div>
@@ -909,11 +1120,15 @@ export default function PatientsPage() {
 
                 {selectedPatient.predictions?.length ? (
                   <div className="space-y-3">
-                    {selectedPatient.predictions
+                    {getSortedPredictions(selectedPatient)
                       .slice(0, 3)
                       .map((prediction) => {
                         const predictionRisk = normalizeRisk(
                           prediction.risk_level
+                        );
+
+                        const predictionStatus = normalizeStatus(
+                          prediction.review_status || prediction.status
                         );
 
                         return (
@@ -934,11 +1149,15 @@ export default function PatientsPage() {
 
                               <p className="mt-2 flex items-center gap-1 text-xs font-medium text-slate-500">
                                 <Calendar className="h-3.5 w-3.5" />
-                                {new Date(
-                                  prediction.created_at
-                                ).toLocaleDateString(
-                                  isArabic ? "ar-EG" : "en-US"
-                                )}
+                                {prediction.created_at
+                                  ? new Date(
+                                      prediction.created_at
+                                    ).toLocaleDateString(
+                                      isArabic ? "ar-EG" : "en-US"
+                                    )
+                                  : isArabic
+                                  ? "لا يوجد تاريخ"
+                                  : "No date"}
                               </p>
                             </div>
 
@@ -947,18 +1166,14 @@ export default function PatientsPage() {
                                 variant="outline"
                                 className={cn(
                                   "rounded-full px-3 py-1 text-xs font-bold shadow-none transition-none",
-                                  getStatusBadgeClass(
-                                    (prediction as any).review_status
-                                  )
+                                  getStatusBadgeClass(predictionStatus)
                                 )}
                               >
-                                {getStatusLabel(
-                                  (prediction as any).review_status
-                                )}
+                                {getStatusLabel(predictionStatus)}
                               </Badge>
 
                               <div className="w-fit rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-                                {prediction.probability}%
+                                {prediction.probability ?? 0}%
                               </div>
                             </div>
                           </div>

@@ -21,7 +21,7 @@ interface ActivityItem {
   icon: string;
   title: string;
   description: string;
-  related_id: number;
+  related_id?: number;
   created_at: string;
 }
 
@@ -43,6 +43,19 @@ export default function RecentActivity({
   const dateLocale = isRTL ? ar : enUS;
 
   const safeActivities = Array.isArray(activities) ? activities : [];
+
+  const cleanActivityText = (value?: string | null) => {
+    if (!value) return "";
+
+    return String(value)
+      .replace(/\b(id|report id|patient id|prediction id|appointment id)\s*#?\s*\d+\b/gi, "")
+      .replace(/\b(report|patient|prediction|appointment)\s*#\s*\d+\b/gi, "$1")
+      .replace(/#\s*\d+\b/g, "")
+      .replace(/\bID\b\s*:?\s*\d+\b/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/\s+([.,،:;!?])/g, "$1")
+      .trim();
+  };
 
   const visibleActivities = useMemo(() => {
     return [...safeActivities]
@@ -204,44 +217,49 @@ export default function RecentActivity({
                 : "before:left-3.5 before:-translate-x-px sm:before:left-4"
             )}
           >
-            {visibleActivities.map((activity, index) => (
-              <div
-                key={`${activity.type}-${activity.related_id}-${index}`}
-                className="group relative flex min-h-[40px] items-start gap-2.5 sm:min-h-[46px] sm:gap-3"
-              >
+            {visibleActivities.map((activity, index) => {
+              const title = cleanActivityText(activity.title);
+              const description = cleanActivityText(activity.description);
+
+              return (
                 <div
-                  className={cn(
-                    "z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-2xl border bg-white shadow-sm sm:h-8 sm:w-8",
-                    "transition-all duration-300 group-hover:scale-105",
-                    getActivityStyle(activity.type)
-                  )}
+                  key={`${activity.type}-${activity.created_at}-${index}`}
+                  className="group relative flex min-h-[40px] items-start gap-2.5 sm:min-h-[46px] sm:gap-3"
                 >
-                  {getActivityIcon(activity.type)}
-                </div>
-
-                <div className="min-w-0 flex-1 pt-0.5">
-                  <div className="mb-0.5 flex items-start justify-between gap-2 sm:mb-1 sm:gap-3">
-                    <h4 className="min-w-0 truncate text-xs font-bold leading-4 tracking-tight text-slate-900 sm:text-sm">
-                      {activity.title}
-                    </h4>
-
-                    <span
-                      className={cn(
-                        "shrink-0 whitespace-nowrap rounded-lg bg-slate-50 px-1.5 py-0.5",
-                        "text-[8px] font-bold uppercase tracking-tight text-slate-400 sm:px-2 sm:py-1 sm:text-[10px]",
-                        isRTL ? "mr-1 sm:mr-2" : "ml-1 sm:ml-2"
-                      )}
-                    >
-                      {formatActivityDate(activity.created_at)}
-                    </span>
+                  <div
+                    className={cn(
+                      "z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-2xl border bg-white shadow-sm sm:h-8 sm:w-8",
+                      "transition-all duration-300 group-hover:scale-105",
+                      getActivityStyle(activity.type)
+                    )}
+                  >
+                    {getActivityIcon(activity.type)}
                   </div>
 
-                  <p className="line-clamp-1 text-[11px] font-medium leading-4 text-slate-500 sm:line-clamp-2 sm:text-xs sm:leading-5">
-                    {activity.description}
-                  </p>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="mb-0.5 flex items-start justify-between gap-2 sm:mb-1 sm:gap-3">
+                      <h4 className="min-w-0 truncate text-xs font-bold leading-4 tracking-tight text-slate-900 sm:text-sm">
+                        {title}
+                      </h4>
+
+                      <span
+                        className={cn(
+                          "shrink-0 whitespace-nowrap rounded-lg bg-slate-50 px-1.5 py-0.5",
+                          "text-[8px] font-bold uppercase tracking-tight text-slate-400 sm:px-2 sm:py-1 sm:text-[10px]",
+                          isRTL ? "mr-1 sm:mr-2" : "ml-1 sm:ml-2"
+                        )}
+                      >
+                        {formatActivityDate(activity.created_at)}
+                      </span>
+                    </div>
+
+                    <p className="line-clamp-1 text-[11px] font-medium leading-4 text-slate-500 sm:line-clamp-2 sm:text-xs sm:leading-5">
+                      {description}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>
