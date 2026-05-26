@@ -1,5 +1,4 @@
 // src/pages/DiagnosisWizard.tsx
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -52,6 +51,13 @@ const formSchema = z.object({
     .min(0, "يجب أن يكون 0 أو أكثر")
     .max(300, "الحد الأقصى 300 mg/dL"),
 
+  // ده ضغط الدم الخاص بموديل السكري PIMA.
+  bloodPressure: z.coerce
+    .number()
+    .min(0, "يجب أن يكون 0 أو أكثر")
+    .max(180, "الحد الأقصى 180 mmHg"),
+
+  // دول مخصوص لحساب الكارديو في الفرونت فقط.
   systolicBloodPressure: z.coerce
     .number()
     .min(0, "يجب أن يكون 0 أو أكثر")
@@ -114,10 +120,11 @@ type CardiovascularPrediction = {
 const DESKTOP_HEADER_HEIGHT = 72;
 
 const CARDIO_COEFFICIENTS = {
-  intercept: -9.85,
-  age: 0.058,
+  intercept: -11.2,
+  age: 0.055,
   gender: 0.42,
-  bmi: 0.065,
+  height: -0.012,
+  weight: 0.035,
   ap_hi: 0.052,
   ap_lo: 0.028,
   cholesterol: 0.48,
@@ -183,7 +190,8 @@ const normalizeGlucoseForCardio = (glucose: number) => {
 const calculateCardiovascularPrediction = ({
   age,
   gender,
-  bmi,
+  height,
+  weight,
   systolicBloodPressure,
   diastolicBloodPressure,
   cholesterol,
@@ -192,7 +200,8 @@ const calculateCardiovascularPrediction = ({
 }: {
   age: number;
   gender: "male" | "female";
-  bmi: number;
+  height: number;
+  weight: number;
   systolicBloodPressure: number;
   diastolicBloodPressure: number;
   cholesterol: number;
@@ -207,7 +216,8 @@ const calculateCardiovascularPrediction = ({
     CARDIO_COEFFICIENTS.intercept +
     CARDIO_COEFFICIENTS.age * age +
     CARDIO_COEFFICIENTS.gender * genderValue +
-    CARDIO_COEFFICIENTS.bmi * bmi +
+    CARDIO_COEFFICIENTS.height * height +
+    CARDIO_COEFFICIENTS.weight * weight +
     CARDIO_COEFFICIENTS.ap_hi * systolicBloodPressure +
     CARDIO_COEFFICIENTS.ap_lo * diastolicBloodPressure +
     CARDIO_COEFFICIENTS.cholesterol * cholesterolValue +
@@ -241,8 +251,9 @@ export default function DiagnosisWizard() {
       gender: "male",
       pregnancies: 0,
       glucose: 85,
+      bloodPressure: 70,
       systolicBloodPressure: 120,
-      diastolicBloodPressure: 70,
+      diastolicBloodPressure: 80,
       skinThickness: 20,
       insulin: 0,
       weight: 70,
@@ -282,6 +293,7 @@ export default function DiagnosisWizard() {
     if (activeStep === "vitals") {
       return await trigger([
         "glucose",
+        "bloodPressure",
         "systolicBloodPressure",
         "diastolicBloodPressure",
         "skinThickness",
@@ -304,14 +316,18 @@ export default function DiagnosisWizard() {
     try {
       const heightInMeters = values.height / 100;
 
+      // ده للسكري فقط.
       const calculatedBmi = Number(
         (values.weight / (heightInMeters * heightInMeters)).toFixed(1)
       );
 
+      // الكارديو بيتحسب Frontend فقط.
+      // مفيش BMI داخل في حساب الكارديو.
       const cardiovascularPrediction = calculateCardiovascularPrediction({
         age: values.age,
         gender: values.gender,
-        bmi: calculatedBmi,
+        height: values.height,
+        weight: values.weight,
         systolicBloodPressure: values.systolicBloodPressure,
         diastolicBloodPressure: values.diastolicBloodPressure,
         cholesterol: values.cholesterol,
@@ -319,27 +335,15 @@ export default function DiagnosisWizard() {
         isArabic,
       });
 
+      // ده اللي بيتبعت للباك لموديل السكري فقط.
       const backendData = {
         gender: values.gender,
         pregnancies: values.gender === "female" ? values.pregnancies : 0,
         glucose: values.glucose,
-
-        // Diabetes model field.
-        // Pima Diabetes BloodPressure is usually diastolic.
-        blood_pressure: values.diastolicBloodPressure,
-
+        blood_pressure: values.bloodPressure,
         skin_thickness: values.skinThickness,
         insulin: values.insulin,
-
-        // BMI is calculated internally from height + weight,
-        // then sent to the diabetes model as the normal bmi feature.
         bmi: calculatedBmi,
-
-        // Extra clinical fields for display/reporting if backend accepts them.
-        weight: values.weight,
-        height: values.height,
-        cholesterol: values.cholesterol,
-
         diabetes_pedigree_function: values.diabetesPedigreeFunction,
         age: values.age,
       };
@@ -362,8 +366,14 @@ export default function DiagnosisWizard() {
             gender: values.gender,
             pregnancies: values.gender === "female" ? values.pregnancies : 0,
             glucose: values.glucose,
+
+            // ده ضغط الدم الخاص بالسكري.
+            bloodPressure: values.bloodPressure,
+
+            // دول مخصوص للكارديو.
             systolicBloodPressure: values.systolicBloodPressure,
             diastolicBloodPressure: values.diastolicBloodPressure,
+
             skinThickness: values.skinThickness,
             insulin: values.insulin,
             weight: values.weight,
@@ -372,8 +382,7 @@ export default function DiagnosisWizard() {
             diabetesPedigreeFunction: values.diabetesPedigreeFunction,
             age: values.age,
 
-            // Keep it available for internal/report compatibility,
-            // but hide it in the Report table.
+            // BMI متاح للتوافق أو العرض، لكنه مش مستخدم في الكارديو.
             bmi: calculatedBmi,
           },
 
@@ -738,6 +747,34 @@ export default function DiagnosisWizard() {
                           />
 
                           <FormField
+                            name="bloodPressure"
+                            control={form.control}
+                            render={({ field }) => (
+                              <FormItem className={fieldTextClass}>
+                                <FormLabel>
+                                  {t("diagnosisWizard.bloodPressure")}
+                                </FormLabel>
+
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={180}
+                                    {...field}
+                                    className="h-11 rounded-lg sm:h-10"
+                                  />
+                                </FormControl>
+
+                                <FormDescription className="text-xs">
+                                  {t("diagnosisWizard.bloodPressureDesc")}
+                                </FormDescription>
+
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
                             name="systolicBloodPressure"
                             control={form.control}
                             render={({ field }) => (
@@ -760,8 +797,8 @@ export default function DiagnosisWizard() {
 
                                 <FormDescription className="text-xs">
                                   {isArabic
-                                    ? "القيمة العليا لضغط الدم مثل 120"
-                                    : "Upper blood pressure value, e.g. 120"}
+                                    ? "خاص بحساب خطر القلب والأوعية الدموية مثل 120"
+                                    : "Used for cardiovascular risk calculation, e.g. 120"}
                                 </FormDescription>
 
                                 <FormMessage />
@@ -792,8 +829,8 @@ export default function DiagnosisWizard() {
 
                                 <FormDescription className="text-xs">
                                   {isArabic
-                                    ? "القيمة السفلى لضغط الدم مثل 80"
-                                    : "Lower blood pressure value, e.g. 80"}
+                                    ? "خاص بحساب خطر القلب والأوعية الدموية مثل 80"
+                                    : "Used for cardiovascular risk calculation, e.g. 80"}
                                 </FormDescription>
 
                                 <FormMessage />

@@ -8,12 +8,11 @@ import {
   AlertTriangle,
   ArrowLeft,
   Download,
-  Activity,
   HeartPulse,
   FileText,
-  Stethoscope,
   ClipboardList,
   TrendingUp,
+  Droplets,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import jsPDF from "jspdf";
@@ -21,12 +20,6 @@ import autoTable from "jspdf-autotable";
 import Header from "@/components/shared/Header";
 import Footer from "@/components/shared/Footer";
 import { useTranslation } from "react-i18next";
-
-interface ExtendedjsPDF extends jsPDF {
-  lastAutoTable?: {
-    finalY: number;
-  };
-}
 
 type RiskTone = {
   level: string;
@@ -146,43 +139,29 @@ export default function Report() {
   }, [probability, t, isArabic]);
 
   const getCardioResultMessage = (cardioProbability: number) => {
+    const percentage = cardioProbability.toFixed(1);
+
     if (cardioProbability >= 80) {
       return isArabic
-        ? `تشير النتيجة إلى احتمالية عالية جدًا لخطر القلب والأوعية الدموية بنسبة ${cardioProbability.toFixed(
-            1
-          )}%. ينصح بالمتابعة الطبية في أقرب وقت لتقييم عوامل الخطورة ووضع خطة متابعة مناسبة.`
-        : `The cardiovascular risk probability is ${cardioProbability.toFixed(
-            1
-          )}%, which indicates a very high risk level. Medical follow-up is recommended as soon as possible to assess risk factors and define an appropriate care plan.`;
+        ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: عالي جدًا. قد تشمل عوامل الخطر ارتفاع ضغط الدم، ارتفاع الكوليسترول، زيادة الوزن، ارتفاع السكر، أو وجود مؤشرات قوية على إجهاد القلب والأوعية الدموية. يُنصح بمراجعة طبيب القلب أو الباطنة في أقرب وقت وإجراء فحوصات إضافية.`
+        : `Risk probability: ${percentage}% - Risk level: Very High. Risk factors may include high blood pressure, high cholesterol, excess weight, elevated glucose, or strong indicators of cardiovascular strain. Medical review with a cardiologist or internal medicine specialist is recommended as soon as possible, along with further tests.`;
     }
 
     if (cardioProbability >= 60) {
       return isArabic
-        ? `تشير النتيجة إلى احتمالية عالية لخطر القلب والأوعية الدموية بنسبة ${cardioProbability.toFixed(
-            1
-          )}%. يفضل مراجعة الطبيب لمتابعة ضغط الدم والكوليسترول وباقي عوامل الخطورة.`
-        : `The cardiovascular risk probability is ${cardioProbability.toFixed(
-            1
-          )}%, which indicates a high risk level. Medical review is recommended to monitor blood pressure, cholesterol, and other risk factors.`;
+        ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: مرتفع. قد تشمل عوامل الخطر ارتفاع ضغط الدم، زيادة الكوليسترول، زيادة الوزن، ارتفاع السكر، أو ضعف نمط الحياة الصحي. يُنصح بمراجعة طبيب وإجراء فحوصات إضافية لمتابعة عوامل الخطورة.`
+        : `Risk probability: ${percentage}% - Risk level: High. Risk factors may include high blood pressure, elevated cholesterol, excess weight, elevated glucose, or unhealthy lifestyle patterns. Medical review and additional tests are recommended to monitor risk factors.`;
     }
 
     if (cardioProbability >= 30) {
       return isArabic
-        ? `تشير النتيجة إلى احتمالية متوسطة لخطر القلب والأوعية الدموية بنسبة ${cardioProbability.toFixed(
-            1
-          )}%. ينصح بتحسين نمط الحياة ومتابعة المؤشرات الصحية بشكل دوري.`
-        : `The cardiovascular risk probability is ${cardioProbability.toFixed(
-            1
-          )}%, which indicates a medium risk level. Lifestyle improvement and periodic health monitoring are recommended.`;
+        ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: متوسط. قد تشمل عوامل الخطر بداية ارتفاع ضغط الدم، زيادة بسيطة في الوزن، ارتفاع الكوليسترول، أو ارتفاع السكر بدرجة متوسطة. يُنصح بتحسين نمط الحياة ومتابعة المؤشرات الصحية بشكل دوري.`
+        : `Risk probability: ${percentage}% - Risk level: Medium. Risk factors may include early blood pressure elevation, mild excess weight, elevated cholesterol, or moderate glucose elevation. Lifestyle improvement and periodic health monitoring are recommended.`;
     }
 
     return isArabic
-      ? `تشير النتيجة إلى احتمالية منخفضة لخطر القلب والأوعية الدموية بنسبة ${cardioProbability.toFixed(
-          1
-        )}%. ينصح بالحفاظ على العادات الصحية والمتابعة الدورية.`
-      : `The cardiovascular risk probability is ${cardioProbability.toFixed(
-          1
-        )}%, which indicates a low risk level. Maintaining healthy habits and routine monitoring is recommended.`;
+      ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: منخفض. لا تظهر المؤشرات المدخلة خطورة مرتفعة حاليًا على القلب والأوعية الدموية، لكن يُنصح بالحفاظ على نمط حياة صحي ومتابعة ضغط الدم والكوليسترول والسكر بشكل دوري.`
+      : `Risk probability: ${percentage}% - Risk level: Low. The submitted indicators do not currently show high cardiovascular risk, but maintaining a healthy lifestyle and periodically monitoring blood pressure, cholesterol, and glucose is recommended.`;
   };
 
   const cardioTone = useMemo((): RiskTone => {
@@ -284,7 +263,9 @@ export default function Report() {
 
   const cardioPieData = [
     {
-      name: isArabic ? "خطر القلب والأوعية الدموية" : "Cardiovascular Risk",
+      name: isArabic
+        ? "خطر الإصابة بأمراض القلب والأوعية الدموية"
+        : "Cardiovascular Disease Risk",
       value: cardiovascularProbability,
     },
     {
@@ -463,18 +444,102 @@ export default function Report() {
     if (key === "glucose") return `${value} mg/dL`;
     if (key === "cholesterol") return `${value} mg/dL`;
 
-    if (key === "systolicBloodPressure" || key === "diastolicBloodPressure") {
+    if (
+      key === "bloodPressure" ||
+      key === "blood_pressure" ||
+      key === "systolicBloodPressure" ||
+      key === "systolic_blood_pressure" ||
+      key === "diastolicBloodPressure" ||
+      key === "diastolic_blood_pressure"
+    ) {
       return `${value} mmHg`;
     }
 
     return String(value);
   };
 
+  const getPdfFieldLabel = (key: string) => {
+    switch (key) {
+      case "gender":
+        return "Gender";
+      case "pregnancies":
+        return "Pregnancies";
+      case "glucose":
+        return "Glucose";
+      case "bloodPressure":
+      case "blood_pressure":
+        return "Blood Pressure";
+      case "systolicBloodPressure":
+      case "systolic_blood_pressure":
+        return "Systolic Blood Pressure";
+      case "diastolicBloodPressure":
+      case "diastolic_blood_pressure":
+        return "Diastolic Blood Pressure";
+      case "skinThickness":
+      case "skin_thickness":
+        return "Skin Thickness";
+      case "insulin":
+        return "Insulin";
+      case "weight":
+        return "Weight";
+      case "height":
+        return "Height";
+      case "cholesterol":
+        return "Cholesterol";
+      case "bmi":
+        return "BMI";
+      case "diabetesPedigreeFunction":
+      case "diabetes_pedigree_function":
+        return "Diabetes Pedigree Function";
+      case "age":
+        return "Age";
+      default:
+        return key;
+    }
+  };
+
+  const getPdfDisplayValue = (key: string, value: unknown) => {
+    if (key === "gender") {
+      if (value === "male") return "Male";
+      if (value === "female") return "Female";
+    }
+
+    if (key === "weight") return `${value} kg`;
+    if (key === "height") return `${value} cm`;
+    if (key === "glucose") return `${value} mg/dL`;
+    if (key === "cholesterol") return `${value} mg/dL`;
+
+    if (
+      key === "bloodPressure" ||
+      key === "blood_pressure" ||
+      key === "systolicBloodPressure" ||
+      key === "systolic_blood_pressure" ||
+      key === "diastolicBloodPressure" ||
+      key === "diastolic_blood_pressure"
+    ) {
+      return `${value} mmHg`;
+    }
+
+    return String(value);
+  };
+
+  const getPdfRiskLevel = (riskProbability: number) => {
+    if (riskProbability > 70) return "High";
+    if (riskProbability > 50) return "High";
+    if (riskProbability > 20) return "Medium";
+    return "Low";
+  };
+
+  const getPdfCardioRiskLevel = (cardioProbability: number) => {
+    if (cardioProbability >= 80) return "Very High";
+    if (cardioProbability >= 60) return "High";
+    if (cardioProbability >= 30) return "Medium";
+    return "Low";
+  };
+
   const filteredFormEntries = Object.entries(formData).filter(([key]) => {
     const hiddenKeys = new Set([
       "bmi",
-      "bloodPressure",
-      "blood_pressure",
       "smoke",
       "physicalActivity",
       "physical_activity",
@@ -492,142 +557,336 @@ export default function Report() {
     }
   );
 
-  const downloadPDF = () => {
-    try {
-      const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
+const downloadPDF = async () => {
+  try {
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    const primary = [13, 177, 201] as [number, number, number]; // HealthCare cyan
+    const dark = [15, 23, 42] as [number, number, number];
+    const muted = [100, 116, 139] as [number, number, number];
+    const border = [226, 232, 240] as [number, number, number];
+    const softGray = [248, 250, 252] as [number, number, number];
+    const lightPrimary = [236, 253, 255] as [number, number, number];
+
+    const hexToRgb = (hex: string): [number, number, number] => {
+      const cleanHex = hex.replace("#", "");
+      const value = parseInt(cleanHex, 16);
+
+      return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+    };
+
+    const diabetesPdfLevel = getPdfRiskLevel(probability);
+    const cardioPdfLevel = getPdfCardioRiskLevel(cardiovascularProbability);
+
+    const currentDate = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+    });
+
+    const reportId = `HC-${new Date()
+      .toISOString()
+      .slice(0, 10)
+      .replaceAll("-", "")}-${Math.floor(Math.random() * 9000 + 1000)}`;
+
+    const drawBrandLogo = (x: number, y: number) => {
+      // Small logo icon only - website name size kept clear
+      doc.setDrawColor(...primary);
+      doc.setLineWidth(0.9);
+      doc.setLineCap("round");
+      doc.setLineJoin("round");
+
+      doc.line(x, y + 5.5, x + 3.5, y + 5.5);
+      doc.line(x + 3.5, y + 5.5, x + 5.5, y + 0.5);
+      doc.line(x + 5.5, y + 0.5, x + 9.2, y + 12.5);
+      doc.line(x + 9.2, y + 12.5, x + 12.2, y + 5.5);
+      doc.line(x + 12.2, y + 5.5, x + 16.8, y + 5.5);
+
+      doc.setFillColor(...primary);
+      doc.circle(x + 19, y + 5.5, 0.6, "F");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(...primary);
+      doc.text("HealthCare", x + 22.5, y + 8.7);
+    };
+
+    const drawHeader = () => {
+      doc.setFillColor(255, 255, 255);
+      doc.rect(0, 0, pageWidth, 34, "F");
+
+      doc.setFillColor(...lightPrimary);
+      doc.rect(0, 0, pageWidth, 3.5, "F");
+
+      drawBrandLogo(14, 13);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(...dark);
+      doc.text("Medical Risk Report", pageWidth - 14, 12, {
+        align: "right",
       });
 
-      const currentDate = new Date().toLocaleDateString(
-        isArabic ? "ar-EG" : "en-US"
-      );
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.3);
+      doc.setTextColor(...muted);
+      doc.text(`Report ID: ${reportId}`, pageWidth - 14, 18, {
+        align: "right",
+      });
+      doc.text(`Date: ${currentDate}`, pageWidth - 14, 23.5, {
+        align: "right",
+      });
 
-      doc.setFontSize(20);
-      doc.text(t("report.pdf.title"), 105, 20, { align: "center" });
+      doc.setDrawColor(...border);
+      doc.setLineWidth(0.3);
+      doc.line(14, 31.5, pageWidth - 14, 31.5);
+    };
 
-      doc.setFontSize(12);
-      doc.text(`${t("report.pdf.analysisDate")}: ${currentDate}`, 105, 30, {
+    const drawFooter = () => {
+      doc.setDrawColor(...border);
+      doc.setLineWidth(0.25);
+      doc.line(14, pageHeight - 14, pageWidth - 14, pageHeight - 14);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.2);
+      doc.setTextColor(...muted);
+      doc.text("HealthCare Medical Risk Report", 14, pageHeight - 8.5);
+    };
+
+    const addSectionTitle = (title: string, y: number) => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(...dark);
+      doc.text(title, 14, y);
+
+      doc.setDrawColor(...primary);
+      doc.setLineWidth(0.4);
+      doc.line(14, y + 2.5, 45, y + 2.5);
+    };
+
+    const drawRiskBadge = (
+      label: string,
+      x: number,
+      y: number,
+      color: [number, number, number]
+    ) => {
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(...color);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(x, y, 31, 7.2, 3.6, 3.6, "FD");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(...color);
+      doc.text(label, x + 15.5, y + 4.8, {
         align: "center",
       });
+    };
 
-      doc.setFontSize(16);
-      doc.setTextColor(0, 0, 0);
-      doc.text(t("report.diabetesRiskProbability"), 20, 48);
+    const addResultBox = ({
+      title,
+      percentage,
+      level,
+      color,
+      x,
+      y,
+      width,
+    }: {
+      title: string;
+      percentage: number;
+      level: string;
+      color: [number, number, number];
+      x: number;
+      y: number;
+      width: number;
+    }) => {
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(...border);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(x, y, width, 35, 2.5, 2.5, "FD");
 
-      doc.setFontSize(30);
-      doc.setTextColor(riskTone.color);
-      doc.text(`${probability.toFixed(2)}%`, 20, 63);
+      doc.setFillColor(...primary);
+      doc.roundedRect(x, y, width, 1.7, 2.5, 2.5, "F");
 
-      doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
-      doc.text(`${t("report.riskLevelLabel")}: ${riskTone.level}`, 20, 73);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.2);
+      doc.setTextColor(...dark);
+      doc.text(title, x + 5, y + 8.8);
 
-      doc.setFontSize(11);
-      doc.text(riskTone.message, 20, 83, {
-        maxWidth: 170,
-        align: isArabic ? "right" : "left",
+      drawRiskBadge(level, x + width - 36, y + 5.1, color);
+
+      // Percentage without risk color for clean lab-style report
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(21);
+      doc.setTextColor(...dark);
+      doc.text(`${percentage.toFixed(2)}%`, x + 5, y + 23.5);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...muted);
+      doc.text("Calculated Risk Value", x + 5, y + 30.5);
+    };
+
+    drawHeader();
+    drawFooter();
+
+    // Title area - compact to keep one page
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.setTextColor(...dark);
+    doc.text("Medical Risk Report", 14, 43);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.2);
+    doc.setTextColor(...muted);
+    doc.text(
+      "Diabetes and cardiovascular risk values based on submitted data.",
+      14,
+      49
+    );
+
+    let currentY = 61;
+
+    addSectionTitle("Risk Values", currentY);
+    currentY += 7;
+
+    if (cardiovascularPrediction) {
+      addResultBox({
+        title: "Diabetes Risk",
+        percentage: probability,
+        level: diabetesPdfLevel,
+        color: hexToRgb(riskTone.color),
+        x: 14,
+        y: currentY,
+        width: 88,
       });
 
-      let currentY = 106;
-
-      if (cardiovascularPrediction) {
-        doc.setFontSize(16);
-        doc.setTextColor(0, 0, 0);
-        doc.text(
-          isArabic
-            ? "احتمالية خطر القلب والأوعية الدموية"
-            : "Cardiovascular Risk Probability",
-          20,
-          currentY
-        );
-
-        doc.setFontSize(30);
-        doc.setTextColor(cardioTone.color);
-        doc.text(`${cardiovascularProbability.toFixed(2)}%`, 20, currentY + 15);
-
-        doc.setFontSize(12);
-        doc.setTextColor(0, 0, 0);
-        doc.text(
-          `${t("report.riskLevelLabel")}: ${cardioTone.level}`,
-          20,
-          currentY + 25
-        );
-
-        doc.setFontSize(11);
-        doc.text(cardioTone.message, 20, currentY + 35, {
-          maxWidth: 170,
-          align: isArabic ? "right" : "left",
-        });
-
-        currentY += 58;
-      }
-
-      const tableData = filteredFormEntries.map(([key, value]) => [
-        getFieldLabel(key),
-        getDisplayValue(key, value),
-      ]);
-
-      autoTable(doc, {
-        startY: currentY,
-        head: [[t("report.pdf.parameter"), t("report.pdf.value")]],
-        body: tableData,
-        theme: "grid",
-        styles: {
-          fontSize: 10,
-          cellPadding: 3.5,
-          halign: isArabic ? "right" : "left",
-        },
-        headStyles: {
-          fillColor: [66, 139, 202],
-          textColor: 255,
-        },
-        alternateRowStyles: { fillColor: [240, 240, 240] },
+      addResultBox({
+        title: "Cardiovascular Risk",
+        percentage: cardiovascularProbability,
+        level: cardioPdfLevel,
+        color: hexToRgb(cardioTone.color),
+        x: 108,
+        y: currentY,
+        width: 88,
       });
-
-      const finalY = (doc as ExtendedjsPDF).lastAutoTable?.finalY || currentY;
-
-      doc.setFontSize(13);
-      doc.setTextColor(0, 0, 0);
-      doc.text(t("report.personalizedRecommendations"), 20, finalY + 14);
-
-      let adviceY = finalY + 24;
-
-      recommendations.forEach((rec) => {
-        doc.setFontSize(10);
-        doc.text(`• ${rec}`, 25, adviceY, {
-          maxWidth: 160,
-        });
-        adviceY += 7;
+    } else {
+      addResultBox({
+        title: "Diabetes Risk",
+        percentage: probability,
+        level: diabetesPdfLevel,
+        color: hexToRgb(riskTone.color),
+        x: 14,
+        y: currentY,
+        width: 182,
       });
-
-      if (cardioRecommendations.length > 0) {
-        adviceY += 5;
-
-        doc.setFontSize(13);
-        doc.text(t("report.personalizedRecommendations"), 20, adviceY);
-
-        adviceY += 9;
-
-        cardioRecommendations.forEach((rec) => {
-          doc.setFontSize(10);
-          doc.text(`• ${rec}`, 25, adviceY, {
-            maxWidth: 160,
-          });
-          adviceY += 7;
-        });
-      }
-
-      doc.save(
-        `Medical_Risk_Report_${new Date().toISOString().slice(0, 10)}.pdf`
-      );
-    } catch (error) {
-      console.error("PDF generation error:", error);
-      alert(t("report.pdfError"));
     }
-  };
 
+    currentY += 47;
+
+    addSectionTitle("Submitted Values", currentY);
+    currentY += 6;
+
+    const tableData = filteredFormEntries.map(([key, value]) => [
+      getPdfFieldLabel(key),
+      getPdfDisplayValue(key, value),
+    ]);
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [["Parameter", "Value"]],
+      body: tableData,
+      theme: "grid",
+      pageBreak: "avoid",
+      rowPageBreak: "avoid",
+      styles: {
+        font: "helvetica",
+        fontSize: 7.7,
+        cellPadding: {
+          top: 2,
+          right: 2.4,
+          bottom: 2,
+          left: 2.4,
+        },
+        halign: "left",
+        valign: "middle",
+        lineColor: border,
+        lineWidth: 0.12,
+        textColor: dark,
+        overflow: "linebreak",
+      },
+      headStyles: {
+        fillColor: [15, 23, 42],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        fontSize: 8,
+        cellPadding: {
+          top: 2.2,
+          right: 2.4,
+          bottom: 2.2,
+          left: 2.4,
+        },
+      },
+      alternateRowStyles: {
+        fillColor: softGray,
+      },
+      columnStyles: {
+        0: {
+          cellWidth: 98,
+          fontStyle: "bold",
+        },
+        1: {
+          cellWidth: 84,
+        },
+      },
+      margin: {
+        left: 14,
+        right: 14,
+        top: 36,
+        bottom: 18,
+      },
+      didDrawPage: () => {
+        drawHeader();
+        drawFooter();
+      },
+    });
+
+    const totalPages = doc.getNumberOfPages();
+
+    for (let i = 1; i <= totalPages; i += 1) {
+      doc.setPage(i);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.2);
+      doc.setTextColor(...muted);
+      doc.text(`Page ${i} of ${totalPages}`, pageWidth - 32, pageHeight - 8.5);
+    }
+
+    doc.save(
+      `HealthCare_Medical_Risk_Report_${new Date()
+        .toISOString()
+        .slice(0, 10)}.pdf`
+    );
+  } catch (error) {
+    console.error("PDF generation error:", error);
+
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : typeof error === "string"
+        ? error
+        : "Unknown PDF generation error";
+
+    alert(`PDF Error: ${errorMessage}`);
+  }
+};
   const PredictionCard = ({
     title,
     subtitle,
@@ -796,8 +1055,6 @@ export default function Report() {
                     <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
                       <FileText className="h-4.5 w-4.5" strokeWidth={2.3} />
                     </span>
-
-                    
                   </div>
 
                   <CardTitle className="text-xl font-semibold tracking-tight text-slate-900 md:text-2xl">
@@ -837,7 +1094,7 @@ export default function Report() {
                   visuals={riskVisuals}
                   pieData={pieData}
                   icon={
-                    <Activity
+                    <Droplets
                       className={`h-5 w-5 ${riskTone.textClass}`}
                       strokeWidth={2.4}
                     />
@@ -848,14 +1105,14 @@ export default function Report() {
                   <PredictionCard
                     title={
                       isArabic
-                        ? "احتمالية خطر القلب والأوعية الدموية"
-                        : "Cardiovascular Risk Probability"
+                        ? "احتمالية خطر الإصابة بأمراض القلب والأوعية الدموية"
+                        : "Cardiovascular Disease Risk Probability"
                     }
                     subtitle={isArabic ? "نتيجة مبدئية" : "Preliminary Result"}
                     metricLabel={
                       isArabic
-                        ? "خطر القلب والأوعية الدموية"
-                        : "Cardiovascular Risk"
+                        ? "خطر الإصابة بأمراض القلب والأوعية الدموية"
+                        : "Cardiovascular Disease Risk"
                     }
                     probability={cardiovascularProbability}
                     tone={cardioTone}
@@ -882,7 +1139,7 @@ export default function Report() {
                   <CardContent className="p-4 md:p-5">
                     <div className="mb-3 flex items-center gap-2.5">
                       <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/80">
-                        <Stethoscope
+                        <TrendingUp
                           className={`h-4.5 w-4.5 ${riskTone.textClass}`}
                           strokeWidth={2.4}
                         />
@@ -929,8 +1186,8 @@ export default function Report() {
                           </h3>
                           <p className="text-[11px] font-medium text-slate-500">
                             {isArabic
-                              ? "احتمالية خطر القلب والأوعية الدموية"
-                              : "Cardiovascular Risk Probability"}
+                              ? "احتمالية خطر الإصابة بأمراض القلب والأوعية الدموية"
+                              : "Cardiovascular Disease Risk Probability"}
                           </p>
                         </div>
                       </div>
@@ -966,7 +1223,9 @@ export default function Report() {
 
                   <div
                     className={`grid grid-cols-1 gap-4 ${
-                      cardiovascularPrediction ? "lg:grid-cols-2" : "lg:grid-cols-1"
+                      cardiovascularPrediction
+                        ? "lg:grid-cols-2"
+                        : "lg:grid-cols-1"
                     }`}
                   >
                     <div className="rounded-[18px] border border-slate-100 bg-white p-3.5 shadow-sm">
@@ -975,7 +1234,7 @@ export default function Report() {
                           <span
                             className={`flex h-7 w-7 items-center justify-center rounded-lg ${riskTone.softBg}`}
                           >
-                            <Activity
+                            <Droplets
                               className={`h-3.5 w-3.5 ${riskTone.textClass}`}
                             />
                           </span>
@@ -1023,7 +1282,6 @@ export default function Report() {
                             <h4 className="text-xs font-semibold text-slate-900">
                               {t("report.personalizedRecommendations")}
                             </h4>
-                            
                           </div>
 
                           <Badge

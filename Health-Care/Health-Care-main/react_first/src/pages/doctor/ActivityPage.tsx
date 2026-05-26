@@ -65,6 +65,23 @@ export default function ActivityPage() {
     fetchActivities();
   }, []);
 
+  const hideIdsFromText = (text?: string) => {
+    if (!text) return "";
+
+    return text
+      .replace(/\bID\s*[:#-]?\s*\d+\b/gi, "")
+      .replace(/\bid\s*[:#-]?\s*\d+\b/gi, "")
+      .replace(/\brelated[_\s-]?id\s*[:#-]?\s*\d+\b/gi, "")
+      .replace(/\bpatient[_\s-]?id\s*[:#-]?\s*\d+\b/gi, "")
+      .replace(/\bprediction[_\s-]?id\s*[:#-]?\s*\d+\b/gi, "")
+      .replace(/\bappointment[_\s-]?id\s*[:#-]?\s*\d+\b/gi, "")
+      .replace(/\breport[_\s-]?id\s*[:#-]?\s*\d+\b/gi, "")
+      .replace(/\s*#\d+\b/g, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/\s+([.,:;!?])/g, "$1")
+      .trim();
+  };
+
   const getActivityIcon = (type: string) => {
     switch (type) {
       case "prediction":
@@ -131,7 +148,10 @@ export default function ActivityPage() {
             </h1>
 
             <p className="mt-1 text-sm font-medium text-slate-500">
-              {activities.length} activities
+              {t("doctorDashboard.activity.count", {
+                count: activities.length,
+                defaultValue: `${activities.length} activities`,
+              })}
             </p>
           </div>
         </div>
@@ -168,37 +188,44 @@ export default function ActivityPage() {
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {activities.map((activity, index) => (
-                <div
-                  key={`${activity.type}-${activity.related_id}-${index}`}
-                  className="group flex items-start gap-4 p-5 transition-colors hover:bg-slate-50/70"
-                >
+              {activities.map((activity, index) => {
+                const cleanTitle = hideIdsFromText(activity.title);
+                const cleanDescription = hideIdsFromText(activity.description);
+
+                return (
                   <div
-                    className={cn(
-                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border bg-white shadow-sm",
-                      getActivityStyle(activity.type)
-                    )}
+                    key={`${activity.type}-${activity.related_id}-${index}`}
+                    className="group flex items-start gap-4 p-5 transition-colors hover:bg-slate-50/70"
                   >
-                    {getActivityIcon(activity.type)}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex items-start justify-between gap-3">
-                      <h4 className="min-w-0 text-sm font-bold tracking-tight text-slate-900">
-                        {activity.title}
-                      </h4>
-
-                      <span className="shrink-0 whitespace-nowrap rounded-lg bg-slate-50 px-2 py-1 text-[10px] font-bold uppercase tracking-tight text-slate-400">
-                        {formatActivityDate(activity.created_at)}
-                      </span>
+                    <div
+                      className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border bg-white shadow-sm",
+                        getActivityStyle(activity.type)
+                      )}
+                    >
+                      {getActivityIcon(activity.type)}
                     </div>
 
-                    <p className="text-sm font-medium leading-6 text-slate-500">
-                      {activity.description}
-                    </p>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-start justify-between gap-3">
+                        <h4 className="min-w-0 text-sm font-bold tracking-tight text-slate-900">
+                          {cleanTitle}
+                        </h4>
+
+                        <span className="shrink-0 whitespace-nowrap rounded-lg bg-slate-50 px-2 py-1 text-[10px] font-bold uppercase tracking-tight text-slate-400">
+                          {formatActivityDate(activity.created_at)}
+                        </span>
+                      </div>
+
+                      {cleanDescription && (
+                        <p className="text-sm font-medium leading-6 text-slate-500">
+                          {cleanDescription}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
