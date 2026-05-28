@@ -20,6 +20,8 @@ import {
   ShieldCheck,
   ScrollText,
   PhoneCall,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/shared/BrandLogo";
@@ -39,6 +41,8 @@ interface PatientSidebarProps {
   setIsDesktopSidebarCollapsed?: React.Dispatch<React.SetStateAction<boolean>>;
   handleLogout?: () => Promise<void>;
 }
+
+type Theme = "light" | "dark";
 
 export default function PatientSidebar({
   className,
@@ -60,6 +64,9 @@ export default function PatientSidebar({
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [internalMobileOpen, setInternalMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [theme, setTheme] = useState<Theme>("light");
+
+  const isDark = theme === "dark";
 
   const mobileOpen =
     typeof isSidebarOpen === "boolean" ? isSidebarOpen : internalMobileOpen;
@@ -72,6 +79,19 @@ export default function PatientSidebar({
       : internalCollapsed;
 
   const setCollapsed = setIsDesktopSidebarCollapsed || setInternalCollapsed;
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as Theme | null;
+
+    if (savedTheme === "dark") {
+      document.documentElement.classList.add("dark");
+      setTheme("dark");
+      return;
+    }
+
+    document.documentElement.classList.remove("dark");
+    setTheme("light");
+  }, []);
 
   useEffect(() => {
     const openSidebar = () => {
@@ -93,6 +113,19 @@ export default function PatientSidebar({
   const toggleCollapse = () => {
     setCollapsed((prev) => !prev);
     setAccountMenuOpen(false);
+  };
+
+  const handleToggleTheme = () => {
+    const nextTheme: Theme = isDark ? "light" : "dark";
+
+    setTheme(nextTheme);
+    localStorage.setItem("theme", nextTheme);
+
+    if (nextTheme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
   };
 
   const handleGoHome = () => {
@@ -211,7 +244,34 @@ export default function PatientSidebar({
         </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pt-4 pb-4">
+      <div className="px-4 pb-3">
+        <button
+          type="button"
+          onClick={handleToggleTheme}
+          title={isDark ? "Light mode" : "Dark mode"}
+          aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-primary/10 hover:text-primary",
+            isCompact && !forceOpen && "justify-center px-0"
+          )}
+        >
+          {isDark ? (
+            <Sun className="h-5 w-5 shrink-0 text-primary" />
+          ) : (
+            <Moon className="h-5 w-5 shrink-0 text-primary" />
+          )}
+
+          {(!isCompact || forceOpen) && (
+            <span className="truncate">
+              {isDark
+                ? t("theme.light", "Light Mode")
+                : t("theme.dark", "Dark Mode")}
+            </span>
+          )}
+        </button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto pb-4 pt-1">
         <nav className="space-y-1 px-2">
           {navItems.map((item) => (
             <NavLink
@@ -245,11 +305,11 @@ export default function PatientSidebar({
         </nav>
       </div>
 
-      <div className="relative mt-auto border-t p-4">
+      <div className="relative mt-auto border-t border-border p-4">
         {accountMenuOpen && (
           <div
             className={cn(
-              "absolute bottom-[78px] z-20 rounded-2xl border border-border bg-card p-1 shadow-xl",
+              "absolute bottom-[78px] z-20 rounded-2xl border border-border bg-card p-1 text-card-foreground shadow-xl",
               isCompact && !forceOpen ? "left-3 right-3" : "left-4 right-4"
             )}
           >
@@ -272,6 +332,26 @@ export default function PatientSidebar({
               <User className="h-4 w-4 shrink-0" />
               {(!isCompact || forceOpen) && (
                 <span>{t("dashboard.profile", "Profile")}</span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleToggleTheme}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-primary"
+            >
+              {isDark ? (
+                <Sun className="h-4 w-4 shrink-0" />
+              ) : (
+                <Moon className="h-4 w-4 shrink-0" />
+              )}
+
+              {(!isCompact || forceOpen) && (
+                <span>
+                  {isDark
+                    ? t("theme.light", "Light Mode")
+                    : t("theme.dark", "Dark Mode")}
+                </span>
               )}
             </button>
 
@@ -348,7 +428,7 @@ export default function PatientSidebar({
 
       <aside
         className={cn(
-          "fixed top-0 z-30 hidden h-screen shrink-0 flex-col overflow-hidden border-x bg-white transition-all duration-300 xl:flex",
+          "fixed top-0 z-30 hidden h-screen shrink-0 flex-col overflow-hidden border-x border-border bg-background text-foreground transition-all duration-300 xl:flex",
           isRTL ? "right-0" : "left-0",
           collapsed ? "w-20" : "w-64",
           className
@@ -363,7 +443,7 @@ export default function PatientSidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 z-[60] flex h-screen w-72 flex-col overflow-hidden border-x bg-white shadow-2xl transition-transform duration-300 xl:hidden",
+          "fixed inset-y-0 z-[60] flex h-screen w-72 flex-col overflow-hidden border-x border-border bg-background text-foreground shadow-2xl transition-transform duration-300 xl:hidden",
           isRTL ? "right-0" : "left-0",
           mobileOpen
             ? "translate-x-0"

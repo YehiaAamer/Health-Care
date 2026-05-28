@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
 import { ar, enUS } from "date-fns/locale";
@@ -48,7 +48,10 @@ export default function RecentActivity({
     if (!value) return "";
 
     return String(value)
-      .replace(/\b(id|report id|patient id|prediction id|appointment id)\s*#?\s*\d+\b/gi, "")
+      .replace(
+        /\b(id|report id|patient id|prediction id|appointment id)\s*#?\s*\d+\b/gi,
+        ""
+      )
       .replace(/\b(report|patient|prediction|appointment)\s*#\s*\d+\b/gi, "$1")
       .replace(/#\s*\d+\b/g, "")
       .replace(/\bID\b\s*:?\s*\d+\b/gi, "")
@@ -73,7 +76,7 @@ export default function RecentActivity({
   }, [safeActivities]);
 
   const cardClassName =
-    "flex h-full w-full flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:shadow-md hover:shadow-slate-200/60";
+    "flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-md";
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -114,13 +117,13 @@ export default function RecentActivity({
       case "prediction":
         return "bg-primary/10 text-primary border-primary/15";
       case "review":
-        return "bg-emerald-50 text-emerald-600 border-emerald-100";
+        return "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30";
       case "appointment":
-        return "bg-sky-50 text-sky-600 border-sky-100";
+        return "bg-sky-50 text-sky-600 border-sky-100 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30";
       case "message":
-        return "bg-amber-50 text-amber-600 border-amber-100";
+        return "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30";
       default:
-        return "bg-slate-50 text-slate-500 border-slate-100";
+        return "bg-muted text-muted-foreground border-border";
     }
   };
 
@@ -139,7 +142,7 @@ export default function RecentActivity({
 
   const CardTitleBlock = () => (
     <CardHeader className="flex shrink-0 flex-row items-center justify-between gap-3 px-4 pb-2 pt-4 sm:px-5 sm:pb-3 sm:pt-5">
-      <CardTitle className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold tracking-tight text-slate-900 sm:text-base">
+      <CardTitle className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold tracking-tight text-foreground sm:text-base">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:h-8 sm:w-8">
           <History className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.3} />
         </span>
@@ -203,7 +206,7 @@ export default function RecentActivity({
               <History className="h-6 w-6 opacity-80" strokeWidth={2.2} />
             </div>
 
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
               {t("doctorDashboard.activity.empty")}
             </p>
           </div>
@@ -211,7 +214,7 @@ export default function RecentActivity({
           <div
             className={cn(
               "relative flex min-h-0 flex-1 flex-col justify-between gap-1.5 sm:gap-2",
-              "before:absolute before:top-1 before:h-[calc(100%-8px)] before:w-0.5 before:bg-slate-100",
+              "before:absolute before:top-1 before:h-[calc(100%-8px)] before:w-0.5 before:bg-border",
               isRTL
                 ? "before:right-3.5 before:translate-x-px sm:before:right-4"
                 : "before:left-3.5 before:-translate-x-px sm:before:left-4"
@@ -228,7 +231,7 @@ export default function RecentActivity({
                 >
                   <div
                     className={cn(
-                      "z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-2xl border bg-white shadow-sm sm:h-8 sm:w-8",
+                      "z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-2xl border bg-card shadow-sm sm:h-8 sm:w-8",
                       "transition-all duration-300 group-hover:scale-105",
                       getActivityStyle(activity.type)
                     )}
@@ -238,14 +241,14 @@ export default function RecentActivity({
 
                   <div className="min-w-0 flex-1 pt-0.5">
                     <div className="mb-0.5 flex items-start justify-between gap-2 sm:mb-1 sm:gap-3">
-                      <h4 className="min-w-0 truncate text-xs font-bold leading-4 tracking-tight text-slate-900 sm:text-sm">
+                      <h4 className="min-w-0 truncate text-xs font-bold leading-4 tracking-tight text-foreground sm:text-sm">
                         {title}
                       </h4>
 
                       <span
                         className={cn(
-                          "shrink-0 whitespace-nowrap rounded-lg bg-slate-50 px-1.5 py-0.5",
-                          "text-[8px] font-bold uppercase tracking-tight text-slate-400 sm:px-2 sm:py-1 sm:text-[10px]",
+                          "shrink-0 whitespace-nowrap rounded-lg bg-muted px-1.5 py-0.5",
+                          "text-[8px] font-bold uppercase tracking-tight text-muted-foreground sm:px-2 sm:py-1 sm:text-[10px]",
                           isRTL ? "mr-1 sm:mr-2" : "ml-1 sm:ml-2"
                         )}
                       >
@@ -253,7 +256,7 @@ export default function RecentActivity({
                       </span>
                     </div>
 
-                    <p className="line-clamp-1 text-[11px] font-medium leading-4 text-slate-500 sm:line-clamp-2 sm:text-xs sm:leading-5">
+                    <p className="line-clamp-1 text-[11px] font-medium leading-4 text-muted-foreground sm:line-clamp-2 sm:text-xs sm:leading-5">
                       {description}
                     </p>
                   </div>

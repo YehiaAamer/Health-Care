@@ -68,15 +68,11 @@ export default function RiskDistributionChart({
 
     return {
       key: riskKey,
-      name:
-        isRTL
-          ? matchedItem?.level || fallbackLabels[riskKey].ar
-          : matchedItem?.level_en || fallbackLabels[riskKey].en,
+      name: isRTL
+        ? matchedItem?.level || fallbackLabels[riskKey].ar
+        : matchedItem?.level_en || fallbackLabels[riskKey].en,
       value: matchedItem?.count || 0,
-      color:
-        colorMap[riskKey] ||
-        matchedItem?.color ||
-        "#94a3b8",
+      color: colorMap[riskKey] || matchedItem?.color || "#94a3b8",
     };
   });
 
@@ -85,21 +81,24 @@ export default function RiskDistributionChart({
   const getRiskTextColor = (riskKey: string) => {
     switch (riskKey) {
       case "low":
-        return "text-emerald-600";
+        return "text-emerald-600 dark:text-emerald-300";
       case "medium":
-        return "text-amber-600";
+        return "text-amber-600 dark:text-amber-300";
       case "high":
-        return "text-orange-600";
+        return "text-orange-600 dark:text-orange-300";
       case "very high":
-        return "text-red-600";
+        return "text-red-600 dark:text-red-300";
       default:
-        return "text-slate-600";
+        return "text-muted-foreground";
     }
   };
 
+  const cardClassName =
+    "flex h-full min-h-[390px] w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-md sm:min-h-[420px] sm:rounded-3xl";
+
   if (isLoading) {
     return (
-      <Card className="flex h-full min-h-[390px] w-full flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:shadow-md hover:shadow-slate-200/60 sm:min-h-[420px] sm:rounded-3xl">
+      <Card className={cardClassName}>
         <CardHeader className="flex flex-row items-center gap-3 px-5 pb-3 pt-5 sm:px-6">
           <Skeleton className="h-9 w-9 rounded-2xl" />
           <Skeleton className="h-5 w-[150px] rounded-md" />
@@ -119,25 +118,25 @@ export default function RiskDistributionChart({
   }
 
   return (
-    <Card className="flex h-full min-h-[390px] w-full flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:shadow-md hover:shadow-slate-200/60 sm:min-h-[420px] sm:rounded-3xl">
+    <Card className={cardClassName}>
       <CardHeader className="flex flex-row items-center gap-3 px-5 pb-3 pt-5 sm:px-6">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
           <PieIcon className="h-4 w-4" strokeWidth={2.3} />
         </div>
 
-        <CardTitle className="min-w-0 truncate text-base font-bold leading-6 tracking-tight text-slate-900">
+        <CardTitle className="min-w-0 truncate text-base font-bold leading-6 tracking-tight text-foreground">
           {t("doctorDashboard.riskChart.title")}
         </CardTitle>
       </CardHeader>
 
       <CardContent className="flex flex-1 flex-col px-5 pb-5 pt-1 sm:px-6 sm:pb-6">
         {data?.total === 0 || !data ? (
-          <div className="flex flex-1 flex-col items-center justify-center text-center text-slate-400">
+          <div className="flex flex-1 flex-col items-center justify-center text-center text-muted-foreground">
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-primary/10 text-primary">
               <PieIcon className="h-7 w-7 opacity-80" strokeWidth={2.2} />
             </div>
 
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
               {t("doctorDashboard.riskChart.empty")}
             </p>
           </div>
@@ -152,7 +151,7 @@ export default function RiskDistributionChart({
               {normalizedDistribution.map((item) => (
                 <div
                   key={item.key}
-                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500"
+                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
                 >
                   <span
                     className="h-3 w-3 shrink-0 rounded-sm"
@@ -196,10 +195,18 @@ export default function RiskDistributionChart({
                     ]}
                     contentStyle={{
                       borderRadius: "16px",
-                      border: "1px solid #e2e8f0",
-                      boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
+                      border: "1px solid hsl(var(--border))",
+                      background: "hsl(var(--card))",
+                      color: "hsl(var(--card-foreground))",
+                      boxShadow: "0 12px 24px rgba(0, 0, 0, 0.14)",
                       fontSize: "12px",
                       fontWeight: "bold",
+                    }}
+                    itemStyle={{
+                      color: "hsl(var(--foreground))",
+                    }}
+                    labelStyle={{
+                      color: "hsl(var(--muted-foreground))",
                     }}
                   />
                 </PieChart>
@@ -210,7 +217,7 @@ export default function RiskDistributionChart({
               {normalizedDistribution.map((item) => (
                 <div
                   key={item.key}
-                  className="rounded-2xl border border-slate-100 bg-slate-50/60 px-3 py-3 text-center"
+                  className="rounded-2xl border border-border bg-muted/30 px-3 py-3 text-center transition-colors hover:bg-primary/5"
                 >
                   <p
                     className={cn(
@@ -221,7 +228,7 @@ export default function RiskDistributionChart({
                     {item.value}
                   </p>
 
-                  <p className="mt-1.5 truncate text-xs font-semibold text-slate-500">
+                  <p className="mt-1.5 truncate text-xs font-semibold text-muted-foreground">
                     {item.name}
                   </p>
                 </div>

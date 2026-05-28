@@ -18,9 +18,9 @@ export default function StatsCards({ stats, isLoading }: StatsCardsProps) {
       title: t("doctorDashboard.stats.totalPatients"),
       value: stats?.total_patients ?? 0,
       icon: Users,
-      color: "text-sky-600",
-      bgColor: "bg-sky-50",
-      borderColor: "hover:border-sky-100",
+      color: "text-sky-600 dark:text-sky-300",
+      bgColor: "bg-sky-50 dark:bg-sky-500/10",
+      borderColor: "hover:border-sky-200 dark:hover:border-sky-500/30",
       trend: "+2",
       trendLabel: t("doctorDashboard.stats.thisMonth"),
     },
@@ -28,9 +28,9 @@ export default function StatsCards({ stats, isLoading }: StatsCardsProps) {
       title: t("doctorDashboard.stats.pendingReviews"),
       value: stats?.pending_reviews ?? 0,
       icon: FileText,
-      color: "text-amber-600",
-      bgColor: "bg-amber-50",
-      borderColor: "hover:border-amber-100",
+      color: "text-amber-600 dark:text-amber-300",
+      bgColor: "bg-amber-50 dark:bg-amber-500/10",
+      borderColor: "hover:border-amber-200 dark:hover:border-amber-500/30",
       trend: "-1",
       trendLabel: t("doctorDashboard.stats.fromYesterday"),
     },
@@ -38,9 +38,9 @@ export default function StatsCards({ stats, isLoading }: StatsCardsProps) {
       title: t("doctorDashboard.stats.todayAppointments"),
       value: stats?.today_appointments ?? 0,
       icon: CheckCircle,
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-50",
-      borderColor: "hover:border-emerald-100",
+      color: "text-emerald-600 dark:text-emerald-300",
+      bgColor: "bg-emerald-50 dark:bg-emerald-500/10",
+      borderColor: "hover:border-emerald-200 dark:hover:border-emerald-500/30",
     },
     {
       title: t("doctorDashboard.stats.totalPredictions"),
@@ -58,7 +58,7 @@ export default function StatsCards({ stats, isLoading }: StatsCardsProps) {
         {[1, 2, 3, 4].map((i) => (
           <Card
             key={i}
-            className="min-h-[180px] rounded-3xl border border-slate-100 bg-white shadow-sm"
+            className="min-h-[180px] rounded-3xl border border-border bg-card text-card-foreground shadow-sm"
           >
             <CardContent className="flex h-full min-h-[180px] flex-col justify-between p-6">
               <div className="flex items-start justify-between gap-4">
@@ -83,19 +83,19 @@ export default function StatsCards({ stats, isLoading }: StatsCardsProps) {
         <Card
           key={index}
           className={cn(
-            "group min-h-[180px] overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm",
-            "transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-200/60",
+            "group min-h-[180px] overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm",
+            "transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg",
             card.borderColor
           )}
         >
           <CardContent className="flex h-full min-h-[180px] flex-col justify-between p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <h3 className="min-h-[32px] text-[11px] font-semibold uppercase leading-4 tracking-[0.16em] text-slate-400">
+                <h3 className="min-h-[32px] text-[11px] font-semibold uppercase leading-4 tracking-[0.16em] text-muted-foreground">
                   {card.title}
                 </h3>
 
-                <div className="mt-4 text-3xl font-bold leading-none tracking-tight text-slate-900">
+                <div className="mt-4 text-3xl font-bold leading-none tracking-tight text-foreground">
                   {card.value}
                 </div>
               </div>
@@ -119,14 +119,14 @@ export default function StatsCards({ stats, isLoading }: StatsCardsProps) {
                     className={cn(
                       "rounded-lg px-2 py-1",
                       card.trend.startsWith("+")
-                        ? "bg-emerald-50 text-emerald-600"
-                        : "bg-amber-50 text-amber-600"
+                        ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
+                        : "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300"
                     )}
                   >
                     {card.trend}
                   </span>
 
-                  <span className="ml-2 text-slate-400">
+                  <span className="ml-2 text-muted-foreground">
                     {card.trendLabel}
                   </span>
                 </div>

@@ -1,6 +1,16 @@
 import { NavLink, useNavigate, Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Bell, User, Settings, LogOut, Globe, Menu, X } from "lucide-react";
+import {
+  Bell,
+  User,
+  Settings,
+  LogOut,
+  Globe,
+  Menu,
+  X,
+  Moon,
+  Sun,
+} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -10,6 +20,8 @@ interface HeaderProps {
   variant?: "default" | "auth" | "dashboard";
 }
 
+type Theme = "light" | "dark";
+
 const Header = ({ variant = "default" }: HeaderProps) => {
   const { user, logout, isLoading } = useAuth();
   const { t, i18n } = useTranslation();
@@ -18,13 +30,28 @@ const Header = ({ variant = "default" }: HeaderProps) => {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [theme, setTheme] = useState<Theme>("light");
+
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isArabic = i18n.language.startsWith("ar");
   const isDoctor = user?.role === "doctor";
   const isPatient = user?.role === "patient" || !user?.role;
+  const isDark = theme === "dark";
 
   const shouldHideHeader = isPatient && location.pathname === "/dashboard";
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as Theme | null;
+
+    if (savedTheme === "dark") {
+      document.documentElement.classList.add("dark");
+      setTheme("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      setTheme("light");
+    }
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -74,6 +101,19 @@ const Header = ({ variant = "default" }: HeaderProps) => {
     const newLang = isArabic ? "en" : "ar";
     await i18n.changeLanguage(newLang);
     setMenuOpen(false);
+  };
+
+  const handleToggleTheme = () => {
+    const nextTheme: Theme = isDark ? "light" : "dark";
+
+    setTheme(nextTheme);
+    localStorage.setItem("theme", nextTheme);
+
+    if (nextTheme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
   };
 
   const closeMobileNav = () => setMobileNavOpen(false);
@@ -243,13 +283,13 @@ const Header = ({ variant = "default" }: HeaderProps) => {
 
       {menuOpen && (
         <div
-          className={`absolute top-full z-[60] mt-2 w-56 min-w-[14rem] overflow-hidden rounded-xl border bg-background shadow-lg ${
+          className={`absolute top-full z-[60] mt-2 w-56 min-w-[14rem] overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-lg ${
             isArabic ? "left-0 origin-top-left" : "right-0 origin-top-right"
           }`}
           dir={isArabic ? "rtl" : "ltr"}
         >
           <div
-            className={`border-b bg-muted/30 px-4 py-3 ${
+            className={`border-b border-border bg-muted/30 px-4 py-3 ${
               isArabic ? "text-right" : "text-left"
             }`}
           >
@@ -271,7 +311,7 @@ const Header = ({ variant = "default" }: HeaderProps) => {
               </div>
 
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">
+                <p className="truncate text-sm font-semibold text-foreground">
                   {user?.first_name
                     ? `${user.first_name} ${user?.last_name || ""}`
                     : t("myAccount")}
@@ -286,7 +326,7 @@ const Header = ({ variant = "default" }: HeaderProps) => {
 
           <button
             onClick={handleSettingsClick}
-            className={`flex w-full items-center gap-2 px-4 py-3 text-sm hover:bg-accent hover:text-primary ${
+            className={`flex w-full items-center gap-2 px-4 py-3 text-sm text-foreground transition hover:bg-accent hover:text-primary ${
               isArabic ? "flex-row-reverse text-right" : "text-left"
             }`}
           >
@@ -296,7 +336,7 @@ const Header = ({ variant = "default" }: HeaderProps) => {
 
           <button
             onClick={handleToggleLanguage}
-            className={`flex w-full items-center gap-2 px-4 py-3 text-sm hover:bg-accent hover:text-primary ${
+            className={`flex w-full items-center gap-2 px-4 py-3 text-sm text-foreground transition hover:bg-accent hover:text-primary ${
               isArabic ? "flex-row-reverse text-right" : "text-left"
             }`}
           >
@@ -306,7 +346,7 @@ const Header = ({ variant = "default" }: HeaderProps) => {
 
           <button
             onClick={handleLogout}
-            className={`flex w-full items-center gap-2 px-4 py-3 text-sm hover:bg-accent hover:text-destructive ${
+            className={`flex w-full items-center gap-2 px-4 py-3 text-sm text-foreground transition hover:bg-accent hover:text-destructive ${
               isArabic ? "flex-row-reverse text-right" : "text-left"
             }`}
           >
@@ -321,7 +361,7 @@ const Header = ({ variant = "default" }: HeaderProps) => {
   return (
     <>
       <header
-        className="fixed top-0 left-0 right-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+        className="fixed left-0 right-0 top-0 z-50 w-full border-b border-border bg-background/95 text-foreground backdrop-blur supports-[backdrop-filter]:bg-background/80"
         dir={isArabic ? "rtl" : "ltr"}
       >
         <div className="h-[72px] w-full max-w-none px-4 sm:px-5 lg:px-6">
@@ -352,8 +392,24 @@ const Header = ({ variant = "default" }: HeaderProps) => {
               <Button
                 variant="ghost"
                 size="icon"
+                onClick={handleToggleTheme}
+                className="text-primary hover:bg-primary/10 hover:text-primary"
+                aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+                title={isDark ? "Light mode" : "Dark mode"}
+              >
+                {isDark ? (
+                  <Sun className="h-5 w-5" />
+                ) : (
+                  <Moon className="h-5 w-5" />
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={handleToggleLanguage}
                 className="text-primary hover:bg-primary/10 hover:text-primary"
+                aria-label="Toggle language"
               >
                 <Globe className="h-5 w-5" />
               </Button>
@@ -364,6 +420,7 @@ const Header = ({ variant = "default" }: HeaderProps) => {
                     variant="ghost"
                     size="icon"
                     className="text-primary hover:bg-primary/10 hover:text-primary"
+                    aria-label="Notifications"
                   >
                     <Bell className="h-5 w-5" />
                   </Button>
@@ -374,7 +431,12 @@ const Header = ({ variant = "default" }: HeaderProps) => {
                 !isLoading && (
                   <div className="hidden items-center gap-2 md:flex">
                     <Link to="/login">
-                      <Button variant="ghost">{t("login")}</Button>
+                      <Button
+                        variant="ghost"
+                        className="text-foreground hover:bg-primary/10 hover:text-primary"
+                      >
+                        {t("login")}
+                      </Button>
                     </Link>
 
                     <Link to="/signup">
@@ -397,11 +459,11 @@ const Header = ({ variant = "default" }: HeaderProps) => {
 
           <div
             dir={isArabic ? "rtl" : "ltr"}
-            className={`absolute top-0 h-full w-[280px] border-l border-r bg-background shadow-2xl transition-all duration-300 ${
+            className={`absolute top-0 h-full w-[280px] border-l border-r border-border bg-background text-foreground shadow-2xl transition-all duration-300 ${
               isArabic ? "left-0" : "right-0"
             }`}
           >
-            <div className="flex items-center justify-between border-b px-4 py-4">
+            <div className="flex items-center justify-between border-b border-border px-4 py-4">
               <BrandLogo />
 
               <Button
@@ -415,13 +477,32 @@ const Header = ({ variant = "default" }: HeaderProps) => {
               </Button>
             </div>
 
+            <div className="border-b border-border px-4 py-3">
+              <button
+                type="button"
+                onClick={handleToggleTheme}
+                className="flex w-full items-center justify-between rounded-xl bg-muted/40 px-4 py-3 text-sm font-medium text-foreground transition hover:bg-primary/10 hover:text-primary"
+              >
+                <span>{isArabic ? "المظهر" : "Theme"}</span>
+
+                {isDark ? (
+                  <Sun className="h-5 w-5 text-primary" />
+                ) : (
+                  <Moon className="h-5 w-5 text-primary" />
+                )}
+              </button>
+            </div>
+
             <div className="space-y-2 px-3 py-4">
               {renderMainLinks(true)}
 
               {!user && !isLoading && (
                 <div className="space-y-2 pt-3">
                   <Link to="/login" onClick={closeMobileNav}>
-                    <Button variant="ghost" className="w-full">
+                    <Button
+                      variant="ghost"
+                      className="w-full text-foreground hover:bg-primary/10 hover:text-primary"
+                    >
                       {t("login")}
                     </Button>
                   </Link>

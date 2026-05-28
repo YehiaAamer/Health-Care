@@ -65,22 +65,22 @@ export default function DoctorPrivacyPage() {
 
   const pageContent = isArabic ? content.ar : content.en;
 
-  return (
+ return (
     <div
-      className="min-h-full w-full max-w-none"
       dir={isArabic ? "rtl" : "ltr"}
+      className="min-h-full w-full max-w-none animate-in fade-in px-0 pb-8 pt-8 text-foreground duration-700 md:pt-0"
     >
       <div className="space-y-8">
         <div className="min-w-0">
           <div className="mb-3 flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" />
 
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
               {pageContent.title}
             </h1>
           </div>
 
-          <p className="text-sm font-medium leading-8 text-slate-500">
+          <p className="text-sm font-medium leading-8 text-muted-foreground">
             {pageContent.subtitle}
           </p>
         </div>
@@ -93,11 +93,11 @@ export default function DoctorPrivacyPage() {
               </div>
 
               <div className="min-w-0">
-                <h2 className="mb-3 text-base font-bold tracking-tight text-slate-900">
+                <h2 className="mb-3 text-base font-bold tracking-tight text-foreground">
                   {section.title}
                 </h2>
 
-                <p className="text-sm font-medium leading-8 text-slate-500">
+                <p className="text-sm font-medium leading-8 text-muted-foreground">
                   {section.text}
                 </p>
               </div>
@@ -105,11 +105,11 @@ export default function DoctorPrivacyPage() {
           ))}
         </div>
 
-        <div className="space-y-3 border-t border-slate-100 pt-5">
+        <div className="space-y-3 border-t border-border pt-5">
           {pageContent.notes.map((note, index) => (
             <p
               key={index}
-              className="text-sm font-medium leading-7 text-slate-500"
+              className="text-sm font-medium leading-7 text-muted-foreground"
             >
               {note}
             </p>

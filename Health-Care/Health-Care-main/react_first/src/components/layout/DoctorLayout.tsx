@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Menu } from "lucide-react";
 import DoctorSidebar from "../doctor/DoctorSidebar";
+import { cn } from "@/lib/utils";
 
 export default function DoctorLayout() {
   const { i18n } = useTranslation();
@@ -25,12 +26,13 @@ export default function DoctorLayout() {
             <button
               type="button"
               onClick={openSidebar}
-              className={`absolute top-4 z-30 flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-none hover:bg-white hover:text-slate-500 md:hidden ${
+              className={cn(
+                "absolute top-5 z-30 flex h-10 w-10 items-center justify-center rounded-xl border-0 bg-transparent text-primary shadow-none transition-none hover:bg-primary/10 hover:text-primary md:hidden",
                 isRTL ? "right-4" : "left-4"
-              }`}
+              )}
               aria-label="Open sidebar"
             >
-              <Menu className="h-4 w-4" />
+              <Menu className="h-5 w-5" />
             </button>
 
             <div className="w-full px-4 pb-6 pt-8 sm:px-6 lg:px-8">

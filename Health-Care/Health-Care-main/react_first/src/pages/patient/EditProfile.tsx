@@ -38,9 +38,10 @@ export default function EditProfile() {
   });
 
   const [profilePicture, setProfilePicture] = useState<File | null>(null);
-  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(
-    user?.profile_picture || null
-  );
+  const [profilePicturePreview, setProfilePicturePreview] = useState<
+    string | null
+  >(user?.profile_picture || null);
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,11 +70,16 @@ export default function EditProfile() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+
     if (file) {
       if (!file.type.startsWith("image/")) {
         toast.error(t("editProfile.toasts.invalidImage"));
@@ -86,10 +92,13 @@ export default function EditProfile() {
       }
 
       setProfilePicture(file);
+
       const reader = new FileReader();
+
       reader.onloadend = () => {
         setProfilePicturePreview(reader.result as string);
       };
+
       reader.readAsDataURL(file);
     }
   };
@@ -111,12 +120,18 @@ export default function EditProfile() {
           `${import.meta.env.VITE_API_URL}/api/profile/picture/`,
           {
             method: "DELETE",
-            headers: { Authorization: `Bearer ${accessToken}` },
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
           }
         );
 
         if (response.ok) {
-          updateUser({ ...user, profile_picture: null });
+          updateUser({
+            ...user,
+            profile_picture: null,
+          });
+
           toast.success(t("editProfile.toasts.pictureDeleted"));
         }
       } catch {
@@ -127,6 +142,7 @@ export default function EditProfile() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     setIsLoading(true);
     setError(null);
 
@@ -143,10 +159,15 @@ export default function EditProfile() {
 
       if (profilePicture) {
         const formDataPayload = new FormData();
+
         formDataPayload.append("first_name", formData.first_name);
         formDataPayload.append("last_name", formData.last_name);
         formDataPayload.append("email", formData.email);
-        if (formData.phone) formDataPayload.append("phone", formData.phone);
+
+        if (formData.phone) {
+          formDataPayload.append("phone", formData.phone);
+        }
+
         formDataPayload.append("profile_picture", profilePicture);
 
         response = await fetch(`${import.meta.env.VITE_API_URL}/api/profile/`, {
@@ -176,7 +197,9 @@ export default function EditProfile() {
 
       if (!response.ok) {
         const errorData = JSON.parse(responseText);
-        throw new Error(errorData.error || t("editProfile.toasts.updateFailed"));
+        throw new Error(
+          errorData.error || t("editProfile.toasts.updateFailed")
+        );
       }
 
       const result = JSON.parse(responseText);
@@ -189,8 +212,12 @@ export default function EditProfile() {
       navigate("/dashboard");
     } catch (err) {
       console.error("❌ Error:", err);
+
       const errorMessage =
-        err instanceof Error ? err.message : t("editProfile.toasts.unexpectedError");
+        err instanceof Error
+          ? err.message
+          : t("editProfile.toasts.unexpectedError");
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -204,7 +231,7 @@ export default function EditProfile() {
 
   return (
     <div
-      className="min-h-screen flex flex-col bg-background overflow-x-hidden"
+      className="flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground"
       dir={isArabic ? "rtl" : "ltr"}
     >
       <Header variant="dashboard" />
@@ -215,7 +242,7 @@ export default function EditProfile() {
           paddingTop: `${DESKTOP_HEADER_HEIGHT + 24}px`,
         }}
       >
-        <div className="w-full px-4 sm:px-6 lg:px-8 py-8 md:py-10">
+        <div className="w-full px-4 py-8 sm:px-6 md:py-10 lg:px-8">
           <div className="mx-auto w-full max-w-4xl">
             <div
               ref={profileRef}
@@ -226,7 +253,7 @@ export default function EditProfile() {
               }`}
             >
               <div className="relative mb-5">
-                <div className="h-28 w-28 overflow-hidden rounded-full bg-gradient-to-br from-primary to-cyan-600 flex items-center justify-center">
+                <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-cyan-600 ring-4 ring-primary/10">
                   {profilePicturePreview ? (
                     <img
                       src={profilePicturePreview}
@@ -234,14 +261,14 @@ export default function EditProfile() {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <User className="h-12 w-12 text-white" />
+                    <User className="h-12 w-12 text-primary-foreground" />
                   )}
                 </div>
 
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition hover:opacity-90"
+                  className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition hover:bg-primary/90"
                   aria-label={t("editProfile.changePhoto")}
                 >
                   <Camera className="h-4 w-4" />
@@ -251,7 +278,7 @@ export default function EditProfile() {
                   <button
                     type="button"
                     onClick={handleRemovePicture}
-                    className="absolute top-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white shadow-sm transition hover:bg-red-600"
+                    className="absolute right-0 top-0 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white shadow-sm transition hover:bg-red-600 dark:bg-red-500 dark:hover:bg-red-600"
                     aria-label={t("editProfile.removePhoto")}
                   >
                     <X className="h-4 w-4" />
@@ -267,7 +294,7 @@ export default function EditProfile() {
                 className="hidden"
               />
 
-              <h1 className="text-3xl font-semibold tracking-tight">
+              <h1 className="text-3xl font-semibold tracking-tight text-foreground">
                 {fullName}
               </h1>
 
@@ -278,7 +305,7 @@ export default function EditProfile() {
 
             <form onSubmit={handleSubmit} className="md:px-8">
               {error && (
-                <Alert className="mb-6 border-red-200 bg-red-50 text-red-800">
+                <Alert className="mb-6 rounded-2xl border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
                   <p>{error}</p>
                 </Alert>
               )}
@@ -293,12 +320,12 @@ export default function EditProfile() {
                   }`}
                 >
                   <div className="mb-6">
-                    <h2 className="text-2xl font-semibold tracking-tight">
+                    <h2 className="text-2xl font-semibold tracking-tight text-foreground">
                       {t("editProfile.title")}
                     </h2>
                   </div>
 
-                  <div className="divide-y rounded-2xl border bg-card shadow-sm">
+                  <div className="divide-y divide-border rounded-2xl border border-border bg-card text-card-foreground shadow-sm">
                     <div className="grid gap-3 px-4 py-5 md:grid-cols-[220px_minmax(0,1fr)] md:px-6">
                       <div>
                         <Label
@@ -308,6 +335,7 @@ export default function EditProfile() {
                           {t("editProfile.firstName")}
                         </Label>
                       </div>
+
                       <div>
                         <Input
                           id="first_name"
@@ -315,7 +343,7 @@ export default function EditProfile() {
                           value={formData.first_name}
                           onChange={handleInputChange}
                           placeholder={t("editProfile.placeholders.firstName")}
-                          className={`h-11 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 ${
+                          className={`h-11 border-0 bg-transparent px-0 text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 ${
                             isArabic ? "text-right" : "text-left"
                           }`}
                           required
@@ -332,6 +360,7 @@ export default function EditProfile() {
                           {t("editProfile.lastName")}
                         </Label>
                       </div>
+
                       <div>
                         <Input
                           id="last_name"
@@ -339,7 +368,7 @@ export default function EditProfile() {
                           value={formData.last_name}
                           onChange={handleInputChange}
                           placeholder={t("editProfile.placeholders.lastName")}
-                          className={`h-11 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 ${
+                          className={`h-11 border-0 bg-transparent px-0 text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 ${
                             isArabic ? "text-right" : "text-left"
                           }`}
                           required
@@ -356,6 +385,7 @@ export default function EditProfile() {
                           {t("editProfile.email")}
                         </Label>
                       </div>
+
                       <div>
                         <Input
                           id="email"
@@ -364,7 +394,7 @@ export default function EditProfile() {
                           value={formData.email}
                           onChange={handleInputChange}
                           placeholder={t("editProfile.placeholders.email")}
-                          className="h-11 border-0 bg-transparent px-0 text-left shadow-none focus-visible:ring-0"
+                          className="h-11 border-0 bg-transparent px-0 text-left text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
                           dir="ltr"
                           required
                         />
@@ -380,6 +410,7 @@ export default function EditProfile() {
                           {t("editProfile.phone")}
                         </Label>
                       </div>
+
                       <div>
                         <Input
                           id="phone"
@@ -388,7 +419,7 @@ export default function EditProfile() {
                           value={formData.phone}
                           onChange={handleInputChange}
                           placeholder={t("editProfile.placeholders.phone")}
-                          className="h-11 border-0 bg-transparent px-0 text-left shadow-none focus-visible:ring-0"
+                          className="h-11 border-0 bg-transparent px-0 text-left text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
                           dir="ltr"
                         />
                       </div>
@@ -411,7 +442,11 @@ export default function EditProfile() {
                   >
                     {isLoading ? (
                       <>
-                        <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                        <Loader2
+                          className={`h-4 w-4 animate-spin ${
+                            isArabic ? "ml-2" : "mr-2"
+                          }`}
+                        />
                         {t("editProfile.saving")}
                       </>
                     ) : (
@@ -422,7 +457,7 @@ export default function EditProfile() {
                   <Button
                     type="button"
                     variant="link"
-                    className="px-0 text-center text-muted-foreground"
+                    className="px-0 text-center text-muted-foreground hover:text-primary"
                     onClick={() => navigate("/change-password")}
                   >
                     {t("editProfile.editPassword")}

@@ -175,21 +175,21 @@ const Dashboard = () => {
     const normalized = normalizeRiskLevel(riskLevel);
 
     if (normalized === "high") return "text-red-500";
-    if (normalized === "medium") return "text-yellow-600";
-    if (normalized === "low") return "text-green-600";
+    if (normalized === "medium") return "text-yellow-500";
+    if (normalized === "low") return "text-green-500";
     return "text-muted-foreground";
   };
 
   const getRiskBadgeColor = (riskLevel?: string) => {
     switch (normalizeRiskLevel(riskLevel)) {
       case "low":
-        return "border-green-200 bg-green-100 text-green-700 hover:border-green-200 hover:bg-green-100 hover:text-green-700";
+        return "border-green-200 bg-green-100 text-green-700 hover:border-green-200 hover:bg-green-100 hover:text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300 dark:hover:bg-green-500/10 dark:hover:text-green-300";
       case "medium":
-        return "border-yellow-200 bg-yellow-100 text-yellow-700 hover:border-yellow-200 hover:bg-yellow-100 hover:text-yellow-700";
+        return "border-yellow-200 bg-yellow-100 text-yellow-700 hover:border-yellow-200 hover:bg-yellow-100 hover:text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-300 dark:hover:bg-yellow-500/10 dark:hover:text-yellow-300";
       case "high":
-        return "border-red-200 bg-red-100 text-red-700 hover:border-red-200 hover:bg-red-100 hover:text-red-700";
+        return "border-red-200 bg-red-100 text-red-700 hover:border-red-200 hover:bg-red-100 hover:text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-300";
       default:
-        return "border-gray-200 bg-gray-100 text-gray-700 hover:border-gray-200 hover:bg-gray-100 hover:text-gray-700";
+        return "border-border bg-muted text-muted-foreground hover:border-border hover:bg-muted hover:text-muted-foreground";
     }
   };
 
@@ -470,15 +470,15 @@ const Dashboard = () => {
 
   return (
     <div
-      className="min-h-screen flex flex-col bg-background overflow-x-hidden"
+      className="flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground"
       dir={isArabic ? "rtl" : "ltr"}
     >
       <Header variant="dashboard" />
 
-   <main
-  className="flex-1 w-full max-w-none overflow-x-hidden px-3 sm:px-4 lg:px-5 pb-4 pt-16 xl:pt-0"
-  style={{ paddingTop: undefined }}
->
+      <main
+        className="w-full max-w-none flex-1 overflow-x-hidden px-3 pb-4 pt-16 sm:px-4 lg:px-5 xl:pt-0"
+        style={{ paddingTop: undefined }}
+      >
         <div className="relative w-full max-w-none">
           <PatientSidebar
             user={user}
@@ -494,20 +494,22 @@ const Dashboard = () => {
           <div
             className={`w-full min-w-0 space-y-4 transition-all duration-300 ease-out ${desktopContentOffsetClass}`}
           >
-            <div className={`flex flex-col gap-3 pt-1 xl:pt-5 ${smoothSectionClass}`}>
+            <div
+              className={`flex flex-col gap-3 pt-1 xl:pt-5 ${smoothSectionClass}`}
+            >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-start justify-between gap-3">
                   <div className={isArabic ? "text-right" : "text-left"}>
-                    <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                    <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
                       {t("dashboard.welcome")}{" "}
                       {user ? `${user.first_name || user.email}!` : ""}
                     </h1>
 
-                    <p className="mt-1 max-w-full text-lg font-medium leading-snug text-slate-500 sm:max-w-none">
+                    <p className="mt-1 max-w-full text-lg font-medium leading-snug text-muted-foreground sm:max-w-none">
                       {t("dashboard.analysisOverview")}
                     </p>
 
-                    <div className="mt-2 text-xs font-semibold text-slate-500">
+                    <div className="mt-2 text-xs font-semibold text-muted-foreground">
                       <span>{formattedDateTime}</span>
                     </div>
                   </div>
@@ -560,7 +562,7 @@ const Dashboard = () => {
 
                   <div className="relative w-full min-w-0">
                     <Search
-                      className={`h-4 w-4 text-muted-foreground absolute top-1/2 -translate-y-1/2 ${
+                      className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground ${
                         isArabic ? "right-3" : "left-3"
                       }`}
                     />
@@ -569,7 +571,7 @@ const Dashboard = () => {
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder={t("dashboard.search")}
-                      className={`rounded-full h-10 w-full ${
+                      className={`h-10 w-full rounded-full border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/30 ${
                         isArabic
                           ? "pr-9 pl-10 text-right"
                           : "pl-9 pr-10 text-left"
@@ -591,7 +593,7 @@ const Dashboard = () => {
                   </div>
 
                   <Link to="/diagnosis" className="w-full sm:w-auto">
-                    <Button className="gap-2 h-10 w-full sm:w-auto whitespace-nowrap">
+                    <Button className="h-10 w-full gap-2 whitespace-nowrap sm:w-auto">
                       <Plus className="h-5 w-5" />
                       {t("dashboard.newTest")}
                     </Button>
@@ -601,16 +603,16 @@ const Dashboard = () => {
             </div>
 
             <section
-              className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 ${smoothSectionClass}`}
+              className={`grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 ${smoothSectionClass}`}
             >
-              <Card className="group rounded-[18px] border bg-card p-4 shadow-sm transition-colors duration-200 hover:bg-primary/5 hover:border-primary/25">
-                <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+              <Card className="group rounded-[18px] border border-border bg-card p-4 text-card-foreground shadow-sm transition-colors duration-200 hover:border-primary/25 hover:bg-primary/5">
+                <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                   <Activity className="h-5 w-5 text-primary" />
                 </div>
-                <p className="text-sm text-muted-foreground mb-1.5">
+                <p className="mb-1.5 text-sm text-muted-foreground">
                   {t("dashboard.averageRisk")}
                 </p>
-                <h3 className="text-2xl font-bold">
+                <h3 className="text-2xl font-bold text-foreground">
                   {predictions.length
                     ? `${formatNumber(averageRisk, {
                         minimumFractionDigits: 2,
@@ -620,11 +622,11 @@ const Dashboard = () => {
                 </h3>
               </Card>
 
-              <Card className="group rounded-[18px] border bg-card p-4 shadow-sm transition-colors duration-200 hover:bg-primary/5 hover:border-primary/25">
-                <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+              <Card className="group rounded-[18px] border border-border bg-card p-4 text-card-foreground shadow-sm transition-colors duration-200 hover:border-primary/25 hover:bg-primary/5">
+                <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                   <ShieldCheck className="h-5 w-5 text-primary" />
                 </div>
-                <p className="text-sm text-muted-foreground mb-1.5">
+                <p className="mb-1.5 text-sm text-muted-foreground">
                   {t("dashboard.latestStatus")}
                 </p>
                 <h3 className={`text-2xl font-bold ${latestRiskTextColor}`}>
@@ -634,26 +636,26 @@ const Dashboard = () => {
                 </h3>
               </Card>
 
-              <Card className="group rounded-[18px] border bg-card p-4 shadow-sm transition-colors duration-200 hover:bg-primary/5 hover:border-primary/25">
-                <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+              <Card className="group rounded-[18px] border border-border bg-card p-4 text-card-foreground shadow-sm transition-colors duration-200 hover:border-primary/25 hover:bg-primary/5">
+                <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                   <FileText className="h-5 w-5 text-primary" />
                 </div>
-                <p className="text-sm text-muted-foreground mb-1.5">
+                <p className="mb-1.5 text-sm text-muted-foreground">
                   {t("dashboard.savedReports")}
                 </p>
-                <h3 className="text-2xl font-bold">
+                <h3 className="text-2xl font-bold text-foreground">
                   {formatNumber(predictions.length)}
                 </h3>
               </Card>
 
-              <Card className="group rounded-[18px] border bg-card p-4 shadow-sm transition-colors duration-200 hover:bg-primary/5 hover:border-primary/25">
-                <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+              <Card className="group rounded-[18px] border border-border bg-card p-4 text-card-foreground shadow-sm transition-colors duration-200 hover:border-primary/25 hover:bg-primary/5">
+                <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                   <Clock3 className="h-5 w-5 text-primary" />
                 </div>
-                <p className="text-sm text-muted-foreground mb-1.5">
+                <p className="mb-1.5 text-sm text-muted-foreground">
                   {t("dashboard.lastCheckup")}
                 </p>
-                <h3 className="text-xl font-bold">
+                <h3 className="text-xl font-bold text-foreground">
                   {latestPrediction
                     ? formatDate(latestPrediction.created_at)
                     : "--"}
@@ -662,17 +664,17 @@ const Dashboard = () => {
             </section>
 
             <section
-              className={`grid grid-cols-1 gap-4 items-start ${smoothSectionClass}`}
+              className={`grid grid-cols-1 items-start gap-4 ${smoothSectionClass}`}
             >
-              <Card className="rounded-[22px] border bg-card p-4 md:p-5 shadow-sm">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+              <Card className="rounded-[22px] border border-border bg-card p-4 text-card-foreground shadow-sm md:p-5">
+                <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className={isArabic ? "text-right" : "text-left"}>
-                    <h3 className="text-xl md:text-2xl font-bold">
+                    <h3 className="text-xl font-bold text-foreground md:text-2xl">
                       {t("dashboard.recentAnalyses")}
                     </h3>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex flex-wrap items-center gap-2">
                     {predictions.length > 3 && !selectedRange && (
                       <Link to="/past-reports">
                         <Button variant="outline" size="sm">
@@ -682,7 +684,9 @@ const Dashboard = () => {
                     )}
 
                     <Button
-                      variant={selectedRange === "weekly" ? "default" : "outline"}
+                      variant={
+                        selectedRange === "weekly" ? "default" : "outline"
+                      }
                       size="sm"
                       onClick={() =>
                         setSelectedRange((prev) =>
@@ -694,7 +698,9 @@ const Dashboard = () => {
                     </Button>
 
                     <Button
-                      variant={selectedRange === "monthly" ? "default" : "outline"}
+                      variant={
+                        selectedRange === "monthly" ? "default" : "outline"
+                      }
                       size="sm"
                       onClick={() =>
                         setSelectedRange((prev) =>
@@ -708,15 +714,15 @@ const Dashboard = () => {
                 </div>
 
                 {selectedRange && (
-                  <div className="rounded-[20px] border bg-gradient-to-b from-primary/5 via-background to-background p-3 md:p-4 mb-4">
-                    <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_.75fr] gap-4 items-start">
-                      <div className="rounded-[20px] border bg-card p-3 md:p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <div className="mb-4 rounded-[20px] border border-border bg-gradient-to-b from-primary/5 via-background to-background p-3 md:p-4">
+                    <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.25fr_.75fr]">
+                      <div className="rounded-[20px] border border-border bg-card p-3 text-card-foreground md:p-4">
+                        <div className="mb-3 flex items-center gap-2">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                             <TrendingUp className="h-5 w-5 text-primary" />
                           </div>
                           <div>
-                            <h4 className="font-semibold">
+                            <h4 className="font-semibold text-foreground">
                               {selectedRange === "weekly"
                                 ? t("dashboard.weekly")
                                 : t("dashboard.monthly")}
@@ -730,7 +736,7 @@ const Dashboard = () => {
                         </div>
 
                         {trendChartData.length > 0 ? (
-                          <div className="h-[210px] sm:h-[240px] md:h-[270px] w-full">
+                          <div className="h-[210px] w-full sm:h-[240px] md:h-[270px]">
                             <ResponsiveContainer width="100%" height="100%">
                               <AreaChart
                                 data={trendChartData}
@@ -802,8 +808,15 @@ const Dashboard = () => {
                                     borderRadius: "14px",
                                     border: "1px solid hsl(var(--border))",
                                     background: "hsl(var(--card))",
+                                    color: "hsl(var(--card-foreground))",
                                     boxShadow:
-                                      "0 10px 30px rgba(0,0,0,0.08)",
+                                      "0 10px 30px rgba(0,0,0,0.18)",
+                                  }}
+                                  labelStyle={{
+                                    color: "hsl(var(--foreground))",
+                                  }}
+                                  itemStyle={{
+                                    color: "hsl(var(--foreground))",
                                   }}
                                   formatter={(value: number) => [
                                     `${value}%`,
@@ -841,10 +854,10 @@ const Dashboard = () => {
                             </ResponsiveContainer>
                           </div>
                         ) : (
-                          <div className="h-[210px] sm:h-[240px] md:h-[270px] rounded-2xl border border-dashed bg-muted/20 flex items-center justify-center text-center px-6">
+                          <div className="flex h-[210px] items-center justify-center rounded-2xl border border-dashed border-border bg-muted/20 px-6 text-center sm:h-[240px] md:h-[270px]">
                             <div>
-                              <BarChart3 className="h-9 w-9 text-muted-foreground mx-auto mb-3" />
-                              <p className="font-medium mb-1">
+                              <BarChart3 className="mx-auto mb-3 h-9 w-9 text-muted-foreground" />
+                              <p className="mb-1 font-medium text-foreground">
                                 {selectedRange === "weekly"
                                   ? t("dashboard.noWeeklyReportsTitle")
                                   : t("dashboard.noMonthlyReportsTitle")}
@@ -859,10 +872,10 @@ const Dashboard = () => {
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-3">
-                        <Card className="rounded-[18px] border bg-card p-3 shadow-none">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                        <Card className="rounded-[18px] border border-border bg-card p-3 text-card-foreground shadow-none">
                           <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                               <Activity className="h-5 w-5 text-primary" />
                             </div>
                             <div>
@@ -871,7 +884,7 @@ const Dashboard = () => {
                                   ? t("dashboard.weeklyAverage")
                                   : t("dashboard.monthlyAverage")}
                               </p>
-                              <h4 className="text-xl font-bold">
+                              <h4 className="text-xl font-bold text-foreground">
                                 {rangePredictions.length
                                   ? `${formatNumber(rangeAverageRisk, {
                                       minimumFractionDigits: 2,
@@ -883,9 +896,9 @@ const Dashboard = () => {
                           </div>
                         </Card>
 
-                        <Card className="rounded-[18px] border bg-card p-3 shadow-none">
+                        <Card className="rounded-[18px] border border-border bg-card p-3 text-card-foreground shadow-none">
                           <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                               <FileText className="h-5 w-5 text-primary" />
                             </div>
                             <div>
@@ -894,16 +907,16 @@ const Dashboard = () => {
                                   ? t("dashboard.reportsThisWeek")
                                   : t("dashboard.reportsThisMonth")}
                               </p>
-                              <h4 className="text-xl font-bold">
+                              <h4 className="text-xl font-bold text-foreground">
                                 {formatNumber(rangePredictions.length)}
                               </h4>
                             </div>
                           </div>
                         </Card>
 
-                        <Card className="rounded-[18px] border bg-card p-3 shadow-none">
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <Card className="rounded-[18px] border border-border bg-card p-3 text-card-foreground shadow-none">
+                          <div className="mb-2 flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                               <ShieldCheck className="h-5 w-5 text-primary" />
                             </div>
                             <div>
@@ -912,7 +925,7 @@ const Dashboard = () => {
                                   ? t("dashboard.highestWeeklyRisk")
                                   : t("dashboard.highestMonthlyRisk")}
                               </p>
-                              <h4 className="text-xl font-bold">
+                              <h4 className="text-xl font-bold text-foreground">
                                 {highestRangeRisk
                                   ? `${formatNumber(
                                       highestRangeRisk.probability,
@@ -932,7 +945,9 @@ const Dashboard = () => {
                                 highestRangeRisk.risk_level
                               )}`}
                             >
-                              {getLocalizedRiskLabel(highestRangeRisk.risk_level)}
+                              {getLocalizedRiskLabel(
+                                highestRangeRisk.risk_level
+                              )}
                             </Badge>
                           )}
                         </Card>
@@ -941,16 +956,16 @@ const Dashboard = () => {
                   </div>
                 )}
 
-                <div className="rounded-[20px] border bg-gradient-to-b from-primary/5 via-background to-background p-3 md:p-4 mb-4">
+                <div className="mb-4 rounded-[20px] border border-border bg-gradient-to-b from-primary/5 via-background to-background p-3 md:p-4">
                   <div className="space-y-4">
-                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1.5">
+                        <p className="mb-1.5 text-sm text-muted-foreground">
                           {t("dashboard.latestAnalysisScore")}
                         </p>
 
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <h2 className="text-3xl md:text-4xl font-bold">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h2 className="text-3xl font-bold text-foreground md:text-4xl">
                             {latestPrediction
                               ? `${formatNumber(latestPrediction.probability, {
                                   minimumFractionDigits: 2,
@@ -965,14 +980,16 @@ const Dashboard = () => {
                                 latestPrediction.risk_level
                               )}`}
                             >
-                              {getLocalizedRiskLabel(latestPrediction.risk_level)}
+                              {getLocalizedRiskLabel(
+                                latestPrediction.risk_level
+                              )}
                             </Badge>
                           )}
                         </div>
                       </div>
 
                       <div className={isArabic ? "md:text-left" : "md:text-right"}>
-                        <p className="text-sm text-muted-foreground mb-1.5">
+                        <p className="mb-1.5 text-sm text-muted-foreground">
                           {t("dashboard.recentAnalyses")}
                         </p>
                         <p className="text-2xl font-bold text-primary">
@@ -988,8 +1005,8 @@ const Dashboard = () => {
                     </div>
 
                     {vitalsChartData.length > 0 ? (
-                      <div className="rounded-[20px] border bg-card p-3 sm:p-4 md:p-5">
-                        <div className="h-[210px] sm:h-[240px] md:h-[280px] w-full">
+                      <div className="rounded-[20px] border border-border bg-card p-3 text-card-foreground sm:p-4 md:p-5">
+                        <div className="h-[210px] w-full sm:h-[240px] md:h-[280px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <AreaChart
                               data={vitalsChartData}
@@ -1061,7 +1078,14 @@ const Dashboard = () => {
                                   borderRadius: "14px",
                                   border: "1px solid hsl(var(--border))",
                                   background: "hsl(var(--card))",
-                                  boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+                                  color: "hsl(var(--card-foreground))",
+                                  boxShadow: "0 10px 30px rgba(0,0,0,0.18)",
+                                }}
+                                labelStyle={{
+                                  color: "hsl(var(--foreground))",
+                                }}
+                                itemStyle={{
+                                  color: "hsl(var(--foreground))",
                                 }}
                                 formatter={(value: number) => [
                                   value,
@@ -1100,7 +1124,7 @@ const Dashboard = () => {
                         </div>
                       </div>
                     ) : (
-                      <div className="rounded-xl border border-dashed bg-muted/20 p-6 text-center text-sm text-muted-foreground">
+                      <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
                         {t("dashboard.noData")}
                       </div>
                     )}
@@ -1110,22 +1134,25 @@ const Dashboard = () => {
                 {isLoading ? (
                   <div className="space-y-3">
                     {[1, 2, 3].map((item) => (
-                      <div key={item} className="rounded-2xl border p-4">
-                        <div className="h-4 w-48 bg-muted rounded mb-3" />
-                        <div className="h-3 w-32 bg-muted rounded mb-2" />
-                        <div className="h-3 w-24 bg-muted rounded" />
+                      <div
+                        key={item}
+                        className="rounded-2xl border border-border bg-card p-4"
+                      >
+                        <div className="mb-3 h-4 w-48 rounded bg-muted" />
+                        <div className="mb-2 h-3 w-32 rounded bg-muted" />
+                        <div className="h-3 w-24 rounded bg-muted" />
                       </div>
                     ))}
                   </div>
                 ) : predictions.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed p-8 text-center bg-muted/20">
-                    <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-8 text-center">
+                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
                       <Beaker className="h-7 w-7 text-primary" />
                     </div>
-                    <h4 className="text-lg font-semibold mb-2">
+                    <h4 className="mb-2 text-lg font-semibold text-foreground">
                       {t("dashboard.noPreviousAnalyses")}
                     </h4>
-                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                    <p className="mx-auto mb-6 max-w-md text-muted-foreground">
                       {t("dashboard.healthTipText")}
                     </p>
                     <Link to="/diagnosis">
@@ -1133,40 +1160,40 @@ const Dashboard = () => {
                     </Link>
                   </div>
                 ) : searchTerm && displayedPredictions.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed p-8 text-center bg-muted/20">
-                    <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-8 text-center">
+                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
                       <Search className="h-7 w-7 text-primary" />
                     </div>
-                    <h4 className="text-lg font-semibold mb-2">
+                    <h4 className="mb-2 text-lg font-semibold text-foreground">
                       {t("dashboard.noData")}
                     </h4>
                     <p className="text-muted-foreground">{searchTerm}</p>
                   </div>
                 ) : error ? (
                   <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-8 text-center">
-                    <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-red-500/10 flex items-center justify-center">
+                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10">
                       <AlertTriangle className="h-6 w-6 text-red-500" />
                     </div>
-                    <h4 className="font-semibold mb-2">
+                    <h4 className="mb-2 font-semibold text-foreground">
                       {t("dashboard.unableToLoadAnalyses")}
                     </h4>
                     <p className="text-sm text-red-500">{error}</p>
                   </div>
                 ) : (
                   <>
-                    <div className="hidden lg:block w-full overflow-hidden">
-                      <div className="w-full overflow-hidden rounded-[20px] border">
-                        <div className="grid grid-cols-[minmax(220px,2fr)_minmax(180px,1.45fr)_minmax(110px,1.05fr)_minmax(120px,1.1fr)] gap-4 bg-muted/30 px-5 py-4 text-sm font-semibold text-muted-foreground">
+                    <div className="hidden w-full overflow-hidden lg:block">
+                      <div className="w-full overflow-hidden rounded-[20px] border border-border bg-card">
+                        <div className="grid grid-cols-[minmax(220px,2fr)_minmax(180px,1.45fr)_minmax(110px,1.05fr)_minmax(120px,1.1fr)] gap-4 border-b border-border bg-muted/30 px-5 py-4 text-sm font-semibold text-muted-foreground">
                           <span className="text-start">
                             {t("dashboard.recentAnalyses")}
                           </span>
                           <span className="text-start">
                             {t("dashboard.riskIndicators")}
                           </span>
-                          <span className="text-start whitespace-nowrap">
+                          <span className="whitespace-nowrap text-start">
                             {t("dashboard.date")}
                           </span>
-                          <span className="text-center whitespace-nowrap">
+                          <span className="whitespace-nowrap text-center">
                             {t("dashboard.action")}
                           </span>
                         </div>
@@ -1177,17 +1204,17 @@ const Dashboard = () => {
                           return (
                             <div
                               key={pred.id}
-                              className="grid grid-cols-[minmax(220px,2fr)_minmax(180px,1.45fr)_minmax(110px,1.05fr)_minmax(120px,1.1fr)] gap-4 items-center px-5 py-4 border-t hover:bg-muted/10"
+                              className="grid grid-cols-[minmax(220px,2fr)_minmax(180px,1.45fr)_minmax(110px,1.05fr)_minmax(120px,1.1fr)] items-center gap-4 border-t border-border px-5 py-4 hover:bg-muted/20"
                             >
                               <div className="min-w-0">
                                 <div className="flex items-center gap-3">
-                                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
                                     <Activity className="h-5 w-5 text-primary" />
                                   </div>
 
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <p className="font-semibold truncate">
+                                      <p className="truncate font-semibold text-foreground">
                                         {t("dashboard.infectionProbability")}:{" "}
                                         {formatNumber(pred.probability, {
                                           minimumFractionDigits: 2,
@@ -1213,12 +1240,12 @@ const Dashboard = () => {
                                   {topIndicators.map((indicator) => (
                                     <div
                                       key={indicator.key}
-                                      className="flex items-center gap-2 min-w-0"
+                                      className="flex min-w-0 items-center gap-2"
                                     >
-                                      <span className="font-medium text-foreground whitespace-nowrap">
+                                      <span className="whitespace-nowrap font-medium text-foreground">
                                         {indicator.label}:
                                       </span>
-                                      <span className="text-muted-foreground whitespace-nowrap">
+                                      <span className="whitespace-nowrap text-muted-foreground">
                                         {formatNumber(indicator.value)}
                                       </span>
                                     </div>
@@ -1230,7 +1257,7 @@ const Dashboard = () => {
                                 <p className="whitespace-nowrap">
                                   {formatDate(pred.created_at)}
                                 </p>
-                                <p className="mt-1 text-xs text-muted-foreground whitespace-nowrap">
+                                <p className="mt-1 whitespace-nowrap text-xs text-muted-foreground">
                                   {formatTime(pred.created_at)}
                                 </p>
                               </div>
@@ -1260,7 +1287,7 @@ const Dashboard = () => {
                                 >
                                   <Button
                                     variant="ghost"
-                                    className="whitespace-nowrap h-10"
+                                    className="h-10 whitespace-nowrap hover:bg-primary/10 hover:text-primary"
                                   >
                                     {t("dashboard.viewReport")}
                                   </Button>
@@ -1279,16 +1306,16 @@ const Dashboard = () => {
                         return (
                           <div
                             key={pred.id}
-                            className="rounded-[18px] border p-4 bg-background"
+                            className="rounded-[18px] border border-border bg-card p-4 text-card-foreground"
                           >
                             <div className="flex items-start gap-3">
-                              <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
                                 <Activity className="h-5 w-5 text-primary" />
                               </div>
 
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <p className="font-semibold leading-snug">
+                                  <p className="font-semibold leading-snug text-foreground">
                                     {t("dashboard.infectionProbability")}:{" "}
                                     {formatNumber(pred.probability, {
                                       minimumFractionDigits: 2,
@@ -1307,7 +1334,7 @@ const Dashboard = () => {
                                 </div>
 
                                 <div className="mt-3 rounded-xl bg-muted/30 p-3">
-                                  <p className="text-xs text-muted-foreground mb-2">
+                                  <p className="mb-2 text-xs text-muted-foreground">
                                     {t("dashboard.riskIndicators")}
                                   </p>
 
@@ -1315,12 +1342,12 @@ const Dashboard = () => {
                                     {topIndicators.map((indicator) => (
                                       <div
                                         key={indicator.key}
-                                        className="flex items-center gap-2 min-w-0"
+                                        className="flex min-w-0 items-center gap-2"
                                       >
-                                        <span className="font-medium text-foreground whitespace-nowrap">
+                                        <span className="whitespace-nowrap font-medium text-foreground">
                                           {indicator.label}:
                                         </span>
-                                        <span className="text-muted-foreground whitespace-nowrap">
+                                        <span className="whitespace-nowrap text-muted-foreground">
                                           {formatNumber(indicator.value)}
                                         </span>
                                       </div>
@@ -1329,13 +1356,13 @@ const Dashboard = () => {
                                 </div>
 
                                 <div className="mt-3 rounded-xl bg-muted/30 p-3">
-                                  <p className="text-xs text-muted-foreground mb-1">
+                                  <p className="mb-1 text-xs text-muted-foreground">
                                     {t("dashboard.date")}
                                   </p>
                                   <p className="text-sm text-muted-foreground">
                                     {formatDate(pred.created_at)}
                                   </p>
-                                  <p className="text-xs text-muted-foreground mt-1">
+                                  <p className="mt-1 text-xs text-muted-foreground">
                                     {formatTime(pred.created_at)}
                                   </p>
                                 </div>
@@ -1366,7 +1393,7 @@ const Dashboard = () => {
                                     <Button
                                       type="button"
                                       variant="ghost"
-                                      className="w-full h-10"
+                                      className="h-10 w-full hover:bg-primary/10 hover:text-primary"
                                     >
                                       {t("dashboard.viewReport")}
                                     </Button>
@@ -1384,30 +1411,30 @@ const Dashboard = () => {
             </section>
 
             <section
-              className={`grid grid-cols-1 gap-4 items-start ${smoothSectionClass}`}
+              className={`grid grid-cols-1 items-start gap-4 ${smoothSectionClass}`}
             >
-              <Card className="rounded-[22px] border bg-card p-4 md:p-5 shadow-sm">
+              <Card className="rounded-[22px] border border-border bg-card p-4 text-card-foreground shadow-sm md:p-5">
                 <div className="mb-4">
-                  <h3 className="font-bold text-xl">
+                  <h3 className="text-xl font-bold text-foreground">
                     {t("dashboard.lastDoctorContact")}
                   </h3>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {t("dashboard.lastDoctorContactDesc")}
                   </p>
                 </div>
 
-                <div className="rounded-[18px] border bg-primary/5 p-4">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+                <div className="rounded-[18px] border border-border bg-primary/5 p-4">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
                         <Stethoscope className="h-6 w-6 text-primary" />
                       </div>
 
                       <div className="min-w-0">
-                        <h4 className="text-lg font-semibold truncate">
+                        <h4 className="truncate text-lg font-semibold text-foreground">
                           {t("dashboard.doctorCardTitle")}
                         </h4>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="mt-1 text-sm text-muted-foreground">
                           {t("dashboard.doctorCardText")}
                         </p>
                       </div>

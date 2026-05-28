@@ -16,6 +16,13 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -51,13 +58,6 @@ const formSchema = z.object({
     .min(0, "يجب أن يكون 0 أو أكثر")
     .max(300, "الحد الأقصى 300 mg/dL"),
 
-  // ده ضغط الدم الخاص بموديل السكري PIMA.
-  bloodPressure: z.coerce
-    .number()
-    .min(0, "يجب أن يكون 0 أو أكثر")
-    .max(180, "الحد الأقصى 180 mmHg"),
-
-  // دول مخصوص لحساب الكارديو في الفرونت فقط.
   systolicBloodPressure: z.coerce
     .number()
     .min(0, "يجب أن يكون 0 أو أكثر")
@@ -244,6 +244,17 @@ export default function DiagnosisWizard() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeStep, setActiveStep] = useState<StepKey>("basic");
 
+  const inputClassName = `h-11 w-full rounded-full border border-primary/30 bg-background px-5 text-sm font-medium text-foreground shadow-sm transition-all placeholder:text-muted-foreground hover:bg-primary/5 focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-0 sm:h-10 ${
+    isArabic ? "text-right" : "text-left"
+  }`;
+
+  const selectTriggerClassName = `h-11 w-full rounded-full border border-primary/30 bg-background px-5 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-primary/5 focus:bg-background focus:ring-2 focus:ring-primary/30 focus:ring-offset-0 sm:h-10 ${
+    isArabic ? "text-right" : "text-left"
+  }`;
+
+  const stepCardClassName =
+    "animate-in fade-in-0 slide-in-from-bottom-3 rounded-xl border border-border bg-card/70 text-card-foreground shadow-sm duration-500";
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     mode: "onChange",
@@ -251,7 +262,6 @@ export default function DiagnosisWizard() {
       gender: "male",
       pregnancies: 0,
       glucose: 85,
-      bloodPressure: 70,
       systolicBloodPressure: 120,
       diastolicBloodPressure: 80,
       skinThickness: 20,
@@ -293,7 +303,6 @@ export default function DiagnosisWizard() {
     if (activeStep === "vitals") {
       return await trigger([
         "glucose",
-        "bloodPressure",
         "systolicBloodPressure",
         "diastolicBloodPressure",
         "skinThickness",
@@ -316,13 +325,10 @@ export default function DiagnosisWizard() {
     try {
       const heightInMeters = values.height / 100;
 
-      // ده للسكري فقط.
       const calculatedBmi = Number(
         (values.weight / (heightInMeters * heightInMeters)).toFixed(1)
       );
 
-      // الكارديو بيتحسب Frontend فقط.
-      // مفيش BMI داخل في حساب الكارديو.
       const cardiovascularPrediction = calculateCardiovascularPrediction({
         age: values.age,
         gender: values.gender,
@@ -335,12 +341,11 @@ export default function DiagnosisWizard() {
         isArabic,
       });
 
-      // ده اللي بيتبعت للباك لموديل السكري فقط.
       const backendData = {
         gender: values.gender,
         pregnancies: values.gender === "female" ? values.pregnancies : 0,
         glucose: values.glucose,
-        blood_pressure: values.bloodPressure,
+        blood_pressure: values.diastolicBloodPressure,
         skin_thickness: values.skinThickness,
         insulin: values.insulin,
         bmi: calculatedBmi,
@@ -366,14 +371,9 @@ export default function DiagnosisWizard() {
             gender: values.gender,
             pregnancies: values.gender === "female" ? values.pregnancies : 0,
             glucose: values.glucose,
-
-            // ده ضغط الدم الخاص بالسكري.
-            bloodPressure: values.bloodPressure,
-
-            // دول مخصوص للكارديو.
+            bloodPressure: values.diastolicBloodPressure,
             systolicBloodPressure: values.systolicBloodPressure,
             diastolicBloodPressure: values.diastolicBloodPressure,
-
             skinThickness: values.skinThickness,
             insulin: values.insulin,
             weight: values.weight,
@@ -381,8 +381,6 @@ export default function DiagnosisWizard() {
             cholesterol: values.cholesterol,
             diabetesPedigreeFunction: values.diabetesPedigreeFunction,
             age: values.age,
-
-            // BMI متاح للتوافق أو العرض، لكنه مش مستخدم في الكارديو.
             bmi: calculatedBmi,
           },
 
@@ -462,7 +460,7 @@ export default function DiagnosisWizard() {
 
   return (
     <div
-      className="min-h-screen flex flex-col overflow-x-hidden bg-gradient-to-b from-background via-background to-accent/20"
+      className="flex min-h-screen flex-col overflow-x-hidden bg-gradient-to-b from-background via-background to-accent/20 text-foreground"
       dir={isArabic ? "rtl" : "ltr"}
     >
       <Header variant="dashboard" />
@@ -474,19 +472,19 @@ export default function DiagnosisWizard() {
           paddingBottom: "24px",
         }}
       >
-        <Card className="overflow-hidden rounded-2xl border-0 bg-background/95 shadow-xl backdrop-blur sm:rounded-3xl">
-          <CardHeader className="border-b bg-gradient-to-br from-background via-primary/5 to-accent/30 px-4 pb-4 pt-5 text-center sm:px-6 sm:pb-5 sm:pt-6">
+        <Card className="overflow-hidden rounded-2xl border border-border bg-card/95 text-card-foreground shadow-xl backdrop-blur sm:rounded-3xl">
+          <CardHeader className="border-b border-border bg-gradient-to-br from-card via-primary/5 to-accent/30 px-4 pb-4 pt-5 text-center sm:px-6 sm:pb-5 sm:pt-6">
             <div className="mb-3 flex justify-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 shadow-sm sm:h-14 sm:w-14">
                 <Activity className="h-6 w-6 text-primary sm:h-7 sm:w-7" />
               </div>
             </div>
 
-            <CardTitle className="text-xl font-bold tracking-tight sm:text-2xl md:text-3xl">
+            <CardTitle className="text-xl font-bold tracking-tight text-card-foreground sm:text-2xl md:text-3xl">
               {t("diagnosisWizard.pageTitle")}
             </CardTitle>
 
-            <CardDescription className="mx-auto mt-2 max-w-xl text-xs leading-6 sm:text-sm md:text-base">
+            <CardDescription className="mx-auto mt-2 max-w-xl text-xs leading-6 text-muted-foreground sm:text-sm md:text-base">
               {t("diagnosisWizard.pageSubtitle")}
             </CardDescription>
           </CardHeader>
@@ -573,7 +571,7 @@ export default function DiagnosisWizard() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                 <div className="relative min-h-[250px] sm:min-h-[270px] md:min-h-[300px]">
                   {activeStep === "basic" && (
-                    <Card className="animate-in fade-in-0 slide-in-from-bottom-3 rounded-xl border border-border/70 bg-card/40 shadow-sm duration-500">
+                    <Card className={stepCardClassName}>
                       <CardHeader className="px-4 pb-3 pt-4 sm:px-5 sm:pb-4 sm:pt-5">
                         <div
                           className={`flex items-start gap-2 sm:items-center ${
@@ -583,11 +581,11 @@ export default function DiagnosisWizard() {
                           <UserRound className="mt-1 h-4 w-4 shrink-0 text-primary sm:mt-0" />
 
                           <div className={sectionTitleClass}>
-                            <CardTitle className="text-base sm:text-lg">
+                            <CardTitle className="text-base text-card-foreground sm:text-lg">
                               {t("diagnosisWizard.section1")}
                             </CardTitle>
 
-                            <CardDescription className="mt-1 text-xs leading-5 sm:text-sm">
+                            <CardDescription className="mt-1 text-xs leading-5 text-muted-foreground sm:text-sm">
                               {t("diagnosisWizard.section1Desc")}
                             </CardDescription>
                           </div>
@@ -606,19 +604,42 @@ export default function DiagnosisWizard() {
                                 </FormLabel>
 
                                 <FormControl>
-                                  <select
+                                  <Select
                                     value={field.value}
-                                    onChange={field.onChange}
-                                    className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring sm:h-10"
+                                    onValueChange={field.onChange}
                                   >
-                                    <option value="male">
-                                      {isArabic ? "ذكر" : "Male"}
-                                    </option>
+                                    <SelectTrigger
+                                      dir={isArabic ? "rtl" : "ltr"}
+                                      className={selectTriggerClassName}
+                                    >
+                                      <SelectValue
+                                        placeholder={
+                                          isArabic
+                                            ? "اختاري النوع"
+                                            : "Select gender"
+                                        }
+                                      />
+                                    </SelectTrigger>
 
-                                    <option value="female">
-                                      {isArabic ? "أنثى" : "Female"}
-                                    </option>
-                                  </select>
+                                    <SelectContent
+                                      dir={isArabic ? "rtl" : "ltr"}
+                                      className="rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl [&_[cmdk-item-indicator]]:hidden [&_svg]:hidden"
+                                    >
+                                      <SelectItem
+                                        value="male"
+                                        className="cursor-pointer rounded-xl px-4 py-2 text-sm text-foreground focus:bg-primary/10 focus:text-primary"
+                                      >
+                                        {isArabic ? "ذكر" : "Male"}
+                                      </SelectItem>
+
+                                      <SelectItem
+                                        value="female"
+                                        className="cursor-pointer rounded-xl px-4 py-2 text-sm text-foreground focus:bg-primary/10 focus:text-primary"
+                                      >
+                                        {isArabic ? "أنثى" : "Female"}
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
                                 </FormControl>
 
                                 <FormDescription className="text-xs">
@@ -647,7 +668,7 @@ export default function DiagnosisWizard() {
                                     min={21}
                                     max={81}
                                     {...field}
-                                    className="h-11 rounded-lg sm:h-10"
+                                    className={inputClassName}
                                   />
                                 </FormControl>
 
@@ -676,7 +697,7 @@ export default function DiagnosisWizard() {
                                       min={0}
                                       max={20}
                                       {...field}
-                                      className="h-11 rounded-lg sm:h-10"
+                                      className={inputClassName}
                                     />
                                   </FormControl>
 
@@ -695,7 +716,7 @@ export default function DiagnosisWizard() {
                   )}
 
                   {activeStep === "vitals" && (
-                    <Card className="animate-in fade-in-0 slide-in-from-bottom-3 rounded-xl border border-border/70 bg-card/40 shadow-sm duration-500">
+                    <Card className={stepCardClassName}>
                       <CardHeader className="px-4 pb-3 pt-4 sm:px-5 sm:pb-4 sm:pt-5">
                         <div
                           className={`flex items-start gap-2 sm:items-center ${
@@ -705,11 +726,11 @@ export default function DiagnosisWizard() {
                           <HeartPulse className="mt-1 h-4 w-4 shrink-0 text-primary sm:mt-0" />
 
                           <div className={sectionTitleClass}>
-                            <CardTitle className="text-base sm:text-lg">
+                            <CardTitle className="text-base text-card-foreground sm:text-lg">
                               {t("diagnosisWizard.section2")}
                             </CardTitle>
 
-                            <CardDescription className="mt-1 text-xs leading-5 sm:text-sm">
+                            <CardDescription className="mt-1 text-xs leading-5 text-muted-foreground sm:text-sm">
                               {t("diagnosisWizard.section2Desc")}
                             </CardDescription>
                           </div>
@@ -733,40 +754,12 @@ export default function DiagnosisWizard() {
                                     min={0}
                                     max={300}
                                     {...field}
-                                    className="h-11 rounded-lg sm:h-10"
+                                    className={inputClassName}
                                   />
                                 </FormControl>
 
                                 <FormDescription className="text-xs">
                                   {t("diagnosisWizard.glucoseDesc")}
-                                </FormDescription>
-
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            name="bloodPressure"
-                            control={form.control}
-                            render={({ field }) => (
-                              <FormItem className={fieldTextClass}>
-                                <FormLabel>
-                                  {t("diagnosisWizard.bloodPressure")}
-                                </FormLabel>
-
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    max={180}
-                                    {...field}
-                                    className="h-11 rounded-lg sm:h-10"
-                                  />
-                                </FormControl>
-
-                                <FormDescription className="text-xs">
-                                  {t("diagnosisWizard.bloodPressureDesc")}
                                 </FormDescription>
 
                                 <FormMessage />
@@ -791,13 +784,13 @@ export default function DiagnosisWizard() {
                                     min={0}
                                     max={260}
                                     {...field}
-                                    className="h-11 rounded-lg sm:h-10"
+                                    className={inputClassName}
                                   />
                                 </FormControl>
 
                                 <FormDescription className="text-xs">
                                   {isArabic
-                                    ? "خاص بحساب خطر القلب والأوعية الدموية مثل 120"
+                                    ? "خاص بحساب خطر القلب والأوعية الدموية، مثال: 120"
                                     : "Used for cardiovascular risk calculation, e.g. 120"}
                                 </FormDescription>
 
@@ -823,14 +816,14 @@ export default function DiagnosisWizard() {
                                     min={0}
                                     max={180}
                                     {...field}
-                                    className="h-11 rounded-lg sm:h-10"
+                                    className={inputClassName}
                                   />
                                 </FormControl>
 
                                 <FormDescription className="text-xs">
                                   {isArabic
-                                    ? "خاص بحساب خطر القلب والأوعية الدموية مثل 80"
-                                    : "Used for cardiovascular risk calculation, e.g. 80"}
+                                    ? "يستخدم للكارديو، ويتبعت لموديل السكر كضغط الدم، مثال: 80"
+                                    : "Used for cardio and sent to diabetes model as blood pressure, e.g. 80"}
                                 </FormDescription>
 
                                 <FormMessage />
@@ -853,7 +846,7 @@ export default function DiagnosisWizard() {
                                     min={0}
                                     max={99}
                                     {...field}
-                                    className="h-11 rounded-lg sm:h-10"
+                                    className={inputClassName}
                                   />
                                 </FormControl>
 
@@ -881,7 +874,7 @@ export default function DiagnosisWizard() {
                                     min={0}
                                     max={846}
                                     {...field}
-                                    className="h-11 rounded-lg sm:h-10"
+                                    className={inputClassName}
                                   />
                                 </FormControl>
 
@@ -910,7 +903,7 @@ export default function DiagnosisWizard() {
                                     min={1}
                                     max={300}
                                     {...field}
-                                    className="h-11 rounded-lg sm:h-10"
+                                    className={inputClassName}
                                   />
                                 </FormControl>
 
@@ -941,7 +934,7 @@ export default function DiagnosisWizard() {
                                     min={80}
                                     max={250}
                                     {...field}
-                                    className="h-11 rounded-lg sm:h-10"
+                                    className={inputClassName}
                                   />
                                 </FormControl>
 
@@ -961,7 +954,7 @@ export default function DiagnosisWizard() {
                   )}
 
                   {activeStep === "risk" && (
-                    <Card className="animate-in fade-in-0 slide-in-from-bottom-3 rounded-xl border border-border/70 bg-card/40 shadow-sm duration-500">
+                    <Card className={stepCardClassName}>
                       <CardHeader className="px-4 pb-3 pt-4 sm:px-5 sm:pb-4 sm:pt-5">
                         <div
                           className={`flex items-start gap-2 sm:items-center ${
@@ -971,11 +964,11 @@ export default function DiagnosisWizard() {
                           <FlaskConical className="mt-1 h-4 w-4 shrink-0 text-primary sm:mt-0" />
 
                           <div className={sectionTitleClass}>
-                            <CardTitle className="text-base sm:text-lg">
+                            <CardTitle className="text-base text-card-foreground sm:text-lg">
                               {t("diagnosisWizard.section3")}
                             </CardTitle>
 
-                            <CardDescription className="mt-1 text-xs leading-5 sm:text-sm">
+                            <CardDescription className="mt-1 text-xs leading-5 text-muted-foreground sm:text-sm">
                               {t("diagnosisWizard.section3Desc")}
                             </CardDescription>
                           </div>
@@ -1001,7 +994,7 @@ export default function DiagnosisWizard() {
                                     min={0}
                                     max={500}
                                     {...field}
-                                    className="h-11 rounded-lg sm:h-10"
+                                    className={inputClassName}
                                   />
                                 </FormControl>
 
@@ -1032,7 +1025,7 @@ export default function DiagnosisWizard() {
                                     min={0.078}
                                     max={2.42}
                                     {...field}
-                                    className="h-11 rounded-lg sm:h-10"
+                                    className={inputClassName}
                                   />
                                 </FormControl>
 
@@ -1063,7 +1056,7 @@ export default function DiagnosisWizard() {
                         type="button"
                         variant="outline"
                         onClick={goPrevious}
-                        className={`h-11 w-full rounded-full px-5 text-sm font-medium shadow-sm sm:h-10 sm:w-auto ${
+                        className={`h-11 w-full rounded-full border-border bg-background px-5 text-sm font-medium text-foreground shadow-sm hover:bg-primary/10 hover:text-primary sm:h-10 sm:w-auto ${
                           isArabic ? "flex-row-reverse" : ""
                         }`}
                       >

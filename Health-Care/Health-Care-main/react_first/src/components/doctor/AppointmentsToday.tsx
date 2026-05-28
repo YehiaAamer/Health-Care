@@ -128,9 +128,9 @@ export default function AppointmentsToday({
   };
 
   return (
-    <Card className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:shadow-md hover:shadow-slate-200/60">
+    <Card className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-md">
       <CardHeader className="flex shrink-0 flex-row items-center justify-between gap-3 px-4 pb-2 pt-4 sm:px-5 sm:pb-3 sm:pt-5">
-        <CardTitle className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold tracking-tight text-slate-900 sm:text-base">
+        <CardTitle className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold tracking-tight text-foreground sm:text-base">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:h-8 sm:w-8">
             <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.3} />
           </span>
@@ -175,8 +175,8 @@ export default function AppointmentsToday({
             ))}
           </div>
         ) : safeAppointments.length === 0 ? (
-          <div className="flex min-h-[110px] flex-1 flex-col items-center justify-center rounded-xl bg-muted/30 px-4 text-center text-muted-foreground">
-            <Calendar className="mb-2 h-7 w-7 opacity-25" />
+          <div className="flex min-h-[110px] flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-4 text-center text-muted-foreground">
+            <Calendar className="mb-2 h-7 w-7 opacity-40" />
 
             <p className="max-w-[240px] text-sm">
               {t("doctorDashboard.appointments.empty")}
@@ -195,16 +195,16 @@ export default function AppointmentsToday({
                 >
                   <div
                     className={cn(
-                      "h-2 w-2 shrink-0 rounded-full border-2 border-background sm:h-2.5 sm:w-2.5",
+                      "h-2 w-2 shrink-0 rounded-full border-2 border-card sm:h-2.5 sm:w-2.5",
                       getStatusColor()
                     )}
                   />
 
-                  <div className="w-[56px] shrink-0 text-[11px] font-semibold leading-none text-slate-500 sm:w-[68px] sm:text-sm">
+                  <div className="w-[56px] shrink-0 text-[11px] font-semibold leading-none text-muted-foreground sm:w-[68px] sm:text-sm">
                     {getTime(appt)}
                   </div>
 
-                  <div className="flex min-h-[40px] min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/40 px-2 py-1.5 transition-colors hover:bg-primary/5 sm:min-h-[46px] sm:gap-2.5 sm:px-2.5 sm:py-2">
+                  <div className="flex min-h-[40px] min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-muted/30 px-2 py-1.5 transition-colors hover:bg-primary/5 sm:min-h-[46px] sm:gap-2.5 sm:px-2.5 sm:py-2">
                     <Avatar className="h-7 w-7 shrink-0 border border-border sm:h-8 sm:w-8">
                       <AvatarImage src={getPatientImage(appt)} />
 
@@ -214,14 +214,14 @@ export default function AppointmentsToday({
                     </Avatar>
 
                     <div className="min-w-0 flex-1 overflow-hidden">
-                      <p className="truncate text-xs font-semibold leading-4 text-slate-900 sm:text-sm">
+                      <p className="truncate text-xs font-semibold leading-4 text-foreground sm:text-sm">
                         {patientName}
                       </p>
 
                       <div className="mt-0.5 flex items-center gap-1">
                         {getTypeIcon(appointmentType)}
 
-                        <p className="truncate text-[10px] capitalize leading-3 text-slate-500 sm:text-[11px]">
+                        <p className="truncate text-[10px] capitalize leading-3 text-muted-foreground sm:text-[11px]">
                           {appointmentType.replaceAll("_", " ")}
                         </p>
                       </div>

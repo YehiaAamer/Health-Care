@@ -302,13 +302,13 @@ export default function MessagesPage() {
   const getRiskBadgeStyles = (level?: string) => {
     switch (normalizeRisk(level)) {
       case "veryhigh":
-        return "border-red-200 bg-red-600 text-white";
+        return "border-red-500 bg-red-600 text-white dark:border-red-400 dark:bg-red-500 dark:text-white";
       case "high":
-        return "border-red-100 bg-red-50 text-red-600";
+        return "border-red-100 bg-red-50 text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300";
       case "medium":
-        return "border-amber-100 bg-amber-50 text-amber-600";
+        return "border-amber-100 bg-amber-50 text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300";
       case "low":
-        return "border-emerald-100 bg-emerald-50 text-emerald-600";
+        return "border-emerald-100 bg-emerald-50 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300";
       default:
         return "border-primary/15 bg-primary/10 text-primary";
     }
@@ -333,8 +333,14 @@ export default function MessagesPage() {
   };
 
   const getIndicatorDotClass = (color: "red" | "green" | "primary") => {
-    if (color === "red") return "bg-red-500 ring-red-100";
-    if (color === "green") return "bg-emerald-500 ring-emerald-100";
+    if (color === "red") {
+      return "bg-red-500 ring-red-100 dark:ring-red-500/20";
+    }
+
+    if (color === "green") {
+      return "bg-emerald-500 ring-emerald-100 dark:ring-emerald-500/20";
+    }
+
     return "bg-primary ring-primary/10";
   };
 
@@ -345,7 +351,8 @@ export default function MessagesPage() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center">
         <LoadingDots />
-        <p className="mt-4 text-xs font-bold uppercase tracking-widest text-slate-400">
+
+        <p className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
           {t("doctorDashboard.sidebar.messages.loading")}
         </p>
       </div>
@@ -355,7 +362,7 @@ export default function MessagesPage() {
   return (
     <div
       dir={isArabic ? "rtl" : "ltr"}
-      className="grid min-h-[calc(100vh-132px)] grid-cols-1 gap-4 overflow-visible pt-8 animate-in fade-in duration-700 md:min-h-[calc(100vh-100px)] md:pt-0 2xl:grid-cols-[minmax(0,1fr)_360px]"
+      className="grid min-h-[calc(100vh-132px)] grid-cols-1 gap-5 overflow-visible pt-8 text-foreground animate-in fade-in duration-700 md:min-h-[calc(100vh-100px)] md:pt-0 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[320px_minmax(0,1fr)_360px]"
       onClick={closeMenus}
     >
       <input
@@ -365,408 +372,12 @@ export default function MessagesPage() {
         onChange={handleFileSelected}
       />
 
-      <Card className="relative z-20 grid min-h-0 overflow-visible rounded-3xl border border-slate-100 bg-white shadow-sm xl:h-[calc(100vh-100px)] xl:grid-cols-[320px_minmax(0,1fr)]">
-        <div
-          className={cn(
-            "relative z-30 flex h-[360px] min-h-0 flex-col overflow-visible rounded-t-3xl bg-white sm:h-[420px] xl:h-full",
-            "xl:rounded-none xl:rounded-s-3xl",
-            isArabic
-              ? "xl:border-l xl:border-slate-100"
-              : "xl:border-r xl:border-slate-100"
-          )}
-        >
-          <div className="shrink-0 rounded-t-3xl border-b border-slate-100 bg-white p-4 sm:p-5 xl:rounded-ss-3xl xl:rounded-tr-none">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
-                {t("doctorDashboard.sidebar.messages.title")}
-              </h2>
-
-              <div className="relative">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenMenu(openMenu === "threads" ? null : "threads");
-                    setOpenConversationMenu(null);
-                    setRiskDropdownOpen(false);
-                  }}
-                  className="h-9 w-9 rounded-xl text-slate-400 hover:bg-primary/10 hover:text-primary"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-
-                {openMenu === "threads" && (
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    className={cn(
-                      "absolute top-11 z-[100] w-48 rounded-2xl border border-slate-100 bg-white p-2 shadow-xl",
-                      isArabic ? "left-0" : "right-0"
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        closeMenus();
-                        fetchConversations(true);
-                      }}
-                      className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-slate-600 hover:bg-primary/10 hover:text-primary"
-                    >
-                      {isArabic ? "تحديث المحادثات" : "Refresh conversations"}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearch("");
-                        closeMenus();
-                      }}
-                      className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-slate-600 hover:bg-primary/10 hover:text-primary"
-                    >
-                      {isArabic ? "مسح البحث" : "Clear search"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="relative mb-4">
-              <Search
-                className={cn(
-                  "absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400",
-                  isArabic ? "right-4" : "left-4"
-                )}
-              />
-
-              <Input
-                placeholder={isArabic ? "اختار مريض..." : "Select patient..."}
-                className={cn(
-                  "h-11 rounded-2xl border-slate-200 bg-white text-sm font-semibold shadow-sm focus-visible:ring-4 focus-visible:ring-primary/10",
-                  isArabic ? "pr-11 pl-10 text-right" : "pl-11 pr-10"
-                )}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  className={cn(
-                    "absolute top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary",
-                    isArabic ? "left-3" : "right-3"
-                  )}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-
-            <div className="flex gap-2 overflow-visible pb-1">
-              {[
-                {
-                  id: "all",
-                  label: t("doctorDashboard.sidebar.messages.filters.all"),
-                },
-                {
-                  id: "unread",
-                  label: t("doctorDashboard.sidebar.messages.filters.unread"),
-                },
-              ].map((filter) => (
-                <button
-                  key={filter.id}
-                  type="button"
-                  onClick={() => setActiveFilter(filter.id)}
-                  className={cn(
-                    "whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold transition-none",
-                    activeFilter === filter.id
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-primary/10 text-primary hover:bg-primary/10"
-                  )}
-                >
-                  {filter.label}
-                </button>
-              ))}
-
-              <div className="relative shrink-0">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setRiskDropdownOpen((prev) => !prev);
-                    setOpenMenu(null);
-                    setOpenConversationMenu(null);
-                  }}
-                  className={cn(
-                    "flex items-center gap-1 whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold transition-none",
-                    activeRiskFilter !== "all"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-primary/10 text-primary hover:bg-primary/10"
-                  )}
-                >
-                  {activeRiskFilter === "veryHighRisk"
-                    ? isArabic
-                      ? "عالية جدًا"
-                      : "Very High"
-                    : activeRiskFilter === "highRisk"
-                    ? isArabic
-                      ? "عالية"
-                      : "High"
-                    : activeRiskFilter === "mediumRisk"
-                    ? isArabic
-                      ? "متوسطة"
-                      : "Medium"
-                    : activeRiskFilter === "lowRisk"
-                    ? isArabic
-                      ? "منخفضة"
-                      : "Low"
-                    : isArabic
-                    ? "الخطورة"
-                    : "Risk"}
-
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </button>
-
-                {riskDropdownOpen && (
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    className={cn(
-                      "absolute top-11 z-[100] w-44 rounded-2xl border border-slate-100 bg-white p-2 shadow-xl",
-                      isArabic ? "right-0" : "left-0"
-                    )}
-                  >
-                    {[
-                      { id: "all", label: isArabic ? "كل الحالات" : "All Risks" },
-                      {
-                        id: "veryHighRisk",
-                        label: isArabic ? "عالية جدًا" : "Very High",
-                      },
-                      { id: "highRisk", label: isArabic ? "عالية" : "High" },
-                      {
-                        id: "mediumRisk",
-                        label: isArabic ? "متوسطة" : "Medium",
-                      },
-                      { id: "lowRisk", label: isArabic ? "منخفضة" : "Low" },
-                    ].map((risk) => (
-                      <button
-                        key={risk.id}
-                        type="button"
-                        onClick={() => {
-                          setActiveRiskFilter(risk.id);
-                          setRiskDropdownOpen(false);
-                        }}
-                        className={cn(
-                          "w-full rounded-xl px-3 py-2 text-start text-xs font-bold hover:bg-primary/10 hover:text-primary",
-                          activeRiskFilter === risk.id
-                            ? "bg-primary/10 text-primary"
-                            : "text-slate-600"
-                        )}
-                      >
-                        {risk.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="space-y-2 p-3">
-              {filteredConversations.length === 0 ? (
-                <div className="py-10 text-center text-xs font-bold uppercase tracking-widest text-slate-400">
-                  {search
-                    ? isArabic
-                      ? "لا توجد نتائج مطابقة"
-                      : "No matching conversations"
-                    : t("doctorDashboard.sidebar.messages.noConversations")}
-                </div>
-              ) : (
-                filteredConversations.map((conv) => (
-                  <div
-                    key={conv.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleSelectConversation(conv)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSelectConversation(conv);
-                    }}
-                    className={cn(
-                      "relative flex w-full cursor-pointer items-center gap-3 rounded-3xl border p-4 text-start transition-none",
-                      selectedConv?.id === conv.id
-                        ? "border-primary/20 bg-primary/10"
-                        : "border-transparent bg-white hover:bg-primary/[0.03]"
-                    )}
-                  >
-                    <div className="relative shrink-0">
-                      <Avatar className="h-11 w-11 border border-primary/15 bg-primary/5">
-                        <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
-                          {conv.patient_name
-                            ?.split(" ")
-                            .filter(Boolean)
-                            .map((name) => name[0])
-                            .join("")
-                            .toUpperCase() || "P"}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      {conv.online && (
-                        <span
-                          className={cn(
-                            "absolute bottom-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-500",
-                            isArabic ? "left-0" : "right-0"
-                          )}
-                        />
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1 pe-8">
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <h4 className="truncate text-sm font-bold text-slate-900">
-                          {conv.patient_name}
-                        </h4>
-
-                        <span className="shrink-0 text-[10px] font-bold text-slate-400">
-                          {conv.time}
-                        </span>
-                      </div>
-
-                      <p className="mb-2 truncate text-xs font-medium text-slate-500">
-                        {conv.last_message ||
-                          (isArabic ? "لا توجد رسائل بعد" : "No messages yet")}
-                      </p>
-
-                      <Badge
-                        className={cn(
-                          "rounded-full border px-2 py-0.5 text-[10px] font-bold shadow-none",
-                          getRiskBadgeStyles(conv.risk_level)
-                        )}
-                      >
-                        {getRiskLabel(conv.risk_level)}
-                      </Badge>
-                    </div>
-
-                    <div
-                      className={cn(
-                        "absolute top-3",
-                        isArabic ? "left-3" : "right-3"
-                      )}
-                    >
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenConversationMenu(
-                            openConversationMenu === conv.id ? null : conv.id
-                          );
-                          setOpenMenu(null);
-                          setRiskDropdownOpen(false);
-                        }}
-                        className="h-7 w-7 rounded-xl text-slate-400 hover:bg-primary/10 hover:text-primary"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-
-                      {openConversationMenu === conv.id && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className={cn(
-                            "absolute top-9 z-[100] w-44 rounded-2xl border border-slate-100 bg-white p-2 shadow-xl",
-                            isArabic ? "left-0" : "right-0"
-                          )}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleSelectConversation(conv)}
-                            className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-slate-600 hover:bg-primary/10 hover:text-primary"
-                          >
-                            {isArabic ? "اختيار المريض" : "Select patient"}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              closeMenus();
-                              fetchConversations(true);
-                            }}
-                            className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-slate-600 hover:bg-primary/10 hover:text-primary"
-                          >
-                            {isArabic ? "تحديث القائمة" : "Refresh list"}
-                          </button>
-
-                          <div className="mt-1 border-t border-slate-100 px-3 py-2 text-[10px] font-bold text-slate-400">
-                            #{conv.patient_id}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {Number(conv.unread_count) > 0 &&
-                      selectedConv?.id !== conv.id && (
-                        <span
-                          className={cn(
-                            "absolute top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground",
-                            isArabic ? "left-10" : "right-10"
-                          )}
-                        >
-                          {conv.unread_count}
-                        </span>
-                      )}
-                  </div>
-                ))
-              )}
-            </div>
-          </ScrollArea>
-        </div>
-
-        <div className="relative z-20 flex h-[520px] min-h-0 flex-col overflow-visible bg-white md:h-[620px] xl:h-full xl:rounded-e-3xl">
-          <div className="flex min-h-[80px] shrink-0 items-center justify-between gap-4 border-b border-slate-100 bg-white px-4 sm:px-5 xl:rounded-se-3xl">
-            <div className="flex min-w-0 items-center gap-3">
-              {selectedConv && (
-                <Avatar className="h-12 w-12 border border-primary/15 bg-primary/5">
-                  <AvatarFallback className="bg-primary/10 text-sm font-bold text-primary">
-                    {selectedConv.patient_name
-                      ?.split(" ")
-                      .filter(Boolean)
-                      .map((name) => name[0])
-                      .join("")
-                      .toUpperCase() || "P"}
-                  </AvatarFallback>
-                </Avatar>
-              )}
-
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  {selectedConv && (
-                    <h3 className="truncate text-base font-bold text-slate-900">
-                      {selectedConv.patient_name}
-                    </h3>
-                  )}
-
-                  {selectedConv && (
-                    <Badge
-                      className={cn(
-                        "rounded-full border px-2 py-0.5 text-[10px] font-bold shadow-none",
-                        getRiskBadgeStyles(selectedConv.risk_level)
-                      )}
-                    >
-                      {getRiskLabel(selectedConv.risk_level)}
-                    </Badge>
-                  )}
-                </div>
-
-                {selectedConv && (
-                  <p className="mt-1 text-xs font-semibold text-slate-400">
-                    {`${t("doctorDashboard.sidebar.messages.id")}: #${
-                      selectedConv.patient_id
-                    }`}
-                  </p>
-                )}
-              </div>
-            </div>
+      <Card className="relative z-30 flex h-[360px] min-h-0 flex-col overflow-visible rounded-3xl border border-border bg-card text-card-foreground shadow-sm sm:h-[420px] xl:h-[calc(100vh-100px)]">
+        <div className="shrink-0 rounded-t-3xl border-b border-border bg-card p-4 sm:p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
+              {t("doctorDashboard.sidebar.messages.title")}
+            </h2>
 
             <div className="relative">
               <Button
@@ -775,237 +386,620 @@ export default function MessagesPage() {
                 size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setOpenMenu(openMenu === "chat" ? null : "chat");
+                  setOpenMenu(openMenu === "threads" ? null : "threads");
                   setOpenConversationMenu(null);
                   setRiskDropdownOpen(false);
                 }}
-                className="h-10 w-10 rounded-2xl text-slate-400 hover:bg-primary/10 hover:text-primary"
+                className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
               >
-                <MoreHorizontal className="h-5 w-5" />
+                <MoreVertical className="h-4 w-4" />
               </Button>
 
-              {openMenu === "chat" && (
+              {openMenu === "threads" && (
                 <div
                   onClick={(e) => e.stopPropagation()}
                   className={cn(
-                    "absolute top-12 z-[100] w-52 rounded-2xl border border-slate-100 bg-white p-2 shadow-xl",
+                    "absolute top-11 z-[100] w-48 rounded-2xl border border-border bg-popover p-2 text-popover-foreground shadow-xl",
                     isArabic ? "left-0" : "right-0"
                   )}
                 >
-                  {!selectedConv && (
-                    <div className="px-3 py-2 text-xs font-bold text-slate-400">
-                      {isArabic ? "اختار مريض الأول" : "Select patient first"}
-                    </div>
-                  )}
-
                   <button
                     type="button"
-                    onClick={refreshSelectedConversation}
-                    className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-slate-600 hover:bg-primary/10 hover:text-primary"
+                    onClick={() => {
+                      closeMenus();
+                      fetchConversations(true);
+                    }}
+                    className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
                   >
-                    {isArabic ? "تحديث الرسائل" : "Refresh messages"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleFileSelectClick}
-                    className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-slate-600 hover:bg-primary/10 hover:text-primary"
-                  >
-                    {isArabic ? "رفع ملف" : "Upload file"}
+                    {isArabic ? "تحديث المحادثات" : "Refresh conversations"}
                   </button>
 
                   <button
                     type="button"
                     onClick={() => {
-                      setNewMessage("");
+                      setSearch("");
                       closeMenus();
                     }}
-                    className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-slate-600 hover:bg-primary/10 hover:text-primary"
+                    className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
                   >
-                    {isArabic ? "مسح الرسالة" : "Clear message"}
+                    {isArabic ? "مسح البحث" : "Clear search"}
                   </button>
                 </div>
               )}
             </div>
           </div>
 
-          {(normalizeRisk(selectedConv?.risk_level) === "high" ||
-            normalizeRisk(selectedConv?.risk_level) === "veryhigh") && (
-            <div className="flex min-h-10 shrink-0 items-center justify-between gap-3 bg-red-500 px-4 sm:px-5">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-white" />
+          <div className="relative mb-4">
+            <Search
+              className={cn(
+                "absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground",
+                isArabic ? "right-4" : "left-4"
+              )}
+            />
 
-                <p className="text-xs font-bold text-white">
-                  {t("doctorDashboard.sidebar.messages.chat.emergencyAlert")}
-                </p>
-              </div>
+            <Input
+              placeholder={isArabic ? "اختار مريض..." : "Select patient..."}
+              className={cn(
+                "h-11 rounded-2xl border-border bg-background text-sm font-semibold text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-4 focus-visible:ring-primary/10",
+                isArabic ? "pr-11 pl-10 text-right" : "pl-11 pr-10"
+              )}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
 
+            {search && (
               <button
                 type="button"
-                onClick={refreshPatientContext}
-                className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-bold text-white hover:bg-white/25"
+                onClick={() => setSearch("")}
+                className={cn(
+                  "absolute top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary",
+                  isArabic ? "left-3" : "right-3"
+                )}
               >
-                {t("doctorDashboard.sidebar.messages.viewIndicators")}
+                <X className="h-4 w-4" />
               </button>
-            </div>
-          )}
+            )}
+          </div>
 
-          <ScrollArea
-            className="min-h-0 flex-1 bg-primary/[0.02] px-4 md:px-8"
-            ref={scrollRef}
-          >
-            <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-end space-y-6 py-8">
-              {!selectedConv ? (
-                <div className="flex flex-1" />
-              ) : messagesLoading && messages.length === 0 ? (
-                <div className="flex justify-center py-10">
-                  <LoadingDots />
+          <div className="flex gap-2 overflow-visible pb-1">
+            {[
+              {
+                id: "all",
+                label: t("doctorDashboard.sidebar.messages.filters.all"),
+              },
+              {
+                id: "unread",
+                label: t("doctorDashboard.sidebar.messages.filters.unread"),
+              },
+            ].map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                onClick={() => setActiveFilter(filter.id)}
+                className={cn(
+                  "whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold transition-none",
+                  activeFilter === filter.id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-primary/10 text-primary hover:bg-primary/10"
+                )}
+              >
+                {filter.label}
+              </button>
+            ))}
+
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRiskDropdownOpen((prev) => !prev);
+                  setOpenMenu(null);
+                  setOpenConversationMenu(null);
+                }}
+                className={cn(
+                  "flex items-center gap-1 whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold transition-none",
+                  activeRiskFilter !== "all"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-primary/10 text-primary hover:bg-primary/10"
+                )}
+              >
+                {activeRiskFilter === "veryHighRisk"
+                  ? isArabic
+                    ? "عالية جدًا"
+                    : "Very High"
+                  : activeRiskFilter === "highRisk"
+                  ? isArabic
+                    ? "عالية"
+                    : "High"
+                  : activeRiskFilter === "mediumRisk"
+                  ? isArabic
+                    ? "متوسطة"
+                    : "Medium"
+                  : activeRiskFilter === "lowRisk"
+                  ? isArabic
+                    ? "منخفضة"
+                    : "Low"
+                  : isArabic
+                  ? "الخطورة"
+                  : "Risk"}
+
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+
+              {riskDropdownOpen && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className={cn(
+                    "absolute top-11 z-[100] w-44 rounded-2xl border border-border bg-popover p-2 text-popover-foreground shadow-xl",
+                    isArabic ? "right-0" : "left-0"
+                  )}
+                >
+                  {[
+                    { id: "all", label: isArabic ? "كل الحالات" : "All Risks" },
+                    {
+                      id: "veryHighRisk",
+                      label: isArabic ? "عالية جدًا" : "Very High",
+                    },
+                    { id: "highRisk", label: isArabic ? "عالية" : "High" },
+                    {
+                      id: "mediumRisk",
+                      label: isArabic ? "متوسطة" : "Medium",
+                    },
+                    { id: "lowRisk", label: isArabic ? "منخفضة" : "Low" },
+                  ].map((risk) => (
+                    <button
+                      key={risk.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveRiskFilter(risk.id);
+                        setRiskDropdownOpen(false);
+                      }}
+                      className={cn(
+                        "w-full rounded-xl px-3 py-2 text-start text-xs font-bold hover:bg-primary/10 hover:text-primary",
+                        activeRiskFilter === risk.id
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      {risk.label}
+                    </button>
+                  ))}
                 </div>
-              ) : messages.length === 0 ? (
-                <div className="flex flex-1 flex-col justify-end">
-                  <div className="mx-auto mb-8 max-w-md rounded-3xl border border-primary/10 bg-white p-6 text-center shadow-sm">
-                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <MessageSquare className="h-6 w-6" />
+              )}
+            </div>
+          </div>
+        </div>
+
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="space-y-2 p-3">
+            {filteredConversations.length === 0 ? (
+              <div className="py-10 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                {search
+                  ? isArabic
+                    ? "لا توجد نتائج مطابقة"
+                    : "No matching conversations"
+                  : t("doctorDashboard.sidebar.messages.noConversations")}
+              </div>
+            ) : (
+              filteredConversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleSelectConversation(conv)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSelectConversation(conv);
+                  }}
+                  className={cn(
+                    "relative flex w-full cursor-pointer items-center gap-3 rounded-3xl border p-4 text-start transition-none",
+                    selectedConv?.id === conv.id
+                      ? "border-primary/20 bg-primary/10"
+                      : "border-transparent bg-card hover:bg-primary/[0.04]"
+                  )}
+                >
+                  <div className="relative shrink-0">
+                    <Avatar className="h-11 w-11 border border-primary/15 bg-primary/5">
+                      <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
+                        {conv.patient_name
+                          ?.split(" ")
+                          .filter(Boolean)
+                          .map((name) => name[0])
+                          .join("")
+                          .toUpperCase() || "P"}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    {conv.online && (
+                      <span
+                        className={cn(
+                          "absolute bottom-0 h-3 w-3 rounded-full border-2 border-card bg-emerald-500",
+                          isArabic ? "left-0" : "right-0"
+                        )}
+                      />
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1 pe-8">
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <h4 className="truncate text-sm font-bold text-foreground">
+                        {conv.patient_name}
+                      </h4>
+
+                      <span className="shrink-0 text-[10px] font-bold text-muted-foreground">
+                        {conv.time}
+                      </span>
                     </div>
 
-                    <h3 className="text-base font-bold text-slate-900">
-                      {isArabic
-                        ? "ابدأ المحادثة الآن"
-                        : "Start the conversation"}
-                    </h3>
-
-                    <p className="mt-2 text-sm font-medium leading-6 text-slate-500">
-                      {isArabic
-                        ? `اكتب رسالة إلى ${selectedConv.patient_name} من صندوق الرسائل بالأسفل.`
-                        : `Write a message to ${selectedConv.patient_name} using the message box below.`}
+                    <p className="mb-2 truncate text-xs font-medium text-muted-foreground">
+                      {conv.last_message ||
+                        (isArabic ? "لا توجد رسائل بعد" : "No messages yet")}
                     </p>
-                  </div>
-                </div>
-              ) : (
-                messages.map((msg) => {
-                  const isDoctorMessage = msg.sender_user !== selectedPatientId;
 
-                  return (
-                    <div
-                      key={msg.id}
+                    <Badge
                       className={cn(
-                        "flex gap-4",
-                        isDoctorMessage ? "justify-end" : "justify-start"
+                        "rounded-full border px-2 py-0.5 text-[10px] font-bold shadow-none",
+                        getRiskBadgeStyles(conv.risk_level)
+                      )}
+                    >
+                      {getRiskLabel(conv.risk_level)}
+                    </Badge>
+                  </div>
+
+                  <div
+                    className={cn(
+                      "absolute top-3",
+                      isArabic ? "left-3" : "right-3"
+                    )}
+                  >
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenConversationMenu(
+                          openConversationMenu === conv.id ? null : conv.id
+                        );
+                        setOpenMenu(null);
+                        setRiskDropdownOpen(false);
+                      }}
+                      className="h-7 w-7 rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+
+                    {openConversationMenu === conv.id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className={cn(
+                          "absolute top-9 z-[100] w-44 rounded-2xl border border-border bg-popover p-2 text-popover-foreground shadow-xl",
+                          isArabic ? "left-0" : "right-0"
+                        )}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleSelectConversation(conv)}
+                          className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                        >
+                          {isArabic ? "اختيار المريض" : "Select patient"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            closeMenus();
+                            fetchConversations(true);
+                          }}
+                          className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                        >
+                          {isArabic ? "تحديث القائمة" : "Refresh list"}
+                        </button>
+
+                        <div className="mt-1 border-t border-border px-3 py-2 text-[10px] font-bold text-muted-foreground">
+                          #{conv.patient_id}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {Number(conv.unread_count) > 0 &&
+                    selectedConv?.id !== conv.id && (
+                      <span
+                        className={cn(
+                          "absolute top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground",
+                          isArabic ? "left-10" : "right-10"
+                        )}
+                      >
+                        {conv.unread_count}
+                      </span>
+                    )}
+                </div>
+              ))
+            )}
+          </div>
+        </ScrollArea>
+      </Card>
+
+      <Card className="relative z-20 flex h-[520px] min-h-0 flex-col overflow-visible rounded-3xl border border-border bg-card text-card-foreground shadow-sm md:h-[620px] xl:h-[calc(100vh-100px)]">
+        <div className="flex min-h-[80px] shrink-0 items-center justify-between gap-4 rounded-t-3xl border-b border-border bg-card px-4 sm:px-5">
+          <div className="flex min-w-0 items-center gap-3">
+            {selectedConv && (
+              <Avatar className="h-12 w-12 border border-primary/15 bg-primary/5">
+                <AvatarFallback className="bg-primary/10 text-sm font-bold text-primary">
+                  {selectedConv.patient_name
+                    ?.split(" ")
+                    .filter(Boolean)
+                    .map((name) => name[0])
+                    .join("")
+                    .toUpperCase() || "P"}
+                </AvatarFallback>
+              </Avatar>
+            )}
+
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                {selectedConv && (
+                  <h3 className="truncate text-base font-bold text-foreground">
+                    {selectedConv.patient_name}
+                  </h3>
+                )}
+
+                {selectedConv && (
+                  <Badge
+                    className={cn(
+                      "rounded-full border px-2 py-0.5 text-[10px] font-bold shadow-none",
+                      getRiskBadgeStyles(selectedConv.risk_level)
+                    )}
+                  >
+                    {getRiskLabel(selectedConv.risk_level)}
+                  </Badge>
+                )}
+              </div>
+
+              {selectedConv && (
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                  {`${t("doctorDashboard.sidebar.messages.id")}: #${
+                    selectedConv.patient_id
+                  }`}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="relative">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenMenu(openMenu === "chat" ? null : "chat");
+                setOpenConversationMenu(null);
+                setRiskDropdownOpen(false);
+              }}
+              className="h-10 w-10 rounded-2xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
+            >
+              <MoreHorizontal className="h-5 w-5" />
+            </Button>
+
+            {openMenu === "chat" && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className={cn(
+                  "absolute top-12 z-[100] w-52 rounded-2xl border border-border bg-popover p-2 text-popover-foreground shadow-xl",
+                  isArabic ? "left-0" : "right-0"
+                )}
+              >
+                {!selectedConv && (
+                  <div className="px-3 py-2 text-xs font-bold text-muted-foreground">
+                    {isArabic ? "اختار مريض الأول" : "Select patient first"}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={refreshSelectedConversation}
+                  className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                >
+                  {isArabic ? "تحديث الرسائل" : "Refresh messages"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleFileSelectClick}
+                  className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                >
+                  {isArabic ? "رفع ملف" : "Upload file"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewMessage("");
+                    closeMenus();
+                  }}
+                  className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                >
+                  {isArabic ? "مسح الرسالة" : "Clear message"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {(normalizeRisk(selectedConv?.risk_level) === "high" ||
+          normalizeRisk(selectedConv?.risk_level) === "veryhigh") && (
+          <div className="flex min-h-10 shrink-0 items-center justify-between gap-3 bg-red-500 px-4 sm:px-5">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-white" />
+
+              <p className="text-xs font-bold text-white">
+                {t("doctorDashboard.sidebar.messages.chat.emergencyAlert")}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={refreshPatientContext}
+              className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-bold text-white hover:bg-white/25"
+            >
+              {t("doctorDashboard.sidebar.messages.viewIndicators")}
+            </button>
+          </div>
+        )}
+
+        <ScrollArea
+          className="min-h-0 flex-1 bg-primary/[0.03] px-4 md:px-8"
+          ref={scrollRef}
+        >
+          <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-end space-y-6 py-8">
+            {!selectedConv ? (
+              <div className="flex flex-1" />
+            ) : messagesLoading && messages.length === 0 ? (
+              <div className="flex justify-center py-10">
+                <LoadingDots />
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="flex flex-1 flex-col justify-end">
+                <div className="mx-auto mb-8 max-w-md rounded-3xl border border-border bg-card p-6 text-center shadow-sm">
+                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <MessageSquare className="h-6 w-6" />
+                  </div>
+
+                  <h3 className="text-base font-bold text-foreground">
+                    {isArabic
+                      ? "ابدأ المحادثة الآن"
+                      : "Start the conversation"}
+                  </h3>
+
+                  <p className="mt-2 text-sm font-medium leading-6 text-muted-foreground">
+                    {isArabic
+                      ? `اكتب رسالة إلى ${selectedConv.patient_name} من صندوق الرسائل بالأسفل.`
+                      : `Write a message to ${selectedConv.patient_name} using the message box below.`}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              messages.map((msg) => {
+                const isDoctorMessage = msg.sender_user !== selectedPatientId;
+
+                return (
+                  <div
+                    key={msg.id}
+                    className={cn(
+                      "flex gap-4",
+                      isDoctorMessage ? "justify-end" : "justify-start"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "flex max-w-[86%] flex-col sm:max-w-[78%]",
+                        isDoctorMessage ? "items-end" : "items-start"
                       )}
                     >
                       <div
                         className={cn(
-                          "flex max-w-[86%] flex-col sm:max-w-[78%]",
-                          isDoctorMessage ? "items-end" : "items-start"
+                          "rounded-3xl px-5 py-3 text-sm font-semibold leading-6 shadow-sm",
+                          isDoctorMessage
+                            ? "rounded-tr-md bg-primary text-primary-foreground"
+                            : "rounded-tl-md border border-border bg-card text-foreground"
                         )}
                       >
-                        <div
-                          className={cn(
-                            "rounded-3xl px-5 py-3 text-sm font-semibold leading-6 shadow-sm",
-                            isDoctorMessage
-                              ? "rounded-tr-md bg-primary text-primary-foreground"
-                              : "rounded-tl-md border border-slate-100 bg-white text-slate-700"
-                          )}
-                        >
-                          {msg.content}
-                        </div>
+                        {msg.content}
+                      </div>
 
-                        <div className="mt-2 flex items-center gap-2 px-2">
-                          <span className="text-[10px] font-bold text-slate-400">
-                            {msg.created_at
-                              ? new Date(msg.created_at).toLocaleTimeString(
-                                  [],
-                                  {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  }
-                                )
-                              : "--:--"}
-                          </span>
+                      <div className="mt-2 flex items-center gap-2 px-2">
+                        <span className="text-[10px] font-bold text-muted-foreground">
+                          {msg.created_at
+                            ? new Date(msg.created_at).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "--:--"}
+                        </span>
 
-                          {isDoctorMessage && (
-                            <CheckCheck className="h-3.5 w-3.5 text-primary" />
-                          )}
-                        </div>
+                        {isDoctorMessage && (
+                          <CheckCheck className="h-3.5 w-3.5 text-primary" />
+                        )}
                       </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
-          </ScrollArea>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </ScrollArea>
 
-          <div className="shrink-0 rounded-b-3xl border-t border-slate-100 bg-white p-4 md:p-6 xl:rounded-ee-3xl xl:rounded-es-none">
-            <div
-              className={cn(
-                "flex items-center gap-2 rounded-3xl border border-slate-100 bg-white p-2 shadow-sm focus-within:ring-4 focus-within:ring-primary/10 sm:gap-3",
-                !selectedConv && "opacity-90"
-              )}
+        <div className="shrink-0 rounded-b-3xl border-t border-border bg-card p-4 md:p-6">
+          <div
+            className={cn(
+              "flex items-center gap-2 rounded-3xl border border-border bg-background p-2 shadow-sm focus-within:ring-4 focus-within:ring-primary/10 sm:gap-3",
+              !selectedConv && "opacity-90"
+            )}
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={!selectedConv}
+              onClick={handleFileSelectClick}
+              className="h-10 w-10 shrink-0 rounded-2xl text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-40"
             >
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                disabled={!selectedConv}
-                onClick={handleFileSelectClick}
-                className="h-10 w-10 shrink-0 rounded-2xl text-slate-400 hover:bg-primary/10 hover:text-primary disabled:opacity-40"
-              >
-                <Paperclip className="h-5 w-5" />
-              </Button>
+              <Paperclip className="h-5 w-5" />
+            </Button>
 
-              <input
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                disabled={!selectedConv}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                placeholder={
-                  selectedConv
-                    ? t("doctorDashboard.sidebar.messages.typeMessage")
-                    : isArabic
-                    ? "اختار مريض الأول..."
-                    : "Select patient first..."
+            <input
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              disabled={!selectedConv}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
                 }
-                className={cn(
-                  "min-w-0 flex-1 border-none bg-transparent px-2 text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed",
-                  isArabic && "text-right"
-                )}
-              />
+              }}
+              placeholder={
+                selectedConv
+                  ? t("doctorDashboard.sidebar.messages.typeMessage")
+                  : isArabic
+                  ? "اختار مريض الأول..."
+                  : "Select patient first..."
+              }
+              className={cn(
+                "min-w-0 flex-1 border-none bg-transparent px-2 text-sm font-semibold text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed",
+                isArabic && "text-right"
+              )}
+            />
 
-              <Button
-                type="button"
-                onClick={handleSendMessage}
-                disabled={!selectedConv || !newMessage.trim() || sending}
-                className="h-11 shrink-0 rounded-2xl bg-primary px-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 sm:px-4"
-              >
-                {sending ? (
-                  <LoadingDots color="white" />
-                ) : (
-                  <>
-                    <Send
-                      className={cn(
-                        "h-4 w-4",
-                        isArabic ? "sm:ml-2 rotate-180" : "sm:mr-2"
-                      )}
-                    />
-                    <span className="hidden sm:inline">
-                      {t("doctorDashboard.sidebar.messages.send")}
-                    </span>
-                  </>
-                )}
-              </Button>
-            </div>
+            <Button
+              type="button"
+              onClick={handleSendMessage}
+              disabled={!selectedConv || !newMessage.trim() || sending}
+              className="h-11 shrink-0 rounded-2xl bg-primary px-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 sm:px-4"
+            >
+              {sending ? (
+                <LoadingDots color="white" />
+              ) : (
+                <>
+                  <Send
+                    className={cn(
+                      "h-4 w-4",
+                      isArabic ? "rotate-180 sm:ml-2" : "sm:mr-2"
+                    )}
+                  />
+                  <span className="hidden sm:inline">
+                    {t("doctorDashboard.sidebar.messages.send")}
+                  </span>
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </Card>
 
-      <Card className="relative z-10 flex h-[520px] min-h-0 flex-col overflow-visible rounded-3xl border border-slate-100 bg-white shadow-sm md:h-[620px] 2xl:h-[calc(100vh-100px)]">
-        <div className="flex h-[80px] shrink-0 items-center justify-between rounded-t-3xl border-b border-slate-100 px-4 sm:px-6">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-slate-900">
+      <Card className="relative z-10 flex h-[520px] min-h-0 flex-col overflow-visible rounded-3xl border border-border bg-card text-card-foreground shadow-sm md:h-[620px] 2xl:h-[calc(100vh-100px)]">
+        <div className="flex h-[80px] shrink-0 items-center justify-between rounded-t-3xl border-b border-border px-4 sm:px-6">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-foreground">
             {t("doctorDashboard.sidebar.messages.summary.title")}
           </h2>
 
@@ -1020,7 +1014,7 @@ export default function MessagesPage() {
                 setOpenConversationMenu(null);
                 setRiskDropdownOpen(false);
               }}
-              className="h-9 w-9 rounded-xl text-slate-400 hover:bg-primary/10 hover:text-primary"
+              className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
             >
               <MoreVertical className="h-4 w-4" />
             </Button>
@@ -1029,12 +1023,12 @@ export default function MessagesPage() {
               <div
                 onClick={(e) => e.stopPropagation()}
                 className={cn(
-                  "absolute top-11 z-[100] w-52 rounded-2xl border border-slate-100 bg-white p-2 shadow-xl",
+                  "absolute top-11 z-[100] w-52 rounded-2xl border border-border bg-popover p-2 text-popover-foreground shadow-xl",
                   isArabic ? "left-0" : "right-0"
                 )}
               >
                 {!selectedConv && (
-                  <div className="px-3 py-2 text-xs font-bold text-slate-400">
+                  <div className="px-3 py-2 text-xs font-bold text-muted-foreground">
                     {isArabic ? "اختار مريض الأول" : "Select patient first"}
                   </div>
                 )}
@@ -1042,7 +1036,7 @@ export default function MessagesPage() {
                 <button
                   type="button"
                   onClick={refreshPatientContext}
-                  className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-slate-600 hover:bg-primary/10 hover:text-primary"
+                  className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
                 >
                   {isArabic ? "تحديث بيانات المريض" : "Refresh patient data"}
                 </button>
@@ -1054,7 +1048,7 @@ export default function MessagesPage() {
                     setActiveFilter("all");
                     setActiveRiskFilter("highRisk");
                   }}
-                  className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-slate-600 hover:bg-primary/10 hover:text-primary"
+                  className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
                 >
                   {isArabic ? "عرض الحالات عالية الخطورة" : "Show high risk"}
                 </button>
@@ -1068,7 +1062,7 @@ export default function MessagesPage() {
             {patientProfile ? (
               <>
                 <div className="space-y-4">
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                     {t("doctorDashboard.sidebar.messages.summary.riskTrend")}
                   </p>
 
@@ -1118,7 +1112,7 @@ export default function MessagesPage() {
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                       {t(
                         "doctorDashboard.sidebar.messages.summary.latestIndicators"
                       )}
@@ -1169,16 +1163,16 @@ export default function MessagesPage() {
                     ].map((indicator, index) => (
                       <div
                         key={index}
-                        className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
+                        className="rounded-2xl border border-border bg-background/60 p-4 shadow-sm"
                       >
-                        <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                        <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                           {indicator.label}
                         </p>
 
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-bold text-slate-900">
+                          <p className="text-sm font-bold text-foreground">
                             {indicator.value}{" "}
-                            <span className="text-[10px] font-semibold text-slate-400">
+                            <span className="text-[10px] font-semibold text-muted-foreground">
                               {indicator.unit}
                             </span>
                           </p>
@@ -1198,7 +1192,7 @@ export default function MessagesPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                     {t("doctorDashboard.sidebar.messages.recentAssessments")}
                   </p>
 
@@ -1209,30 +1203,30 @@ export default function MessagesPage() {
                       return (
                         <div
                           key={pred.id}
-                          className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
+                          className="flex items-center justify-between rounded-2xl border border-border bg-background/60 p-4 shadow-sm"
                         >
                           <div className="flex items-center gap-3">
                             <div
                               className={cn(
                                 "flex h-9 w-9 items-center justify-center rounded-xl",
                                 predRisk === "high" || predRisk === "veryhigh"
-                                  ? "bg-red-50 text-red-600"
+                                  ? "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300"
                                   : predRisk === "medium"
-                                  ? "bg-amber-50 text-amber-600"
-                                  : "bg-emerald-50 text-emerald-600"
+                                  ? "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300"
+                                  : "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
                               )}
                             >
                               <Activity className="h-4 w-4" />
                             </div>
 
                             <div>
-                              <p className="text-xs font-bold text-slate-900">
+                              <p className="text-xs font-bold text-foreground">
                                 {new Date(pred.created_at).toLocaleDateString(
                                   isArabic ? "ar-EG" : "en-US"
                                 )}
                               </p>
 
-                              <p className="mt-1 text-[10px] font-bold text-slate-400">
+                              <p className="mt-1 text-[10px] font-bold text-muted-foreground">
                                 {getRiskLabel(pred.risk_level)} •{" "}
                                 {Math.round(pred.probability)}%
                               </p>
@@ -1241,7 +1235,7 @@ export default function MessagesPage() {
 
                           <ArrowUpRight
                             className={cn(
-                              "h-4 w-4 text-slate-300",
+                              "h-4 w-4 text-muted-foreground",
                               isArabic && "rotate-[-90deg]"
                             )}
                           />
@@ -1268,7 +1262,7 @@ export default function MessagesPage() {
                   <UserIcon className="mb-4 h-12 w-12 text-primary/20" />
                 )}
 
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                   {selectedConv
                     ? t("doctorDashboard.sidebar.messages.loadingContext")
                     : isArabic

@@ -31,7 +31,6 @@ import {
   ChevronLeft,
   User as UserIcon,
   Mail,
-  Phone,
   X,
   Plus,
   Calendar,
@@ -237,7 +236,9 @@ export default function PatientsPage() {
     return getFullName(user) || user?.email || "";
   };
 
-  const getSortedPredictions = (patient?: PatientWithExtras | PatientDetails) => {
+  const getSortedPredictions = (
+    patient?: PatientWithExtras | PatientDetails
+  ) => {
     const predictions = patient?.predictions || [];
 
     return [...predictions].sort((a, b) => {
@@ -350,22 +351,22 @@ export default function PatientsPage() {
     const normalizedRisk = normalizeRisk(risk);
 
     if (normalizedRisk === "veryhigh") {
-      return "border-red-100 bg-red-50 text-red-600 hover:border-red-100 hover:bg-red-50 hover:text-red-600";
+      return "border-red-200 bg-red-50 text-red-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-300";
     }
 
     if (normalizedRisk === "high") {
-      return "border-orange-100 bg-orange-50 text-orange-600 hover:border-orange-100 hover:bg-orange-50 hover:text-orange-600";
+      return "border-orange-200 bg-orange-50 text-orange-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300 dark:hover:bg-orange-500/10 dark:hover:text-orange-300";
     }
 
     if (normalizedRisk === "medium") {
-      return "border-yellow-100 bg-yellow-50 text-yellow-600 hover:border-yellow-100 hover:bg-yellow-50 hover:text-yellow-600";
+      return "border-yellow-200 bg-yellow-50 text-yellow-600 hover:border-yellow-200 hover:bg-yellow-50 hover:text-yellow-600 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-300 dark:hover:bg-yellow-500/10 dark:hover:text-yellow-300";
     }
 
     if (normalizedRisk === "low") {
-      return "border-green-100 bg-green-50 text-green-600 hover:border-green-100 hover:bg-green-50 hover:text-green-600";
+      return "border-green-200 bg-green-50 text-green-600 hover:border-green-200 hover:bg-green-50 hover:text-green-600 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300 dark:hover:bg-green-500/10 dark:hover:text-green-300";
     }
 
-    return "border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-50 hover:text-slate-500";
+    return "border-border bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground";
   };
 
   const getRiskLabel = (risk: string) => {
@@ -406,17 +407,17 @@ export default function PatientsPage() {
 
     switch (normalizedStatus) {
       case "pending":
-        return "border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-100 hover:text-slate-600";
+        return "border-border bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground";
       case "reviewed":
         return "border-primary/15 bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary";
       case "approved":
-        return "border-emerald-100 bg-emerald-50 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-600";
+        return "border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-300";
       case "rejected":
-        return "border-red-100 bg-red-50 text-red-600 hover:bg-red-50 hover:text-red-600";
+        return "border-red-200 bg-red-50 text-red-600 hover:bg-red-50 hover:text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-300";
       case "needs_followup":
-        return "border-amber-100 bg-amber-50 text-amber-600 hover:bg-amber-50 hover:text-amber-600";
+        return "border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-50 hover:text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/10 dark:hover:text-amber-300";
       default:
-        return "border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-50 hover:text-slate-500";
+        return "border-border bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground";
     }
   };
 
@@ -554,29 +555,29 @@ export default function PatientsPage() {
       title: isArabic ? "حالات عالية جدًا" : "Very High Risk",
       value: patientStats.veryHigh,
       icon: Flame,
-      color: "text-red-600",
-      bgColor: "bg-red-50",
+      color: "text-red-600 dark:text-red-300",
+      bgColor: "bg-red-50 dark:bg-red-500/10",
     },
     {
       title: isArabic ? "حالات عالية الخطورة" : "High Risk",
       value: patientStats.high,
       icon: ShieldAlert,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50",
+      color: "text-orange-600 dark:text-orange-300",
+      bgColor: "bg-orange-50 dark:bg-orange-500/10",
     },
     {
       title: isArabic ? "حالات متوسطة" : "Medium Risk",
       value: patientStats.medium,
       icon: Gauge,
-      color: "text-amber-600",
-      bgColor: "bg-amber-50",
+      color: "text-amber-600 dark:text-amber-300",
+      bgColor: "bg-amber-50 dark:bg-amber-500/10",
     },
     {
       title: isArabic ? "حالات منخفضة" : "Low Risk",
       value: patientStats.low,
       icon: ShieldCheck,
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-50",
+      color: "text-emerald-600 dark:text-emerald-300",
+      bgColor: "bg-emerald-50 dark:bg-emerald-500/10",
     },
   ];
 
@@ -602,15 +603,15 @@ export default function PatientsPage() {
   return (
     <div
       dir={isArabic ? "rtl" : "ltr"}
-      className="min-h-full pb-8 pt-8 animate-in fade-in duration-700 md:pt-0"
+      className="min-h-full w-full max-w-none animate-in fade-in px-0 pb-8 pt-8 text-foreground duration-700 md:pt-0"
     >
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 sm:gap-7">
+      <div className="flex w-full max-w-none flex-col gap-6 sm:gap-7">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             {t("doctorDashboard.patients.title")}
           </h1>
 
-          <p className="mt-1 text-sm font-medium leading-6 text-slate-500">
+          <p className="mt-1 text-sm font-medium leading-6 text-muted-foreground">
             {isArabic
               ? "إدارة ومتابعة سجلات المرضى الخاصة بك."
               : "Manage and monitor your patient records."}
@@ -621,11 +622,11 @@ export default function PatientsPage() {
           {statsCards.map((card, index) => (
             <Card
               key={index}
-              className="group overflow-hidden rounded-[1.75rem] border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+              className="group overflow-hidden rounded-[1.75rem] border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md"
             >
               <CardContent className="relative flex min-h-[160px] flex-col justify-between p-5 sm:min-h-[170px]">
                 <div className="flex items-start justify-between gap-4">
-                  <h3 className="max-w-[150px] text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                  <h3 className="max-w-[150px] text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                     {card.title}
                   </h3>
 
@@ -641,7 +642,7 @@ export default function PatientsPage() {
                 </div>
 
                 <div>
-                  <p className="text-3xl font-bold tracking-tight text-slate-900">
+                  <p className="text-3xl font-bold tracking-tight text-foreground">
                     {card.value}
                   </p>
                 </div>
@@ -650,8 +651,8 @@ export default function PatientsPage() {
           ))}
         </div>
 
-        <Card className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
-          <div className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-5">
+        <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
+          <div className="border-b border-border bg-muted/30 p-4 sm:p-5">
             <div className="flex flex-col gap-4">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -659,11 +660,11 @@ export default function PatientsPage() {
                 </div>
 
                 <div className="min-w-0">
-                  <h2 className="truncate text-base font-bold tracking-tight text-slate-900">
+                  <h2 className="truncate text-base font-bold tracking-tight text-foreground">
                     {isArabic ? "قائمة المرضى" : "Patient Directory"}
                   </h2>
 
-                  <p className="mt-1 text-xs font-semibold text-slate-400">
+                  <p className="mt-1 text-xs font-semibold text-muted-foreground">
                     {isArabic
                       ? `${filteredPatients.length} نتيجة`
                       : `${filteredPatients.length} result${
@@ -675,7 +676,7 @@ export default function PatientsPage() {
 
               <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div className="w-full overflow-x-auto pb-1 xl:w-auto xl:pb-0">
-                  <div className="flex h-12 w-fit items-center gap-1 rounded-full border border-primary/20 bg-white p-1 shadow-sm">
+                  <div className="flex h-12 w-fit items-center gap-1 rounded-full border border-primary/20 bg-background p-1 shadow-sm">
                     <button
                       type="button"
                       onClick={() => setStatusFilter("all")}
@@ -707,12 +708,12 @@ export default function PatientsPage() {
                         />
                       </SelectTrigger>
 
-                      <SelectContent className="rounded-2xl border-slate-100 bg-white p-1 shadow-xl">
+                      <SelectContent className="rounded-2xl border-border bg-popover p-1 text-popover-foreground shadow-xl">
                         {riskFilterOptions.map((option) => (
                           <SelectItem
                             key={option.value}
                             value={option.value}
-                            className="cursor-pointer rounded-xl text-sm font-semibold"
+                            className="cursor-pointer rounded-xl text-sm font-semibold focus:bg-primary/10 focus:text-primary"
                           >
                             {option.label}
                           </SelectItem>
@@ -726,7 +727,7 @@ export default function PatientsPage() {
                   <div className="relative w-full sm:min-w-[320px] xl:w-96">
                     <Search
                       className={cn(
-                        "absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400",
+                        "absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground",
                         isArabic ? "right-4" : "left-4"
                       )}
                     />
@@ -738,7 +739,7 @@ export default function PatientsPage() {
                           : "Search by name or email..."
                       }
                       className={cn(
-                        "h-12 rounded-full border border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm placeholder:text-slate-400 focus-visible:ring-4 focus-visible:ring-primary/10",
+                        "h-12 rounded-full border border-border bg-background text-sm font-semibold text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-4 focus-visible:ring-primary/10",
                         isArabic
                           ? "pr-11 pl-9 text-right"
                           : "pl-11 pr-9 text-left"
@@ -752,7 +753,7 @@ export default function PatientsPage() {
                         type="button"
                         onClick={() => setSearch("")}
                         className={cn(
-                          "absolute top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary",
+                          "absolute top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary",
                           isArabic ? "left-3" : "right-3"
                         )}
                       >
@@ -775,7 +776,7 @@ export default function PatientsPage() {
             </div>
           </div>
 
-          <div className="hidden grid-cols-[1.8fr_1fr_1fr_1fr] border-b border-slate-100 bg-slate-50/70 px-5 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 lg:grid">
+          <div className="hidden grid-cols-[1.8fr_1fr_1fr_1fr] border-b border-border bg-muted/40 px-5 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground lg:grid">
             <div>{isArabic ? "المريض" : "Patient"}</div>
             <div>{isArabic ? "مستوى الخطورة" : "Risk Level"}</div>
             <div>{isArabic ? "الحالة" : "Status"}</div>
@@ -787,7 +788,7 @@ export default function PatientsPage() {
               <LoadingDots />
             </div>
           ) : paginatedPatients.length > 0 ? (
-            <div className="space-y-4 p-3 lg:space-y-0 lg:p-0 lg:divide-y lg:divide-slate-100">
+            <div className="space-y-4 p-3 lg:space-y-0 lg:p-0 lg:divide-y lg:divide-border">
               {paginatedPatients.map((patient) => {
                 const risk = getPatientRisk(patient);
                 const patientStatus = getPatientStatus(patient);
@@ -796,7 +797,7 @@ export default function PatientsPage() {
                 return (
                   <div
                     key={patient.id}
-                    className="grid gap-4 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-300 hover:bg-slate-50/60 sm:p-5 lg:grid-cols-[1.8fr_1fr_1fr_1fr] lg:items-center lg:rounded-none lg:border-0 lg:shadow-none"
+                    className="grid gap-4 rounded-3xl border border-border bg-card p-4 shadow-sm transition-all duration-300 hover:bg-muted/30 sm:p-5 lg:grid-cols-[1.8fr_1fr_1fr_1fr] lg:items-center lg:rounded-none lg:border-0 lg:shadow-none"
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <Avatar className="h-12 w-12 shrink-0 border border-primary/20 bg-primary/5">
@@ -806,12 +807,12 @@ export default function PatientsPage() {
                       </Avatar>
 
                       <div className="min-w-0">
-                        <h3 className="truncate text-[15px] font-bold text-slate-900">
+                        <h3 className="truncate text-[15px] font-bold text-foreground">
                           {patientName}
                         </h3>
 
                         {patient.email && (
-                          <p className="mt-1 truncate text-xs font-medium text-slate-400">
+                          <p className="mt-1 truncate text-xs font-medium text-muted-foreground">
                             {patient.email}
                           </p>
                         )}
@@ -819,7 +820,7 @@ export default function PatientsPage() {
                     </div>
 
                     <div className="flex items-center justify-between gap-3 lg:block">
-                      <span className="text-xs font-bold text-slate-400 lg:hidden">
+                      <span className="text-xs font-bold text-muted-foreground lg:hidden">
                         {isArabic ? "مستوى الخطورة" : "Risk Level"}
                       </span>
 
@@ -835,7 +836,7 @@ export default function PatientsPage() {
                     </div>
 
                     <div className="flex items-center justify-between gap-3 lg:block">
-                      <span className="text-xs font-bold text-slate-400 lg:hidden">
+                      <span className="text-xs font-bold text-muted-foreground lg:hidden">
                         {isArabic ? "الحالة" : "Status"}
                       </span>
 
@@ -871,11 +872,11 @@ export default function PatientsPage() {
             <div className="flex min-h-[360px] flex-col items-center justify-center p-8 text-center">
               <UserIcon className="mb-4 h-10 w-10 text-primary" />
 
-              <h3 className="text-base font-bold text-slate-900">
+              <h3 className="text-base font-bold text-foreground">
                 {t("doctorDashboard.noPatientsFound")}
               </h3>
 
-              <p className="mt-1 text-sm font-medium text-slate-500">
+              <p className="mt-1 text-sm font-medium text-muted-foreground">
                 {t("doctorDashboard.patients.noPatientsFound")}
               </p>
             </div>
@@ -888,7 +889,7 @@ export default function PatientsPage() {
             size="icon"
             disabled={page === 1}
             onClick={isArabic ? goNext : goPrev}
-            className="h-10 w-10 rounded-full border-primary/30 bg-white text-primary hover:bg-primary/10 disabled:opacity-40"
+            className="h-10 w-10 rounded-full border-primary/30 bg-card text-primary hover:bg-primary/10 disabled:opacity-40"
           >
             {isArabic ? (
               <ChevronRight className="h-4 w-4" />
@@ -897,7 +898,7 @@ export default function PatientsPage() {
             )}
           </Button>
 
-          <div className="rounded-full border border-slate-100 bg-white px-4 py-2 text-sm font-bold text-slate-500 shadow-sm">
+          <div className="rounded-full border border-border bg-card px-4 py-2 text-sm font-bold text-muted-foreground shadow-sm">
             {isArabic
               ? `صفحة ${page} من ${totalPages}`
               : `Page ${page} of ${totalPages}`}
@@ -908,7 +909,7 @@ export default function PatientsPage() {
             size="icon"
             disabled={page === totalPages}
             onClick={isArabic ? goPrev : goNext}
-            className="h-10 w-10 rounded-full border-primary/30 bg-white text-primary hover:bg-primary/10 disabled:opacity-40"
+            className="h-10 w-10 rounded-full border-primary/30 bg-card text-primary hover:bg-primary/10 disabled:opacity-40"
           >
             {isArabic ? (
               <ChevronLeft className="h-4 w-4" />
@@ -922,14 +923,14 @@ export default function PatientsPage() {
       <Dialog open={openCreate} onOpenChange={setOpenCreate}>
         <DialogContent
           dir={isArabic ? "rtl" : "ltr"}
-          className="max-h-[90vh] w-[92vw] overflow-y-auto rounded-3xl border border-slate-100 bg-white sm:max-w-xl"
+          className="max-h-[90vh] w-[92vw] overflow-y-auto rounded-3xl border border-border bg-card text-card-foreground sm:max-w-xl"
         >
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-slate-900">
+            <DialogTitle className="text-xl font-bold text-foreground">
               {isArabic ? "إضافة مريض جديد" : "Add New Patient"}
             </DialogTitle>
 
-            <DialogDescription className="text-sm font-medium text-slate-500">
+            <DialogDescription className="text-sm font-medium text-muted-foreground">
               {isArabic
                 ? "أدخل بيانات المريض وسيتم ربطه بحساب الدكتور الحالي."
                 : "Enter patient details and the patient will be assigned to the current doctor."}
@@ -948,7 +949,7 @@ export default function PatientsPage() {
                   }))
                 }
                 className={cn(
-                  "h-12 rounded-xl bg-white",
+                  "h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground",
                   isArabic ? "text-right" : "text-left"
                 )}
               />
@@ -963,7 +964,7 @@ export default function PatientsPage() {
                   }))
                 }
                 className={cn(
-                  "h-12 rounded-xl bg-white",
+                  "h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground",
                   isArabic ? "text-right" : "text-left"
                 )}
               />
@@ -980,7 +981,7 @@ export default function PatientsPage() {
                 }))
               }
               dir="ltr"
-              className="h-12 rounded-xl bg-white text-left"
+              className="h-12 rounded-xl border-border bg-background text-left text-foreground placeholder:text-muted-foreground"
             />
 
             <Input
@@ -995,7 +996,7 @@ export default function PatientsPage() {
                 }))
               }
               dir="ltr"
-              className="h-12 rounded-xl bg-white text-left"
+              className="h-12 rounded-xl border-border bg-background text-left text-foreground placeholder:text-muted-foreground"
             />
           </div>
 
@@ -1032,14 +1033,14 @@ export default function PatientsPage() {
       <Dialog open={openDetails} onOpenChange={setOpenDetails}>
         <DialogContent
           dir={isArabic ? "rtl" : "ltr"}
-          className="max-h-[90vh] w-[92vw] overflow-y-auto rounded-3xl border border-slate-100 bg-white sm:max-w-2xl"
+          className="max-h-[90vh] w-[92vw] overflow-y-auto rounded-3xl border border-border bg-card text-card-foreground sm:max-w-2xl"
         >
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-slate-900">
+            <DialogTitle className="text-xl font-bold text-foreground">
               {isArabic ? "تفاصيل المريض" : "Patient Details"}
             </DialogTitle>
 
-            <DialogDescription className="text-sm font-medium text-slate-500">
+            <DialogDescription className="text-sm font-medium text-muted-foreground">
               {isArabic
                 ? "بيانات المريض وآخر نتائج التحاليل المتاحة."
                 : "Patient information and latest available predictions."}
@@ -1052,7 +1053,7 @@ export default function PatientsPage() {
             </div>
           ) : selectedPatient ? (
             <div className="space-y-5 py-3">
-              <div className="flex items-center gap-4 rounded-2xl bg-primary/[0.03] p-4">
+              <div className="flex items-center gap-4 rounded-2xl bg-primary/[0.03] p-4 dark:bg-primary/10">
                 <Avatar className="h-14 w-14 shrink-0 border border-primary/20 bg-primary/5">
                   <AvatarFallback className="bg-primary/10 text-primary">
                     <UserIcon className="h-6 w-6" />
@@ -1060,55 +1061,38 @@ export default function PatientsPage() {
                 </Avatar>
 
                 <div className="min-w-0">
-                  <h3 className="truncate text-base font-bold text-slate-900">
+                  <h3 className="truncate text-base font-bold text-foreground">
                     {getDisplayName(selectedPatient)}
                   </h3>
 
                   {selectedPatient.email && (
-                    <p className="mt-1 truncate text-xs font-medium text-slate-400">
+                    <p className="mt-1 truncate text-xs font-medium text-muted-foreground">
                       {selectedPatient.email}
                     </p>
                   )}
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl border border-slate-100 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-primary">
-                    <Mail className="h-4 w-4" />
-                    <span className="text-xs font-bold">
-                      {isArabic ? "البريد الإلكتروني" : "Email"}
-                    </span>
-                  </div>
-
-                  <p className="truncate text-sm font-semibold text-slate-900">
-                    {selectedPatient.email ||
-                      (isArabic ? "لا يوجد بريد إلكتروني" : "No email")}
-                  </p>
+              <div className="rounded-2xl border border-border bg-background/40 p-4">
+                <div className="mb-2 flex items-center gap-2 text-primary">
+                  <Mail className="h-4 w-4" />
+                  <span className="text-xs font-bold">
+                    {isArabic ? "البريد الإلكتروني" : "Email"}
+                  </span>
                 </div>
 
-                <div className="rounded-2xl border border-slate-100 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-primary">
-                    <Phone className="h-4 w-4" />
-                    <span className="text-xs font-bold">
-                      {isArabic ? "رقم الهاتف" : "Phone"}
-                    </span>
-                  </div>
-
-                  <p className="text-sm font-semibold text-slate-900">
-                    {selectedPatient.phone ||
-                      selectedPatient.profile?.phone ||
-                      (isArabic ? "لا يوجد رقم هاتف" : "No phone number")}
-                  </p>
-                </div>
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {selectedPatient.email ||
+                    (isArabic ? "لا يوجد بريد إلكتروني" : "No email")}
+                </p>
               </div>
 
-              <div className="rounded-2xl border border-slate-100 p-4">
+              <div className="rounded-2xl border border-border bg-background/40 p-4">
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Activity className="h-4 w-4 text-primary" />
 
-                    <h4 className="text-sm font-bold text-slate-900">
+                    <h4 className="text-sm font-bold text-foreground">
                       {isArabic ? "آخر التحاليل" : "Latest Predictions"}
                     </h4>
                   </div>
@@ -1134,7 +1118,7 @@ export default function PatientsPage() {
                         return (
                           <div
                             key={prediction.id}
-                            className="flex flex-col gap-3 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                            className="flex flex-col gap-3 rounded-xl bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between"
                           >
                             <div>
                               <Badge
@@ -1147,7 +1131,7 @@ export default function PatientsPage() {
                                 {getRiskLabel(predictionRisk)}
                               </Badge>
 
-                              <p className="mt-2 flex items-center gap-1 text-xs font-medium text-slate-500">
+                              <p className="mt-2 flex items-center gap-1 text-xs font-medium text-muted-foreground">
                                 <Calendar className="h-3.5 w-3.5" />
                                 {prediction.created_at
                                   ? new Date(
@@ -1181,7 +1165,7 @@ export default function PatientsPage() {
                       })}
                   </div>
                 ) : (
-                  <p className="text-sm font-medium text-slate-500">
+                  <p className="text-sm font-medium text-muted-foreground">
                     {isArabic
                       ? "لا توجد تحاليل متاحة"
                       : "No predictions available"}

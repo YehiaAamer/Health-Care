@@ -9,6 +9,13 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Form,
   FormControl,
   FormDescription,
@@ -68,10 +75,22 @@ export default function Auth() {
         .string()
         .min(1, t("authPage.validation.confirmPasswordRequired")),
       role: z.enum(["patient", "doctor"]).default("patient"),
+      doctorSpecialty: z.enum(["diabetes", "cardiovascular"]).optional(),
     })
     .refine((data) => data.password === data.confirmPassword, {
       message: t("authPage.validation.passwordsMismatch"),
       path: ["confirmPassword"],
+    })
+    .superRefine((data, ctx) => {
+      if (data.role === "doctor" && !data.doctorSpecialty) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: isArabic
+            ? "برجاء اختيار تخصص الطبيب"
+            : "Please select doctor specialty",
+          path: ["doctorSpecialty"],
+        });
+      }
     });
 
   type LoginFormValues = z.infer<typeof loginSchema>;
@@ -105,8 +124,11 @@ export default function Auth() {
       password: "",
       confirmPassword: "",
       role: "patient",
+      doctorSpecialty: undefined,
     },
   });
+
+  const selectedRole = signupForm.watch("role");
 
   const onLoginSubmit = async (values: LoginFormValues) => {
     setLocalError(null);
@@ -140,12 +162,22 @@ export default function Auth() {
     clearError();
 
     try {
-      const user = await register(
+      const registerUser = register as (
+        email: string,
+        password: string,
+        firstName: string,
+        lastName: string,
+        role: "patient" | "doctor",
+        doctorSpecialty?: "diabetes" | "cardiovascular"
+      ) => Promise<any>;
+
+      const user = await registerUser(
         values.email,
         values.password,
         values.firstName,
         values.lastName,
-        values.role
+        values.role,
+        values.role === "doctor" ? values.doctorSpecialty : undefined
       );
 
       toast.success(t("authPage.signupSuccess"));
@@ -378,12 +410,28 @@ export default function Auth() {
                             </FormLabel>
                             <FormControl>
                               <RadioGroup
-                                onValueChange={field.onChange}
+                                onValueChange={(value) => {
+                                  field.onChange(value);
+
+                                  if (value === "patient") {
+                                    signupForm.setValue(
+                                      "doctorSpecialty",
+                                      undefined
+                                    );
+                                    signupForm.clearErrors("doctorSpecialty");
+                                  }
+                                }}
                                 defaultValue={field.value}
                                 className="flex flex-col space-y-1 sm:flex-row sm:space-x-4 sm:space-y-0"
                                 dir={isArabic ? "rtl" : "ltr"}
                               >
-                                <FormItem className="flex items-center space-x-3 space-y-0">
+                                <FormItem
+                                  className={`flex items-center space-y-0 ${
+                                    isArabic
+                                      ? "space-x-3 space-x-reverse"
+                                      : "space-x-3"
+                                  }`}
+                                >
                                   <FormControl>
                                     <RadioGroupItem value="patient" />
                                   </FormControl>
@@ -413,6 +461,54 @@ export default function Auth() {
                         )}
                       />
 
+                      {selectedRole === "doctor" && (
+                        <FormField
+                          control={signupForm.control}
+                          name="doctorSpecialty"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>
+                                {isArabic
+                                  ? "تخصص الطبيب"
+                                  : "Doctor Specialty"}
+                              </FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                                dir={isArabic ? "rtl" : "ltr"}
+                              >
+                                <FormControl>
+                                  <SelectTrigger
+                                    className={`h-14 rounded-full border-0 bg-muted/60 px-4 shadow-none focus:ring-1 focus:ring-primary ${
+                                      isArabic ? "text-right" : "text-left"
+                                    }`}
+                                  >
+                                    <SelectValue
+                                      placeholder={
+                                        isArabic
+                                          ? "اختر تخصص الطبيب"
+                                          : "Select doctor specialty"
+                                      }
+                                    />
+                                  </SelectTrigger>
+                                </FormControl>
+
+                                <SelectContent className="rounded-2xl">
+                                  <SelectItem value="diabetes">
+                                    {isArabic ? "سكر" : "Diabetes"}
+                                  </SelectItem>
+                                  <SelectItem value="cardiovascular">
+                                    {isArabic
+                                      ? "القلب والأوعية الدموية"
+                                      : "Cardiovascular"}
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
                       <FormField
                         control={signupForm.control}
                         name="firstName"

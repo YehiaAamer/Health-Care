@@ -49,47 +49,59 @@ const Help = () => {
 
   return (
     <div
-      className="min-h-screen flex flex-col"
+      className="flex min-h-screen flex-col bg-background text-foreground"
       dir={isArabic ? "rtl" : "ltr"}
     >
       <Header />
 
       <main
-        className="flex-1 px-4 bg-background"
-        style={{ paddingTop: `${DESKTOP_HEADER_HEIGHT + 48}px`, paddingBottom: "48px" }}
+        className="flex-1 bg-gradient-to-b from-background via-background to-accent/20 px-4"
+        style={{
+          paddingTop: `${DESKTOP_HEADER_HEIGHT + 48}px`,
+          paddingBottom: "48px",
+        }}
       >
         <div className="container mx-auto max-w-4xl">
           <div
             ref={heroRef}
-            className={`text-center mb-12 transition-all duration-700 ease-out ${
-              heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+            className={`mb-12 text-center transition-all duration-700 ease-out ${
+              heroVisible
+                ? "translate-y-0 opacity-100"
+                : "translate-y-10 opacity-0"
             }`}
           >
-            <h1 className="text-4xl font-bold mb-4">{t("help.title")}</h1>
+            <h1 className="mb-4 text-4xl font-bold text-foreground">
+              {t("help.title")}
+            </h1>
 
-            <p className="text-lg text-muted-foreground mb-8">
+            <p className="mb-8 text-lg text-muted-foreground">
               {t("help.subtitle")}
             </p>
 
-            <div className="relative max-w-2xl mx-auto">
+            <div className="relative mx-auto max-w-2xl">
               <Search
-                className={`absolute top-3 h-5 w-5 text-muted-foreground ${
-                  isArabic ? "right-3" : "left-3"
+                className={`absolute top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground ${
+                  isArabic ? "right-4" : "left-4"
                 }`}
               />
+
               <Input
                 placeholder={t("help.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`${isArabic ? "pr-10" : "pl-10"} py-6`}
+                className={`h-14 rounded-full border-border bg-background text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-primary/30 ${
+                  isArabic ? "pr-12 pl-5 text-right" : "pl-12 pr-5 text-left"
+                }`}
               />
             </div>
           </div>
 
           <div
             ref={faqRef}
-            className={`mb-16 transition-all duration-700 ease-out delay-100 ${
-              faqVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+            className={`mb-16 transition-all delay-100 duration-700 ease-out ${
+              faqVisible
+                ? "translate-y-0 opacity-100"
+                : "translate-y-10 opacity-0"
             }`}
           >
             <Accordion type="single" collapsible className="space-y-4">
@@ -97,12 +109,13 @@ const Help = () => {
                 <AccordionItem
                   key={index}
                   value={`item-${index}`}
-                  className="bg-card border rounded-lg px-6"
+                  className="rounded-2xl border border-border bg-card px-6 text-card-foreground shadow-sm"
                 >
-                  <AccordionTrigger className="font-semibold hover:no-underline">
+                  <AccordionTrigger className="font-semibold text-foreground hover:no-underline">
                     {faq.question}
                   </AccordionTrigger>
-                  <AccordionContent className="text-muted-foreground pt-2">
+
+                  <AccordionContent className="pt-2 text-muted-foreground">
                     {faq.answer}
                   </AccordionContent>
                 </AccordionItem>
@@ -112,46 +125,52 @@ const Help = () => {
 
           <div
             ref={contactRef}
-            className={`transition-all duration-700 ease-out delay-200 ${
-              contactVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+            className={`transition-all delay-200 duration-700 ease-out ${
+              contactVisible
+                ? "translate-y-0 opacity-100"
+                : "translate-y-10 opacity-0"
             }`}
           >
-            <h2 className="text-3xl font-bold text-center mb-4">
+            <h2 className="mb-4 text-center text-3xl font-bold text-foreground">
               {t("help.contact.title")}
             </h2>
-            <p className="text-center text-muted-foreground mb-8">
+
+            <p className="mb-8 text-center text-muted-foreground">
               {t("help.contact.subtitle")}
             </p>
 
-            <div className="grid md:grid-cols-1 gap-6">
-              <div className="bg-accent/30 p-8 rounded-lg text-center hover:bg-cyan-50 transition-all duration-200">
-                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="grid gap-6 md:grid-cols-1">
+              <div className="rounded-2xl border border-border bg-card p-8 text-center text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/30 hover:bg-primary/5">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
                   <Mail className="h-8 w-8 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">
+
+                <h3 className="mb-2 text-xl font-semibold text-foreground">
                   {t("help.contact.emailTitle")}
                 </h3>
-                <p className="text-muted-foreground mb-4">
+
+                <p className="mb-4 text-muted-foreground">
                   {t("help.contact.emailDescription")}
                 </p>
+
                 <a
                   href="mailto:support@HealthCare.com"
-                  className="text-primary hover:underline"
+                  className="font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
                 >
                   support@HealthCare.com
                 </a>
               </div>
             </div>
 
-            <div className="mt-12 pt-8 border-t">
-              <h3 className="text-lg font-semibold text-center mb-4">
+            <div className="mt-12 border-t border-border pt-8">
+              <h3 className="mb-4 text-center text-lg font-semibold text-foreground">
                 {t("help.importantPages")}
               </h3>
 
               <div className="flex flex-wrap justify-center gap-6 text-sm">
                 <a
                   href="/privacy"
-                  className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+                  className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-primary"
                 >
                   <ShieldCheck className="h-4 w-4" />
                   <span>{t("help.links.privacy")}</span>
@@ -159,7 +178,7 @@ const Help = () => {
 
                 <a
                   href="/terms"
-                  className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+                  className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-primary"
                 >
                   <FileText className="h-4 w-4" />
                   <span>{t("help.links.terms")}</span>
@@ -167,7 +186,7 @@ const Help = () => {
 
                 <a
                   href="/contact"
-                  className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+                  className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-primary"
                 >
                   <Phone className="h-4 w-4" />
                   <span>{t("help.links.contact")}</span>

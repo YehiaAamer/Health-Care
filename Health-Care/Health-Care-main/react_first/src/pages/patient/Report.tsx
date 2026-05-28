@@ -34,6 +34,7 @@ type ToneVisuals = {
   ringClass: string;
   borderClass: string;
   gradientClass: string;
+  chartRestColor: string;
 };
 
 type PredictionCardProps = {
@@ -104,9 +105,9 @@ export default function Report() {
                 probability: probability.toFixed(1),
               }),
         color: "#ef4444",
-        textClass: "text-red-600",
+        textClass: "text-red-600 dark:text-red-300",
         badgeClass:
-          "border-red-200 bg-red-100 text-red-700 hover:border-red-200 hover:bg-red-100 hover:text-red-700",
+          "border-red-200 bg-red-100 text-red-700 hover:border-red-200 hover:bg-red-100 hover:text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-300",
         softBg: "bg-red-500/10",
       };
     }
@@ -118,9 +119,9 @@ export default function Report() {
           probability: probability.toFixed(1),
         }),
         color: "#eab308",
-        textClass: "text-yellow-600",
+        textClass: "text-yellow-600 dark:text-yellow-300",
         badgeClass:
-          "border-yellow-200 bg-yellow-100 text-yellow-700 hover:border-yellow-200 hover:bg-yellow-100 hover:text-yellow-700",
+          "border-yellow-200 bg-yellow-100 text-yellow-700 hover:border-yellow-200 hover:bg-yellow-100 hover:text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-300 dark:hover:bg-yellow-500/10 dark:hover:text-yellow-300",
         softBg: "bg-yellow-500/10",
       };
     }
@@ -131,9 +132,9 @@ export default function Report() {
         probability: probability.toFixed(1),
       }),
       color: "#22c55e",
-      textClass: "text-green-600",
+      textClass: "text-green-600 dark:text-green-300",
       badgeClass:
-        "border-green-200 bg-green-100 text-green-700 hover:border-green-200 hover:bg-green-100 hover:text-green-700",
+        "border-green-200 bg-green-100 text-green-700 hover:border-green-200 hover:bg-green-100 hover:text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300 dark:hover:bg-green-500/10 dark:hover:text-green-300",
       softBg: "bg-green-500/10",
     };
   }, [probability, t, isArabic]);
@@ -187,9 +188,9 @@ export default function Report() {
         level: isArabic ? "عالي جدًا" : "Very High",
         message: getCardioResultMessage(cardiovascularProbability),
         color: "#dc2626",
-        textClass: "text-red-700",
+        textClass: "text-red-700 dark:text-red-300",
         badgeClass:
-          "border-red-200 bg-red-100 text-red-700 hover:border-red-200 hover:bg-red-100 hover:text-red-700",
+          "border-red-200 bg-red-100 text-red-700 hover:border-red-200 hover:bg-red-100 hover:text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-300",
         softBg: "bg-red-500/10",
       };
     }
@@ -199,9 +200,9 @@ export default function Report() {
         level: isArabic ? "عالي" : "High",
         message: getCardioResultMessage(cardiovascularProbability),
         color: "#ef4444",
-        textClass: "text-red-600",
+        textClass: "text-red-600 dark:text-red-300",
         badgeClass:
-          "border-red-200 bg-red-100 text-red-700 hover:border-red-200 hover:bg-red-100 hover:text-red-700",
+          "border-red-200 bg-red-100 text-red-700 hover:border-red-200 hover:bg-red-100 hover:text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-300",
         softBg: "bg-red-500/10",
       };
     }
@@ -211,9 +212,9 @@ export default function Report() {
         level: isArabic ? "متوسط" : "Medium",
         message: getCardioResultMessage(cardiovascularProbability),
         color: "#eab308",
-        textClass: "text-yellow-600",
+        textClass: "text-yellow-600 dark:text-yellow-300",
         badgeClass:
-          "border-yellow-200 bg-yellow-100 text-yellow-700 hover:border-yellow-200 hover:bg-yellow-100 hover:text-yellow-700",
+          "border-yellow-200 bg-yellow-100 text-yellow-700 hover:border-yellow-200 hover:bg-yellow-100 hover:text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-300 dark:hover:bg-yellow-500/10 dark:hover:text-yellow-300",
         softBg: "bg-yellow-500/10",
       };
     }
@@ -222,9 +223,9 @@ export default function Report() {
       level: isArabic ? "منخفض" : "Low",
       message: getCardioResultMessage(cardiovascularProbability),
       color: "#22c55e",
-      textClass: "text-green-600",
+      textClass: "text-green-600 dark:text-green-300",
       badgeClass:
-        "border-green-200 bg-green-100 text-green-700 hover:border-green-200 hover:bg-green-100 hover:text-green-700",
+        "border-green-200 bg-green-100 text-green-700 hover:border-green-200 hover:bg-green-100 hover:text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300 dark:hover:bg-green-500/10 dark:hover:text-green-300",
       softBg: "bg-green-500/10",
     };
   }, [cardiovascularPrediction, cardiovascularProbability, isArabic]);
@@ -232,24 +233,30 @@ export default function Report() {
   const getToneVisuals = (tone: RiskTone): ToneVisuals => {
     if (tone.color === "#eab308") {
       return {
-        ringClass: "ring-yellow-100",
-        borderClass: "border-yellow-100",
-        gradientClass: "from-yellow-50 via-white to-white",
+        ringClass: "ring-yellow-100 dark:ring-yellow-500/20",
+        borderClass: "border-yellow-100 dark:border-yellow-500/20",
+        gradientClass:
+          "from-yellow-50 via-card to-card dark:from-yellow-500/10 dark:via-card dark:to-card",
+        chartRestColor: "hsl(var(--muted))",
       };
     }
 
     if (tone.color === "#22c55e") {
       return {
-        ringClass: "ring-green-100",
-        borderClass: "border-green-100",
-        gradientClass: "from-green-50 via-white to-white",
+        ringClass: "ring-green-100 dark:ring-green-500/20",
+        borderClass: "border-green-100 dark:border-green-500/20",
+        gradientClass:
+          "from-green-50 via-card to-card dark:from-green-500/10 dark:via-card dark:to-card",
+        chartRestColor: "hsl(var(--muted))",
       };
     }
 
     return {
-      ringClass: "ring-red-100",
-      borderClass: "border-red-100",
-      gradientClass: "from-red-50 via-white to-white",
+      ringClass: "ring-red-100 dark:ring-red-500/20",
+      borderClass: "border-red-100 dark:border-red-500/20",
+      gradientClass:
+        "from-red-50 via-card to-card dark:from-red-500/10 dark:via-card dark:to-card",
+      chartRestColor: "hsl(var(--muted))",
     };
   };
 
@@ -557,336 +564,334 @@ export default function Report() {
     }
   );
 
-const downloadPDF = async () => {
-  try {
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-
-    const primary = [13, 177, 201] as [number, number, number]; // HealthCare cyan
-    const dark = [15, 23, 42] as [number, number, number];
-    const muted = [100, 116, 139] as [number, number, number];
-    const border = [226, 232, 240] as [number, number, number];
-    const softGray = [248, 250, 252] as [number, number, number];
-    const lightPrimary = [236, 253, 255] as [number, number, number];
-
-    const hexToRgb = (hex: string): [number, number, number] => {
-      const cleanHex = hex.replace("#", "");
-      const value = parseInt(cleanHex, 16);
-
-      return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
-    };
-
-    const diabetesPdfLevel = getPdfRiskLevel(probability);
-    const cardioPdfLevel = getPdfCardioRiskLevel(cardiovascularProbability);
-
-    const currentDate = new Date().toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-    });
-
-    const reportId = `HC-${new Date()
-      .toISOString()
-      .slice(0, 10)
-      .replaceAll("-", "")}-${Math.floor(Math.random() * 9000 + 1000)}`;
-
-    const drawBrandLogo = (x: number, y: number) => {
-      // Small logo icon only - website name size kept clear
-      doc.setDrawColor(...primary);
-      doc.setLineWidth(0.9);
-      doc.setLineCap("round");
-      doc.setLineJoin("round");
-
-      doc.line(x, y + 5.5, x + 3.5, y + 5.5);
-      doc.line(x + 3.5, y + 5.5, x + 5.5, y + 0.5);
-      doc.line(x + 5.5, y + 0.5, x + 9.2, y + 12.5);
-      doc.line(x + 9.2, y + 12.5, x + 12.2, y + 5.5);
-      doc.line(x + 12.2, y + 5.5, x + 16.8, y + 5.5);
-
-      doc.setFillColor(...primary);
-      doc.circle(x + 19, y + 5.5, 0.6, "F");
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.setTextColor(...primary);
-      doc.text("HealthCare", x + 22.5, y + 8.7);
-    };
-
-    const drawHeader = () => {
-      doc.setFillColor(255, 255, 255);
-      doc.rect(0, 0, pageWidth, 34, "F");
-
-      doc.setFillColor(...lightPrimary);
-      doc.rect(0, 0, pageWidth, 3.5, "F");
-
-      drawBrandLogo(14, 13);
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      doc.setTextColor(...dark);
-      doc.text("Medical Risk Report", pageWidth - 14, 12, {
-        align: "right",
+  const downloadPDF = async () => {
+    try {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
       });
 
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.3);
-      doc.setTextColor(...muted);
-      doc.text(`Report ID: ${reportId}`, pageWidth - 14, 18, {
-        align: "right",
-      });
-      doc.text(`Date: ${currentDate}`, pageWidth - 14, 23.5, {
-        align: "right",
-      });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
 
-      doc.setDrawColor(...border);
-      doc.setLineWidth(0.3);
-      doc.line(14, 31.5, pageWidth - 14, 31.5);
-    };
+      const primary = [13, 177, 201] as [number, number, number];
+      const dark = [15, 23, 42] as [number, number, number];
+      const muted = [100, 116, 139] as [number, number, number];
+      const border = [226, 232, 240] as [number, number, number];
+      const softGray = [248, 250, 252] as [number, number, number];
+      const lightPrimary = [236, 253, 255] as [number, number, number];
 
-    const drawFooter = () => {
-      doc.setDrawColor(...border);
-      doc.setLineWidth(0.25);
-      doc.line(14, pageHeight - 14, pageWidth - 14, pageHeight - 14);
+      const hexToRgb = (hex: string): [number, number, number] => {
+        const cleanHex = hex.replace("#", "");
+        const value = parseInt(cleanHex, 16);
 
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.2);
-      doc.setTextColor(...muted);
-      doc.text("HealthCare Medical Risk Report", 14, pageHeight - 8.5);
-    };
+        return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+      };
 
-    const addSectionTitle = (title: string, y: number) => {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      doc.setTextColor(...dark);
-      doc.text(title, 14, y);
+      const diabetesPdfLevel = getPdfRiskLevel(probability);
+      const cardioPdfLevel = getPdfCardioRiskLevel(cardiovascularProbability);
 
-      doc.setDrawColor(...primary);
-      doc.setLineWidth(0.4);
-      doc.line(14, y + 2.5, 45, y + 2.5);
-    };
-
-    const drawRiskBadge = (
-      label: string,
-      x: number,
-      y: number,
-      color: [number, number, number]
-    ) => {
-      doc.setFillColor(255, 255, 255);
-      doc.setDrawColor(...color);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(x, y, 31, 7.2, 3.6, 3.6, "FD");
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
-      doc.setTextColor(...color);
-      doc.text(label, x + 15.5, y + 4.8, {
-        align: "center",
-      });
-    };
-
-    const addResultBox = ({
-      title,
-      percentage,
-      level,
-      color,
-      x,
-      y,
-      width,
-    }: {
-      title: string;
-      percentage: number;
-      level: string;
-      color: [number, number, number];
-      x: number;
-      y: number;
-      width: number;
-    }) => {
-      doc.setFillColor(255, 255, 255);
-      doc.setDrawColor(...border);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(x, y, width, 35, 2.5, 2.5, "FD");
-
-      doc.setFillColor(...primary);
-      doc.roundedRect(x, y, width, 1.7, 2.5, 2.5, "F");
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9.2);
-      doc.setTextColor(...dark);
-      doc.text(title, x + 5, y + 8.8);
-
-      drawRiskBadge(level, x + width - 36, y + 5.1, color);
-
-      // Percentage without risk color for clean lab-style report
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(21);
-      doc.setTextColor(...dark);
-      doc.text(`${percentage.toFixed(2)}%`, x + 5, y + 23.5);
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.5);
-      doc.setTextColor(...muted);
-      doc.text("Calculated Risk Value", x + 5, y + 30.5);
-    };
-
-    drawHeader();
-    drawFooter();
-
-    // Title area - compact to keep one page
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(15);
-    doc.setTextColor(...dark);
-    doc.text("Medical Risk Report", 14, 43);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.2);
-    doc.setTextColor(...muted);
-    doc.text(
-      "Diabetes and cardiovascular risk values based on submitted data.",
-      14,
-      49
-    );
-
-    let currentY = 61;
-
-    addSectionTitle("Risk Values", currentY);
-    currentY += 7;
-
-    if (cardiovascularPrediction) {
-      addResultBox({
-        title: "Diabetes Risk",
-        percentage: probability,
-        level: diabetesPdfLevel,
-        color: hexToRgb(riskTone.color),
-        x: 14,
-        y: currentY,
-        width: 88,
+      const currentDate = new Date().toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
       });
 
-      addResultBox({
-        title: "Cardiovascular Risk",
-        percentage: cardiovascularProbability,
-        level: cardioPdfLevel,
-        color: hexToRgb(cardioTone.color),
-        x: 108,
-        y: currentY,
-        width: 88,
-      });
-    } else {
-      addResultBox({
-        title: "Diabetes Risk",
-        percentage: probability,
-        level: diabetesPdfLevel,
-        color: hexToRgb(riskTone.color),
-        x: 14,
-        y: currentY,
-        width: 182,
-      });
-    }
-
-    currentY += 47;
-
-    addSectionTitle("Submitted Values", currentY);
-    currentY += 6;
-
-    const tableData = filteredFormEntries.map(([key, value]) => [
-      getPdfFieldLabel(key),
-      getPdfDisplayValue(key, value),
-    ]);
-
-    autoTable(doc, {
-      startY: currentY,
-      head: [["Parameter", "Value"]],
-      body: tableData,
-      theme: "grid",
-      pageBreak: "avoid",
-      rowPageBreak: "avoid",
-      styles: {
-        font: "helvetica",
-        fontSize: 7.7,
-        cellPadding: {
-          top: 2,
-          right: 2.4,
-          bottom: 2,
-          left: 2.4,
-        },
-        halign: "left",
-        valign: "middle",
-        lineColor: border,
-        lineWidth: 0.12,
-        textColor: dark,
-        overflow: "linebreak",
-      },
-      headStyles: {
-        fillColor: [15, 23, 42],
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-        fontSize: 8,
-        cellPadding: {
-          top: 2.2,
-          right: 2.4,
-          bottom: 2.2,
-          left: 2.4,
-        },
-      },
-      alternateRowStyles: {
-        fillColor: softGray,
-      },
-      columnStyles: {
-        0: {
-          cellWidth: 98,
-          fontStyle: "bold",
-        },
-        1: {
-          cellWidth: 84,
-        },
-      },
-      margin: {
-        left: 14,
-        right: 14,
-        top: 36,
-        bottom: 18,
-      },
-      didDrawPage: () => {
-        drawHeader();
-        drawFooter();
-      },
-    });
-
-    const totalPages = doc.getNumberOfPages();
-
-    for (let i = 1; i <= totalPages; i += 1) {
-      doc.setPage(i);
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.2);
-      doc.setTextColor(...muted);
-      doc.text(`Page ${i} of ${totalPages}`, pageWidth - 32, pageHeight - 8.5);
-    }
-
-    doc.save(
-      `HealthCare_Medical_Risk_Report_${new Date()
+      const reportId = `HC-${new Date()
         .toISOString()
-        .slice(0, 10)}.pdf`
-    );
-  } catch (error) {
-    console.error("PDF generation error:", error);
+        .slice(0, 10)
+        .replaceAll("-", "")}-${Math.floor(Math.random() * 9000 + 1000)}`;
 
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : typeof error === "string"
-        ? error
-        : "Unknown PDF generation error";
+      const drawBrandLogo = (x: number, y: number) => {
+        doc.setDrawColor(...primary);
+        doc.setLineWidth(0.9);
+        doc.setLineCap("round");
+        doc.setLineJoin("round");
 
-    alert(`PDF Error: ${errorMessage}`);
-  }
-};
+        doc.line(x, y + 5.5, x + 3.5, y + 5.5);
+        doc.line(x + 3.5, y + 5.5, x + 5.5, y + 0.5);
+        doc.line(x + 5.5, y + 0.5, x + 9.2, y + 12.5);
+        doc.line(x + 9.2, y + 12.5, x + 12.2, y + 5.5);
+        doc.line(x + 12.2, y + 5.5, x + 16.8, y + 5.5);
+
+        doc.setFillColor(...primary);
+        doc.circle(x + 19, y + 5.5, 0.6, "F");
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.setTextColor(...primary);
+        doc.text("HealthCare", x + 22.5, y + 8.7);
+      };
+
+      const drawHeader = () => {
+        doc.setFillColor(255, 255, 255);
+        doc.rect(0, 0, pageWidth, 34, "F");
+
+        doc.setFillColor(...lightPrimary);
+        doc.rect(0, 0, pageWidth, 3.5, "F");
+
+        drawBrandLogo(14, 13);
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(...dark);
+        doc.text("Medical Risk Report", pageWidth - 14, 12, {
+          align: "right",
+        });
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.3);
+        doc.setTextColor(...muted);
+        doc.text(`Report ID: ${reportId}`, pageWidth - 14, 18, {
+          align: "right",
+        });
+        doc.text(`Date: ${currentDate}`, pageWidth - 14, 23.5, {
+          align: "right",
+        });
+
+        doc.setDrawColor(...border);
+        doc.setLineWidth(0.3);
+        doc.line(14, 31.5, pageWidth - 14, 31.5);
+      };
+
+      const drawFooter = () => {
+        doc.setDrawColor(...border);
+        doc.setLineWidth(0.25);
+        doc.line(14, pageHeight - 14, pageWidth - 14, pageHeight - 14);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.2);
+        doc.setTextColor(...muted);
+        doc.text("HealthCare Medical Risk Report", 14, pageHeight - 8.5);
+      };
+
+      const addSectionTitle = (title: string, y: number) => {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(...dark);
+        doc.text(title, 14, y);
+
+        doc.setDrawColor(...primary);
+        doc.setLineWidth(0.4);
+        doc.line(14, y + 2.5, 45, y + 2.5);
+      };
+
+      const drawRiskBadge = (
+        label: string,
+        x: number,
+        y: number,
+        color: [number, number, number]
+      ) => {
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(...color);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(x, y, 31, 7.2, 3.6, 3.6, "FD");
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7);
+        doc.setTextColor(...color);
+        doc.text(label, x + 15.5, y + 4.8, {
+          align: "center",
+        });
+      };
+
+      const addResultBox = ({
+        title,
+        percentage,
+        level,
+        color,
+        x,
+        y,
+        width,
+      }: {
+        title: string;
+        percentage: number;
+        level: string;
+        color: [number, number, number];
+        x: number;
+        y: number;
+        width: number;
+      }) => {
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(...border);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(x, y, width, 35, 2.5, 2.5, "FD");
+
+        doc.setFillColor(...primary);
+        doc.roundedRect(x, y, width, 1.7, 2.5, 2.5, "F");
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9.2);
+        doc.setTextColor(...dark);
+        doc.text(title, x + 5, y + 8.8);
+
+        drawRiskBadge(level, x + width - 36, y + 5.1, color);
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(21);
+        doc.setTextColor(...dark);
+        doc.text(`${percentage.toFixed(2)}%`, x + 5, y + 23.5);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(...muted);
+        doc.text("Calculated Risk Value", x + 5, y + 30.5);
+      };
+
+      drawHeader();
+      drawFooter();
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(15);
+      doc.setTextColor(...dark);
+      doc.text("Medical Risk Report", 14, 43);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.2);
+      doc.setTextColor(...muted);
+      doc.text(
+        "Diabetes and cardiovascular risk values based on submitted data.",
+        14,
+        49
+      );
+
+      let currentY = 61;
+
+      addSectionTitle("Risk Values", currentY);
+      currentY += 7;
+
+      if (cardiovascularPrediction) {
+        addResultBox({
+          title: "Diabetes Risk",
+          percentage: probability,
+          level: diabetesPdfLevel,
+          color: hexToRgb(riskTone.color),
+          x: 14,
+          y: currentY,
+          width: 88,
+        });
+
+        addResultBox({
+          title: "Cardiovascular Risk",
+          percentage: cardiovascularProbability,
+          level: cardioPdfLevel,
+          color: hexToRgb(cardioTone.color),
+          x: 108,
+          y: currentY,
+          width: 88,
+        });
+      } else {
+        addResultBox({
+          title: "Diabetes Risk",
+          percentage: probability,
+          level: diabetesPdfLevel,
+          color: hexToRgb(riskTone.color),
+          x: 14,
+          y: currentY,
+          width: 182,
+        });
+      }
+
+      currentY += 47;
+
+      addSectionTitle("Submitted Values", currentY);
+      currentY += 6;
+
+      const tableData = filteredFormEntries.map(([key, value]) => [
+        getPdfFieldLabel(key),
+        getPdfDisplayValue(key, value),
+      ]);
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [["Parameter", "Value"]],
+        body: tableData,
+        theme: "grid",
+        pageBreak: "avoid",
+        rowPageBreak: "avoid",
+        styles: {
+          font: "helvetica",
+          fontSize: 7.7,
+          cellPadding: {
+            top: 2,
+            right: 2.4,
+            bottom: 2,
+            left: 2.4,
+          },
+          halign: "left",
+          valign: "middle",
+          lineColor: border,
+          lineWidth: 0.12,
+          textColor: dark,
+          overflow: "linebreak",
+        },
+        headStyles: {
+          fillColor: [15, 23, 42],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          fontSize: 8,
+          cellPadding: {
+            top: 2.2,
+            right: 2.4,
+            bottom: 2.2,
+            left: 2.4,
+          },
+        },
+        alternateRowStyles: {
+          fillColor: softGray,
+        },
+        columnStyles: {
+          0: {
+            cellWidth: 98,
+            fontStyle: "bold",
+          },
+          1: {
+            cellWidth: 84,
+          },
+        },
+        margin: {
+          left: 14,
+          right: 14,
+          top: 36,
+          bottom: 18,
+        },
+        didDrawPage: () => {
+          drawHeader();
+          drawFooter();
+        },
+      });
+
+      const totalPages = doc.getNumberOfPages();
+
+      for (let i = 1; i <= totalPages; i += 1) {
+        doc.setPage(i);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.2);
+        doc.setTextColor(...muted);
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth - 32, pageHeight - 8.5);
+      }
+
+      doc.save(
+        `HealthCare_Medical_Risk_Report_${new Date()
+          .toISOString()
+          .slice(0, 10)}.pdf`
+      );
+    } catch (error) {
+      console.error("PDF generation error:", error);
+
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+          ? error
+          : "Unknown PDF generation error";
+
+      alert(`PDF Error: ${errorMessage}`);
+    }
+  };
+
   const PredictionCard = ({
     title,
     subtitle,
@@ -899,23 +904,23 @@ const downloadPDF = async () => {
   }: PredictionCardProps) => {
     return (
       <Card
-        className={`relative overflow-hidden rounded-[22px] border ${visuals.borderClass} bg-gradient-to-br ${visuals.gradientClass} shadow-sm`}
+        className={`relative overflow-hidden rounded-[22px] border ${visuals.borderClass} bg-gradient-to-br ${visuals.gradientClass} text-card-foreground shadow-sm`}
       >
         <CardContent className="relative p-4 md:p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2.5">
               <span
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/80 ring-4 ${visuals.ringClass}`}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-background/80 ring-4 ${visuals.ringClass}`}
               >
                 {icon}
               </span>
 
               <div className="min-w-0">
-                <h3 className="truncate text-sm font-semibold tracking-tight text-slate-900 md:text-base">
+                <h3 className="truncate text-sm font-semibold tracking-tight text-foreground md:text-base">
                   {title}
                 </h3>
 
-                <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
+                <p className="mt-0.5 truncate text-[11px] font-medium text-muted-foreground">
                   {subtitle}
                 </p>
               </div>
@@ -930,7 +935,7 @@ const downloadPDF = async () => {
 
           <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_130px]">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 {metricLabel}
               </p>
 
@@ -941,7 +946,7 @@ const downloadPDF = async () => {
                 {probability.toFixed(2)}%
               </div>
 
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200/70">
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full transition-all duration-700"
                   style={{
@@ -972,7 +977,7 @@ const downloadPDF = async () => {
                     stroke="none"
                   >
                     <Cell fill={tone.color} />
-                    <Cell fill="#e5e7eb" />
+                    <Cell fill={visuals.chartRestColor} />
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
@@ -989,7 +994,7 @@ const downloadPDF = async () => {
   ) {
     return (
       <div
-        className="flex min-h-screen flex-col bg-background"
+        className="flex min-h-screen flex-col bg-background text-foreground"
         dir={isArabic ? "rtl" : "ltr"}
       >
         <Header variant="dashboard" />
@@ -1001,13 +1006,13 @@ const downloadPDF = async () => {
             paddingBottom: "24px",
           }}
         >
-          <Card className="w-full max-w-sm rounded-2xl border border-border/60 shadow-md">
+          <Card className="w-full max-w-sm rounded-2xl border border-border bg-card text-card-foreground shadow-md">
             <CardContent className="pb-7 pt-7 text-center">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-yellow-500/10">
                 <AlertTriangle className="h-7 w-7 text-yellow-500" />
               </div>
 
-              <h2 className="mb-2 text-lg font-bold tracking-tight">
+              <h2 className="mb-2 text-lg font-bold tracking-tight text-foreground">
                 {t("report.noResultTitle")}
               </h2>
 
@@ -1034,7 +1039,7 @@ const downloadPDF = async () => {
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-gradient-to-b from-background via-background to-slate-50"
+      className="flex min-h-screen flex-col bg-gradient-to-b from-background via-background to-accent/20 text-foreground"
       dir={isArabic ? "rtl" : "ltr"}
     >
       <Header variant="dashboard" />
@@ -1047,8 +1052,8 @@ const downloadPDF = async () => {
         }}
       >
         <div className="space-y-4">
-          <Card className="overflow-hidden rounded-[24px] border border-slate-100 bg-white shadow-lg shadow-slate-200/50">
-            <CardHeader className="border-b border-slate-100 bg-gradient-to-br from-primary/5 via-white to-primary/10 px-4 py-5 md:px-6">
+          <Card className="overflow-hidden rounded-[24px] border border-border bg-card text-card-foreground shadow-lg">
+            <CardHeader className="border-b border-border bg-gradient-to-br from-primary/5 via-card to-primary/10 px-4 py-5 md:px-6">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
                   <div className="mb-2.5 flex items-center gap-2">
@@ -1057,22 +1062,22 @@ const downloadPDF = async () => {
                     </span>
                   </div>
 
-                  <CardTitle className="text-xl font-semibold tracking-tight text-slate-900 md:text-2xl">
+                  <CardTitle className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
                     {t("report.title")}
                   </CardTitle>
 
-                  <p className="mt-1.5 max-w-2xl text-xs font-medium leading-5 text-slate-500 md:text-sm">
+                  <p className="mt-1.5 max-w-2xl text-xs font-medium leading-5 text-muted-foreground md:text-sm">
                     {isArabic
                       ? "ملخص لنتائج توقع السكري وخطر القلب والأوعية الدموية بناءً على المؤشرات المدخلة."
                       : "A summary of diabetes and cardiovascular risk results based on the submitted indicators."}
                   </p>
                 </div>
 
-                <div className="w-fit rounded-xl border border-slate-100 bg-white px-3.5 py-2.5 shadow-sm">
-                  <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400">
+                <div className="w-fit rounded-xl border border-border bg-background px-3.5 py-2.5 shadow-sm">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                     {t("report.pdf.analysisDate")}
                   </p>
-                  <p className="mt-1 text-xs font-semibold text-slate-900">
+                  <p className="mt-1 text-xs font-semibold text-foreground">
                     {reportDate}
                   </p>
                 </div>
@@ -1134,11 +1139,11 @@ const downloadPDF = async () => {
                 }`}
               >
                 <Card
-                  className={`rounded-[22px] border ${riskVisuals.borderClass} ${riskTone.softBg} shadow-sm`}
+                  className={`rounded-[22px] border ${riskVisuals.borderClass} ${riskTone.softBg} text-card-foreground shadow-sm`}
                 >
                   <CardContent className="p-4 md:p-5">
                     <div className="mb-3 flex items-center gap-2.5">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/80">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-background/80">
                         <TrendingUp
                           className={`h-4.5 w-4.5 ${riskTone.textClass}`}
                           strokeWidth={2.4}
@@ -1151,7 +1156,7 @@ const downloadPDF = async () => {
                         >
                           {t("report.preliminaryResult")}
                         </h3>
-                        <p className="text-[11px] font-medium text-slate-500">
+                        <p className="text-[11px] font-medium text-muted-foreground">
                           {t("report.diabetesRiskProbability")}
                         </p>
                       </div>
@@ -1167,11 +1172,11 @@ const downloadPDF = async () => {
 
                 {cardiovascularPrediction && (
                   <Card
-                    className={`rounded-[22px] border ${cardioVisuals.borderClass} ${cardioTone.softBg} shadow-sm`}
+                    className={`rounded-[22px] border ${cardioVisuals.borderClass} ${cardioTone.softBg} text-card-foreground shadow-sm`}
                   >
                     <CardContent className="p-4 md:p-5">
                       <div className="mb-3 flex items-center gap-2.5">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/80">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-background/80">
                           <TrendingUp
                             className={`h-4.5 w-4.5 ${cardioTone.textClass}`}
                             strokeWidth={2.4}
@@ -1184,7 +1189,7 @@ const downloadPDF = async () => {
                           >
                             {isArabic ? "نتيجة مبدئية" : "Preliminary Result"}
                           </h3>
-                          <p className="text-[11px] font-medium text-slate-500">
+                          <p className="text-[11px] font-medium text-muted-foreground">
                             {isArabic
                               ? "احتمالية خطر الإصابة بأمراض القلب والأوعية الدموية"
                               : "Cardiovascular Disease Risk Probability"}
@@ -1202,7 +1207,7 @@ const downloadPDF = async () => {
                 )}
               </div>
 
-              <Card className="rounded-[22px] border border-slate-100 bg-slate-50/70 shadow-sm">
+              <Card className="rounded-[22px] border border-border bg-muted/30 text-card-foreground shadow-sm">
                 <CardContent className="p-4 md:p-5">
                   <div className="mb-4 flex items-center gap-2.5">
                     <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -1210,10 +1215,10 @@ const downloadPDF = async () => {
                     </span>
 
                     <div>
-                      <h3 className="text-sm font-semibold text-slate-900 md:text-base">
+                      <h3 className="text-sm font-semibold text-foreground md:text-base">
                         {t("report.personalizedRecommendations")}
                       </h3>
-                      <p className="text-[11px] font-medium text-slate-500">
+                      <p className="text-[11px] font-medium text-muted-foreground">
                         {isArabic
                           ? "توصيات مبدئية حسب مستوى الخطورة"
                           : "Initial recommendations based on the risk level"}
@@ -1228,7 +1233,7 @@ const downloadPDF = async () => {
                         : "lg:grid-cols-1"
                     }`}
                   >
-                    <div className="rounded-[18px] border border-slate-100 bg-white p-3.5 shadow-sm">
+                    <div className="rounded-[18px] border border-border bg-card p-3.5 text-card-foreground shadow-sm">
                       <div className="mb-3 flex items-center justify-between gap-2.5">
                         <div className="flex items-center gap-2">
                           <span
@@ -1239,7 +1244,7 @@ const downloadPDF = async () => {
                             />
                           </span>
 
-                          <h4 className="text-xs font-semibold text-slate-900">
+                          <h4 className="text-xs font-semibold text-foreground">
                             {t("report.personalizedRecommendations")}
                           </h4>
                         </div>
@@ -1255,7 +1260,7 @@ const downloadPDF = async () => {
                         {recommendations.map((rec, index) => (
                           <li
                             key={`diabetes-${index}`}
-                            className="flex items-start gap-2.5 rounded-xl bg-slate-50/80 px-3 py-2.5 text-xs font-medium leading-5 text-slate-700 md:text-sm"
+                            className="flex items-start gap-2.5 rounded-xl bg-muted/40 px-3 py-2.5 text-xs font-medium leading-5 text-foreground md:text-sm"
                           >
                             <span
                               className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
@@ -1268,7 +1273,7 @@ const downloadPDF = async () => {
                     </div>
 
                     {cardiovascularPrediction && (
-                      <div className="rounded-[18px] border border-slate-100 bg-white p-3.5 shadow-sm">
+                      <div className="rounded-[18px] border border-border bg-card p-3.5 text-card-foreground shadow-sm">
                         <div className="mb-3 flex items-center justify-between gap-2.5">
                           <div className="flex items-center gap-2">
                             <span
@@ -1279,7 +1284,7 @@ const downloadPDF = async () => {
                               />
                             </span>
 
-                            <h4 className="text-xs font-semibold text-slate-900">
+                            <h4 className="text-xs font-semibold text-foreground">
                               {t("report.personalizedRecommendations")}
                             </h4>
                           </div>
@@ -1295,7 +1300,7 @@ const downloadPDF = async () => {
                           {cardioRecommendations.map((rec, index) => (
                             <li
                               key={`cardio-${index}`}
-                              className="flex items-start gap-2.5 rounded-xl bg-slate-50/80 px-3 py-2.5 text-xs font-medium leading-5 text-slate-700 md:text-sm"
+                              className="flex items-start gap-2.5 rounded-xl bg-muted/40 px-3 py-2.5 text-xs font-medium leading-5 text-foreground md:text-sm"
                             >
                               <span
                                 className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
@@ -1311,7 +1316,7 @@ const downloadPDF = async () => {
                 </CardContent>
               </Card>
 
-              <Card className="rounded-[22px] border border-slate-100 bg-white shadow-sm">
+              <Card className="rounded-[22px] border border-border bg-card text-card-foreground shadow-sm">
                 <CardContent className="p-4 md:p-5">
                   <div className="mb-3.5 flex items-center gap-2.5">
                     <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -1319,10 +1324,10 @@ const downloadPDF = async () => {
                     </span>
 
                     <div>
-                      <h3 className="text-sm font-semibold text-slate-900 md:text-base">
+                      <h3 className="text-sm font-semibold text-foreground md:text-base">
                         {t("report.pdf.parameter")}
                       </h3>
-                      <p className="text-[11px] font-medium text-slate-500">
+                      <p className="text-[11px] font-medium text-muted-foreground">
                         {isArabic
                           ? "البيانات المستخدمة في التحليل"
                           : "Submitted values used for analysis"}
@@ -1334,13 +1339,13 @@ const downloadPDF = async () => {
                     {filteredFormEntries.map(([key, value]) => (
                       <div
                         key={key}
-                        className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 transition-all duration-300 hover:bg-white hover:shadow-sm"
+                        className="rounded-xl border border-border bg-muted/40 px-3 py-2.5 transition-all duration-300 hover:bg-primary/5 hover:shadow-sm"
                       >
-                        <div className="text-[10px] font-medium uppercase tracking-[0.1em] text-slate-400">
+                        <div className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
                           {getFieldLabel(key)}
                         </div>
 
-                        <div className="mt-1.5 text-sm font-semibold tracking-tight text-slate-900">
+                        <div className="mt-1.5 text-sm font-semibold tracking-tight text-foreground">
                           {getDisplayValue(key, value)}
                         </div>
                       </div>
@@ -1353,7 +1358,7 @@ const downloadPDF = async () => {
                 <Button
                   variant="outline"
                   asChild
-                  className="h-10 w-full rounded-full border-primary/30 px-5 text-sm font-medium text-primary hover:bg-primary/10 hover:text-primary sm:w-auto"
+                  className="h-10 w-full rounded-full border-primary/30 bg-background px-5 text-sm font-medium text-primary hover:bg-primary/10 hover:text-primary sm:w-auto"
                 >
                   <Link to="/diagnosis">
                     <ArrowLeft

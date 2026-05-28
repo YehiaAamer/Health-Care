@@ -66,7 +66,7 @@ export default function PendingPredictions({
       normalizedLevel.includes("عالي جدا") ||
       normalizedLevel.includes("عالي جدًا")
     ) {
-      return "border-red-100 bg-red-50 text-red-600";
+      return "border-red-200 bg-red-50 text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300";
     }
 
     if (
@@ -74,7 +74,7 @@ export default function PendingPredictions({
       normalizedLevel.includes("مرتفع") ||
       normalizedLevel.includes("عالي")
     ) {
-      return "border-orange-100 bg-orange-50 text-orange-600";
+      return "border-orange-200 bg-orange-50 text-orange-600 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300";
     }
 
     if (
@@ -82,7 +82,7 @@ export default function PendingPredictions({
       normalizedLevel.includes("moderate") ||
       normalizedLevel.includes("متوسط")
     ) {
-      return "border-amber-100 bg-amber-50 text-amber-600";
+      return "border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300";
     }
 
     if (
@@ -90,10 +90,10 @@ export default function PendingPredictions({
       normalizedLevel.includes("منخفض") ||
       normalizedLevel.includes("قليل")
     ) {
-      return "border-emerald-100 bg-emerald-50 text-emerald-600";
+      return "border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300";
     }
 
-    return "border-slate-100 bg-slate-50 text-slate-500";
+    return "border-border bg-muted text-muted-foreground";
   };
 
   const formatRiskLabel = (level?: string) => {
@@ -119,14 +119,24 @@ export default function PendingPredictions({
     }
   };
 
+  const handleReviewClick = (id: number) => {
+    navigate("/doctor-dashboard/reports", {
+      state: {
+        openReportId: id,
+      },
+    });
+
+    onReview(id);
+  };
+
   const cardClassName =
-    "flex h-full w-full flex-col rounded-2xl border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:shadow-md hover:shadow-slate-200/60";
+    "flex h-full w-full flex-col rounded-2xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-md";
 
   if (isLoading) {
     return (
       <Card className={cardClassName}>
         <CardHeader className="flex shrink-0 flex-row items-center justify-between gap-3 px-4 pb-2 pt-4 sm:px-5 sm:pb-3 sm:pt-5">
-          <CardTitle className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold tracking-tight text-slate-900 sm:text-base">
+          <CardTitle className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold tracking-tight text-foreground sm:text-base">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:h-8 sm:w-8">
               <ClipboardList
                 className="h-3.5 w-3.5 sm:h-4 sm:w-4"
@@ -145,7 +155,7 @@ export default function PendingPredictions({
             {[1, 2, 3, 4, 5].map((i) => (
               <div
                 key={i}
-                className="flex min-h-[40px] items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/40 px-2.5 py-1.5 sm:min-h-[46px] sm:px-3 sm:py-2"
+                className="flex min-h-[40px] items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-2.5 py-1.5 sm:min-h-[46px] sm:px-3 sm:py-2"
               >
                 <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
                   <Skeleton className="h-7 w-7 shrink-0 rounded-2xl sm:h-8 sm:w-8" />
@@ -168,7 +178,7 @@ export default function PendingPredictions({
   return (
     <Card className={cardClassName}>
       <CardHeader className="flex shrink-0 flex-row items-center justify-between gap-3 px-4 pb-2 pt-4 sm:px-5 sm:pb-3 sm:pt-5">
-        <CardTitle className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold tracking-tight text-slate-900 sm:text-base">
+        <CardTitle className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold tracking-tight text-foreground sm:text-base">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:h-8 sm:w-8">
             <ClipboardList
               className="h-3.5 w-3.5 sm:h-4 sm:w-4"
@@ -201,48 +211,48 @@ export default function PendingPredictions({
               <ClipboardList className="h-6 w-6 opacity-80" strokeWidth={2.2} />
             </div>
 
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
               {t("doctorDashboard.pendingReviews.empty")}
             </p>
           </div>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="shrink-0 border-y border-slate-100 bg-slate-50/70">
+            <div className="shrink-0 border-y border-border bg-muted/30">
               <div className="grid grid-cols-[36%_28%_20%_16%] px-2 py-2 sm:grid-cols-[40%_26%_20%_14%] sm:px-6">
-                <div className="text-start text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400 sm:text-[10px]">
+                <div className="text-start text-[8px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px]">
                   {t("doctorDashboard.pendingReviews.patient")}
                 </div>
 
-                <div className="text-start text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400 sm:text-[10px]">
+                <div className="text-start text-[8px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px]">
                   {t("doctorDashboard.pendingReviews.riskLevel")}
                 </div>
 
-                <div className="text-start text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400 sm:text-[10px]">
+                <div className="text-start text-[8px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px]">
                   {t("doctorDashboard.pendingReviews.date")}
                 </div>
 
-                <div className="text-end text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400 sm:text-[10px]">
+                <div className="text-end text-[8px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px]">
                   {t("doctorDashboard.pendingReviews.action")}
                 </div>
               </div>
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col justify-between divide-y divide-slate-100">
+            <div className="flex min-h-0 flex-1 flex-col justify-between divide-y divide-border">
               {displayedPredictions.map((pred) => (
                 <div
                   key={pred.id}
-                  className="grid min-h-[42px] grid-cols-[36%_28%_20%_16%] items-center px-2 py-1.5 transition-colors duration-200 hover:bg-slate-50/70 sm:min-h-[48px] sm:grid-cols-[40%_26%_20%_14%] sm:px-6 sm:py-2"
+                  className="grid min-h-[42px] grid-cols-[36%_28%_20%_16%] items-center px-2 py-1.5 transition-colors duration-200 hover:bg-muted/30 sm:min-h-[48px] sm:grid-cols-[40%_26%_20%_14%] sm:px-6 sm:py-2"
                 >
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                      <Avatar className="h-7 w-7 shrink-0 rounded-2xl border border-slate-100 shadow-sm sm:h-8 sm:w-8">
+                      <Avatar className="h-7 w-7 shrink-0 rounded-2xl border border-border shadow-sm sm:h-8 sm:w-8">
                         <AvatarFallback className="rounded-2xl bg-primary/10 text-[11px] font-bold text-primary sm:text-xs">
                           {pred.patient_name?.charAt(0)?.toUpperCase() || "P"}
                         </AvatarFallback>
                       </Avatar>
 
                       <div className="min-w-0">
-                        <p className="truncate text-[11px] font-bold leading-4 tracking-tight text-slate-900 sm:text-sm">
+                        <p className="truncate text-[11px] font-bold leading-4 tracking-tight text-foreground sm:text-sm">
                           {pred.patient_name || "Anonymous"}
                         </p>
                       </div>
@@ -263,7 +273,7 @@ export default function PendingPredictions({
                   </div>
 
                   <div className="min-w-0 px-1">
-                    <span className="block truncate text-[8px] font-semibold leading-4 text-slate-400 sm:text-[10px]">
+                    <span className="block truncate text-[8px] font-semibold leading-4 text-muted-foreground sm:text-[10px]">
                       {formatPredictionDate(pred.created_at)}
                     </span>
                   </div>
@@ -273,7 +283,7 @@ export default function PendingPredictions({
                       type="button"
                       size="sm"
                       variant="ghost"
-                      onClick={() => onReview(pred.id)}
+                      onClick={() => handleReviewClick(pred.id)}
                       className="h-7 max-w-full rounded-xl px-1.5 text-[7px] font-bold uppercase tracking-wider text-primary hover:bg-primary/10 hover:text-primary sm:h-8 sm:px-3 sm:text-[10px] sm:tracking-widest"
                     >
                       <span className="truncate">

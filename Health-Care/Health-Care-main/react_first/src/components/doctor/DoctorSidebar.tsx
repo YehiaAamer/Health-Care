@@ -22,6 +22,8 @@ import {
   Clock3,
   Globe,
   ShieldCheck,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/shared/BrandLogo";
@@ -30,15 +32,34 @@ interface DoctorSidebarProps {
   className?: string;
 }
 
+type Theme = "light" | "dark";
+
 export default function DoctorSidebar({ className }: DoctorSidebarProps) {
   const { t, i18n } = useTranslation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const isRTL = i18n.language === "ar";
+
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [theme, setTheme] = useState<Theme>("light");
+
+  const isDark = theme === "dark";
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as Theme | null;
+
+    if (savedTheme === "dark") {
+      document.documentElement.classList.add("dark");
+      setTheme("dark");
+      return;
+    }
+
+    document.documentElement.classList.remove("dark");
+    setTheme("light");
+  }, []);
 
   useEffect(() => {
     const openSidebar = () => {
@@ -60,6 +81,19 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
   const toggleCollapse = () => {
     setCollapsed((prev) => !prev);
     setAccountMenuOpen(false);
+  };
+
+  const handleToggleTheme = () => {
+    const nextTheme: Theme = isDark ? "light" : "dark";
+
+    setTheme(nextTheme);
+    localStorage.setItem("theme", nextTheme);
+
+    if (nextTheme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
   };
 
   const handleGoHome = () => {
@@ -145,7 +179,7 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
     <>
       <div
         className={cn(
-          "flex min-h-[96px] items-center px-4",
+          "flex min-h-[96px] items-center border-b border-border px-4",
           isCompact && !forceOpen ? "justify-center" : "justify-between"
         )}
       >
@@ -184,7 +218,34 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
         </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pt-8 pb-4">
+      <div className="px-4 pb-3 pt-3">
+        <button
+          type="button"
+          onClick={handleToggleTheme}
+          title={isDark ? "Light mode" : "Dark mode"}
+          aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-primary/10 hover:text-primary",
+            isCompact && !forceOpen && "justify-center px-0"
+          )}
+        >
+          {isDark ? (
+            <Sun className="h-5 w-5 shrink-0 text-primary" />
+          ) : (
+            <Moon className="h-5 w-5 shrink-0 text-primary" />
+          )}
+
+          {(!isCompact || forceOpen) && (
+            <span className="truncate">
+              {isDark
+                ? t("theme.light", "Light Mode")
+                : t("theme.dark", "Dark Mode")}
+            </span>
+          )}
+        </button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto pb-4 pt-1">
         <nav className="space-y-1 px-2">
           {navItems.map((item) => (
             <NavLink
@@ -197,7 +258,7 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
                 cn(
                   "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   isCompact && !forceOpen && "justify-center px-0"
                 )
@@ -233,18 +294,18 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
         </nav>
       </div>
 
-      <div className="relative mt-auto border-t p-4">
+      <div className="relative mt-auto border-t border-border p-4">
         {accountMenuOpen && (
           <div
             className={cn(
-              "absolute bottom-[78px] z-20 rounded-2xl border border-border bg-card p-1 shadow-xl",
+              "absolute bottom-[78px] z-20 rounded-2xl border border-border bg-card p-1 text-card-foreground shadow-xl",
               isCompact && !forceOpen ? "left-3 right-3" : "left-4 right-4"
             )}
           >
             <button
               type="button"
               onClick={handleGoHome}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <Home className="h-4 w-4 shrink-0" />
               {(!isCompact || forceOpen) && (
@@ -255,7 +316,7 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
             <button
               type="button"
               onClick={handleGoToProfile}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <User className="h-4 w-4 shrink-0" />
               {(!isCompact || forceOpen) && (
@@ -266,7 +327,7 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
             <button
               type="button"
               onClick={handleToggleLanguage}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-primary"
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
             >
               <Globe className="h-4 w-4 shrink-0" />
               {(!isCompact || forceOpen) && (
@@ -276,8 +337,28 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
 
             <button
               type="button"
+              onClick={handleToggleTheme}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
+            >
+              {isDark ? (
+                <Sun className="h-4 w-4 shrink-0" />
+              ) : (
+                <Moon className="h-4 w-4 shrink-0" />
+              )}
+
+              {(!isCompact || forceOpen) && (
+                <span>
+                  {isDark
+                    ? t("theme.light", "Light Mode")
+                    : t("theme.dark", "Dark Mode")}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
               onClick={handleLogout}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-destructive"
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
             >
               <LogOut className="h-4 w-4 shrink-0" />
               {(!isCompact || forceOpen) && (
@@ -328,12 +409,13 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
           type="button"
           className="fixed inset-0 z-40 bg-black/40 md:hidden"
           onClick={closeMobileSidebar}
+          aria-label="Close sidebar overlay"
         />
       )}
 
       <aside
         className={cn(
-          "hidden h-screen shrink-0 flex-col overflow-hidden border-x bg-white transition-all duration-300 md:flex",
+          "hidden h-screen shrink-0 flex-col overflow-hidden border-x border-border bg-background text-foreground transition-all duration-300 md:flex",
           collapsed ? "w-20" : "w-64",
           className
         )}
@@ -343,7 +425,7 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
 
       <aside
         className={cn(
-          "fixed inset-y-0 z-50 flex h-screen w-72 flex-col overflow-hidden border-x bg-white shadow-2xl transition-transform duration-300 md:hidden",
+          "fixed inset-y-0 z-50 flex h-screen w-72 flex-col overflow-hidden border-x border-border bg-background text-foreground shadow-2xl transition-transform duration-300 md:hidden",
           isRTL ? "right-0" : "left-0",
           mobileOpen
             ? "translate-x-0"

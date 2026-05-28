@@ -818,7 +818,7 @@ goToDoctorDashboard: "Go to Doctor Dashboard",
 
   diagnosisWizard: {
     backHome: "Back to Home",
-    pageTitle: "Early Diabetes Screening",
+    pageTitle: "Early Detection of Diabetes and Cardiovascular Disease Risk",
     pageSubtitle:
       "Enter your core medical data to get an initial risk assessment in seconds.",
 

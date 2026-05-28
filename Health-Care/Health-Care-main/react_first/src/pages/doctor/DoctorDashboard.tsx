@@ -220,26 +220,29 @@ export default function DoctorDashboard() {
       case "high":
       case "very high":
         return {
-          text: "text-red-600",
-          bg: "bg-red-50",
-          border: "border-red-100",
-          badge: "bg-red-50 text-red-600 border-red-100",
+          text: "text-red-600 dark:text-red-300",
+          bg: "bg-red-50 dark:bg-red-500/10",
+          border: "border-red-100 dark:border-red-500/30",
+          badge:
+            "bg-red-50 text-red-600 border-red-100 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30",
         };
 
       case "medium":
         return {
-          text: "text-amber-600",
-          bg: "bg-amber-50",
-          border: "border-amber-100",
-          badge: "bg-amber-50 text-amber-600 border-amber-100",
+          text: "text-amber-600 dark:text-amber-300",
+          bg: "bg-amber-50 dark:bg-amber-500/10",
+          border: "border-amber-100 dark:border-amber-500/30",
+          badge:
+            "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30",
         };
 
       case "low":
         return {
-          text: "text-emerald-600",
-          bg: "bg-emerald-50",
-          border: "border-emerald-100",
-          badge: "bg-emerald-50 text-emerald-600 border-emerald-100",
+          text: "text-emerald-600 dark:text-emerald-300",
+          bg: "bg-emerald-50 dark:bg-emerald-500/10",
+          border: "border-emerald-100 dark:border-emerald-500/30",
+          badge:
+            "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30",
         };
 
       default:
@@ -355,15 +358,19 @@ export default function DoctorDashboard() {
       id: "approved" as ReviewStatus,
       label: t("doctorDashboard.reports.drawer.actions.approve"),
       icon: Check,
-      activeClass: "border-emerald-200 bg-emerald-50 text-emerald-700",
-      iconClass: "bg-emerald-100 text-emerald-600",
+      activeClass:
+        "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300",
+      iconClass:
+        "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
     },
     {
       id: "rejected" as ReviewStatus,
       label: t("doctorDashboard.reports.drawer.actions.reject"),
       icon: X,
-      activeClass: "border-red-200 bg-red-50 text-red-700",
-      iconClass: "bg-red-100 text-red-600",
+      activeClass:
+        "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300",
+      iconClass:
+        "bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300",
     },
     {
       id: "needs_followup" as ReviewStatus,
@@ -381,21 +388,21 @@ export default function DoctorDashboard() {
   return (
     <div
       dir={isArabic ? "rtl" : "ltr"}
-      className="min-h-full w-full max-w-none pb-8 pt-8 animate-in fade-in duration-700 md:pt-0"
+      className="min-h-full w-full max-w-none animate-in fade-in pb-8 pt-8 text-foreground duration-700 md:pt-0"
     >
       <div className="w-full space-y-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <h2 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+            <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
               {t("doctorDashboard.welcome")},{" "}
               {user?.first_name || user?.username}
             </h2>
 
-            <p className="mt-1 max-w-full text-lg font-medium leading-snug text-slate-500 sm:max-w-none">
+            <p className="mt-1 max-w-full text-lg font-medium leading-snug text-muted-foreground sm:max-w-none">
               {t("doctorDashboard.subtitle")}
             </p>
 
-            <div className="mt-2 text-xs font-semibold text-slate-500">
+            <div className="mt-2 text-xs font-semibold text-muted-foreground">
               <span>{formattedDateTime}</span>
             </div>
           </div>
@@ -404,7 +411,7 @@ export default function DoctorDashboard() {
             <div className="group relative min-w-0 flex-1 lg:w-96 lg:flex-none">
               <Search
                 className={cn(
-                  "absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-primary",
+                  "absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary",
                   isArabic ? "right-5" : "left-5"
                 )}
               />
@@ -415,7 +422,7 @@ export default function DoctorDashboard() {
                 onChange={(e) => setSearchValue(e.target.value)}
                 placeholder={t("doctorDashboard.searchPlaceholder")}
                 className={cn(
-                  "h-12 w-full rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/50 outline-none transition-all placeholder:text-slate-400 focus:border-primary/25 focus:ring-4 focus:ring-primary/10",
+                  "h-12 w-full rounded-2xl border border-border bg-card text-sm font-semibold text-foreground shadow-sm outline-none transition-all placeholder:text-muted-foreground focus:border-primary/25 focus:ring-4 focus:ring-primary/10",
                   isArabic ? "pr-14 pl-10 text-right" : "pl-14 pr-10"
                 )}
               />
@@ -428,6 +435,7 @@ export default function DoctorDashboard() {
                     "absolute top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-primary/10 text-primary transition-none hover:bg-primary/10 hover:text-primary",
                     isArabic ? "left-2" : "right-2"
                   )}
+                  aria-label="Clear search"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -439,7 +447,7 @@ export default function DoctorDashboard() {
               variant="ghost"
               size="icon"
               onClick={handleChangeLanguage}
-              className="h-12 w-12 shrink-0 rounded-2xl bg-white text-primary shadow-sm shadow-slate-200/50 transition-none hover:bg-white hover:text-primary"
+              className="h-12 w-12 shrink-0 rounded-2xl border border-border bg-card text-primary shadow-sm transition-colors hover:bg-primary/10 hover:text-primary"
             >
               <Globe className="h-5 w-5" />
             </Button>
@@ -448,14 +456,14 @@ export default function DoctorDashboard() {
               type="button"
               variant="ghost"
               size="icon"
-              className="relative h-12 w-12 shrink-0 rounded-2xl bg-white text-primary shadow-sm shadow-slate-200/50 transition-none hover:bg-white hover:text-primary"
+              className="relative h-12 w-12 shrink-0 rounded-2xl border border-border bg-card text-primary shadow-sm transition-colors hover:bg-primary/10 hover:text-primary"
             >
               <Bell className="h-5 w-5" />
 
               {stats?.unread_notifications > 0 && (
                 <span
                   className={cn(
-                    "absolute top-3 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500",
+                    "absolute top-3 h-2.5 w-2.5 rounded-full border-2 border-card bg-red-500",
                     isArabic ? "left-3" : "right-3"
                   )}
                 />
@@ -495,10 +503,10 @@ export default function DoctorDashboard() {
       </div>
 
       <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
-        <DialogContent className="max-h-[88vh] w-[92vw] max-w-4xl overflow-hidden rounded-[1.75rem] border border-slate-100 bg-white p-0 shadow-2xl">
+        <DialogContent className="max-h-[88vh] w-[92vw] max-w-4xl overflow-hidden rounded-[1.75rem] border border-border bg-card p-0 text-card-foreground shadow-2xl">
           {selectedReport && (
-            <div className="flex max-h-[88vh] flex-col overflow-hidden bg-white font-sans">
-              <DialogHeader className="border-b border-slate-100 bg-white px-5 py-4 md:px-6">
+            <div className="flex max-h-[88vh] flex-col overflow-hidden bg-card font-sans text-card-foreground">
+              <DialogHeader className="border-b border-border bg-card px-5 py-4 md:px-6">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -506,13 +514,13 @@ export default function DoctorDashboard() {
                     </div>
 
                     <div className="min-w-0">
-                      <DialogTitle className="truncate text-lg font-bold tracking-tight text-slate-900 md:text-xl">
+                      <DialogTitle className="truncate text-lg font-bold tracking-tight text-foreground md:text-xl">
                         {t("doctorDashboard.reports.drawer.reportId", {
                           id: selectedReport.id,
                         })}
                       </DialogTitle>
 
-                      <p className="mt-0.5 truncate text-xs font-medium text-slate-500">
+                      <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
                         {selectedReport.patient_name || "Anonymous Patient"}
                       </p>
                     </div>
@@ -530,10 +538,10 @@ export default function DoctorDashboard() {
               </DialogHeader>
 
               <div className="flex-1 overflow-y-auto">
-                <div className="border-b border-slate-100 bg-gradient-to-br from-primary/5 via-white to-primary/10 px-5 py-4 md:px-6">
+                <div className="border-b border-border bg-gradient-to-br from-primary/5 via-card to-primary/10 px-5 py-4 md:px-6">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="flex min-w-0 items-center gap-3">
-                      <Avatar className="h-12 w-12 shrink-0 border-2 border-white shadow-sm ring-1 ring-slate-100">
+                      <Avatar className="h-12 w-12 shrink-0 border-2 border-background shadow-sm ring-1 ring-border">
                         <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
                           {selectedReport.patient_name
                             ?.split(" ")
@@ -545,11 +553,11 @@ export default function DoctorDashboard() {
                       </Avatar>
 
                       <div className="min-w-0">
-                        <h2 className="truncate text-base font-bold tracking-tight text-slate-900 md:text-lg">
+                        <h2 className="truncate text-base font-bold tracking-tight text-foreground md:text-lg">
                           {selectedReport.patient_name || "Anonymous Patient"}
                         </h2>
 
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500">
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
                           <span>ID #{selectedReport.id}</span>
                           <span>•</span>
                           <span>
@@ -572,7 +580,7 @@ export default function DoctorDashboard() {
 
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="rounded-full border border-primary/15 bg-primary/10 px-4 py-2">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                           AI Probability
                         </span>
 
@@ -588,7 +596,7 @@ export default function DoctorDashboard() {
                           selectedRiskClasses.border
                         )}
                       >
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                           Risk
                         </span>
 
@@ -606,18 +614,18 @@ export default function DoctorDashboard() {
                 </div>
 
                 <Tabs defaultValue="prediction" className="w-full">
-                  <div className="border-b border-slate-100 px-5 md:px-6">
+                  <div className="border-b border-border px-5 md:px-6">
                     <TabsList className="h-12 w-full justify-start gap-7 bg-transparent p-0">
                       <TabsTrigger
                         value="prediction"
-                        className="h-full rounded-none border-b-2 border-transparent px-0 text-[11px] font-bold uppercase tracking-widest text-slate-400 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+                        className="h-full rounded-none border-b-2 border-transparent px-0 text-[11px] font-bold uppercase tracking-widest text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
                       >
                         {t("doctorDashboard.reports.drawer.tabs.prediction")}
                       </TabsTrigger>
 
                       <TabsTrigger
                         value="review"
-                        className="h-full rounded-none border-b-2 border-transparent px-0 text-[11px] font-bold uppercase tracking-widest text-slate-400 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+                        className="h-full rounded-none border-b-2 border-transparent px-0 text-[11px] font-bold uppercase tracking-widest text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
                       >
                         {t("doctorDashboard.reports.drawer.tabs.review")}
                       </TabsTrigger>
@@ -626,31 +634,31 @@ export default function DoctorDashboard() {
 
                   <TabsContent
                     value="prediction"
-                    className="m-0 space-y-5 p-5 animate-in fade-in duration-300 md:p-6"
+                    className="m-0 animate-in space-y-5 p-5 fade-in duration-300 md:p-6"
                   >
                     <div className="space-y-3">
-                      <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                      <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                         {t("doctorDashboard.reports.clinicalIndicators")}
                       </h4>
 
-                      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
-                        <div className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-                          <div className="divide-y divide-slate-100">
+                      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                        <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+                          <div className="divide-y divide-border">
                             {clinicalIndicators.slice(0, 4).map((item, index) => (
                               <div
                                 key={index}
-                                className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50/70"
+                                className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/30"
                               >
-                                <p className="truncate text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                <p className="truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                   {item.label}
                                 </p>
 
                                 <div className="shrink-0 text-right">
-                                  <span className="text-sm font-bold text-slate-900">
+                                  <span className="text-sm font-bold text-foreground">
                                     {item.value}
                                   </span>
 
-                                  <span className="ml-1 text-[10px] font-semibold text-slate-400">
+                                  <span className="ml-1 text-[10px] font-semibold text-muted-foreground">
                                     {item.unit}
                                   </span>
                                 </div>
@@ -658,22 +666,22 @@ export default function DoctorDashboard() {
                             ))}
                           </div>
 
-                          <div className="divide-y divide-slate-100">
+                          <div className="divide-y divide-border">
                             {clinicalIndicators.slice(4).map((item, index) => (
                               <div
                                 key={index}
-                                className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50/70"
+                                className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/30"
                               >
-                                <p className="truncate text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                <p className="truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                   {item.label}
                                 </p>
 
                                 <div className="shrink-0 text-right">
-                                  <span className="text-sm font-bold text-slate-900">
+                                  <span className="text-sm font-bold text-foreground">
                                     {item.value}
                                   </span>
 
-                                  <span className="ml-1 text-[10px] font-semibold text-slate-400">
+                                  <span className="ml-1 text-[10px] font-semibold text-muted-foreground">
                                     {item.unit}
                                   </span>
                                 </div>
@@ -689,7 +697,7 @@ export default function DoctorDashboard() {
                         {t("doctorDashboard.reports.aiInsight")}
                       </h4>
 
-                      <p className="text-sm font-medium leading-6 text-slate-700">
+                      <p className="text-sm font-medium leading-6 text-foreground">
                         {selectedReport.message ||
                           "Based on the clinical indicators provided, the AI model has identified risk patterns. Medical review is recommended."}
                       </p>
@@ -698,10 +706,10 @@ export default function DoctorDashboard() {
 
                   <TabsContent
                     value="review"
-                    className="m-0 space-y-4 p-5 animate-in fade-in duration-300 md:p-6"
+                    className="m-0 animate-in space-y-4 p-5 fade-in duration-300 md:p-6"
                   >
                     <div className="space-y-3">
-                      <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                      <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                         {t("doctorDashboard.reports.clinicalDecision")}
                       </h4>
 
@@ -715,7 +723,7 @@ export default function DoctorDashboard() {
                               "flex items-center gap-3 rounded-2xl border p-3 text-left transition-all duration-300",
                               decision === action.id
                                 ? action.activeClass
-                                : "border-slate-100 bg-white text-slate-500 hover:border-primary/20 hover:bg-primary/5 hover:text-primary"
+                                : "border-border bg-card text-muted-foreground hover:border-primary/20 hover:bg-primary/5 hover:text-primary"
                             )}
                           >
                             <div
@@ -723,7 +731,7 @@ export default function DoctorDashboard() {
                                 "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
                                 decision === action.id
                                   ? action.iconClass
-                                  : "bg-slate-50 text-slate-400"
+                                  : "bg-muted text-muted-foreground"
                               )}
                             >
                               <action.icon className="h-4 w-4" />
@@ -738,13 +746,13 @@ export default function DoctorDashboard() {
                     </div>
 
                     <textarea
-                      className="h-32 w-full resize-none rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm font-medium leading-6 text-slate-700 outline-none transition-all focus:border-primary/20 focus:bg-white focus:ring-4 focus:ring-primary/10"
+                      className="h-32 w-full resize-none rounded-2xl border border-border bg-background p-4 text-sm font-medium leading-6 text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/20 focus:bg-background focus:ring-4 focus:ring-primary/10"
                       placeholder={t("doctorDashboard.reports.notesPlaceholder")}
                       value={doctorNotes}
                       onChange={(e) => setDoctorNotes(e.target.value)}
                     />
 
-                    <div className="flex justify-end border-t border-slate-100 pt-4">
+                    <div className="flex justify-end border-t border-border pt-4">
                       <Button
                         onClick={handleSaveReview}
                         disabled={submitting || decision === "pending"}

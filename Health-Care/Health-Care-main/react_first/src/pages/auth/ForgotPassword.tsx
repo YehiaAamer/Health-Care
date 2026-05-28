@@ -29,13 +29,18 @@ export default function ForgotPassword() {
     try {
       console.log("📤 Sending password reset request for:", email);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/auth/password-reset/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_API_URL || "http://localhost:8000"
+        }/api/auth/password-reset/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email }),
+        }
+      );
 
       const data = await response.json();
       console.log("📥 Response:", data);
@@ -48,10 +53,12 @@ export default function ForgotPassword() {
       toast.success(data.message || t("forgotPassword.successToast"));
     } catch (err) {
       console.error("❌ Error:", err);
+
       const errorMessage =
         err instanceof Error
           ? err.message
           : t("forgotPassword.errors.unexpected");
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -61,39 +68,38 @@ export default function ForgotPassword() {
 
   return (
     <div
-      className="min-h-screen flex flex-col bg-background"
+      className="min-h-screen flex flex-col bg-background text-foreground"
       dir={isArabic ? "rtl" : "ltr"}
     >
       <Header variant="default" />
 
       <main className="flex-1 container mx-auto px-4 pt-24 md:pt-28 pb-12 flex items-center justify-center">
         <div className="w-full max-w-md">
-          <Card className="w-full rounded-[32px] border border-border/60 bg-card px-6 py-8 md:px-8 shadow-md">
-            
+          <Card className="w-full rounded-[32px] border border-border bg-card px-6 py-8 text-card-foreground shadow-md md:px-8">
             {!isSent ? (
               <>
-                {/* HEADER */}
-                <div className="text-center mb-8">
-                  <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-5">
+                <div className="mb-8 text-center">
+                  <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
                     <Mail className="h-9 w-9 text-primary" />
                   </div>
 
-                  <h1 className="text-3xl font-bold tracking-tight">
+                  <h1 className="text-3xl font-bold tracking-tight text-foreground">
                     {t("forgotPassword.title")}
                   </h1>
                 </div>
 
-                {/* ERROR */}
                 {error && (
-                  <Alert className="bg-red-50 border-red-200 mb-5 rounded-2xl">
-                    <p className="text-red-800">{error}</p>
+                  <Alert className="mb-5 rounded-2xl border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                    <p className="text-sm font-medium">{error}</p>
                   </Alert>
                 )}
 
-                {/* FORM */}
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-medium">
+                    <Label
+                      htmlFor="email"
+                      className="text-sm font-medium text-foreground"
+                    >
                       {t("forgotPassword.emailLabel")}
                     </Label>
 
@@ -103,15 +109,16 @@ export default function ForgotPassword() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder={t("forgotPassword.emailPlaceholder")}
-                      className="h-14 rounded-full border-0 bg-zinc-100 px-4 shadow-none text-left focus-visible:ring-1 focus-visible:ring-gray-300"
+                      className="h-14 rounded-full border border-border bg-background px-4 text-left text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-primary"
                       dir="ltr"
+                      autoComplete="email"
                       required
                     />
                   </div>
 
                   <Button
                     type="submit"
-                    className="w-full h-14 rounded-full text-base font-medium"
+                    className="h-14 w-full rounded-full text-base font-medium"
                     disabled={isLoading}
                   >
                     {isLoading ? (
@@ -129,35 +136,43 @@ export default function ForgotPassword() {
                   </Button>
                 </form>
 
-                {/* BACK TO LOGIN */}
                 <div className="mt-6 pt-2 text-center">
                   <Button
+                    type="button"
                     variant="ghost"
                     onClick={() => navigate("/auth")}
-                    className="gap-2 rounded-full text-black text-sm font-semibold tracking-tight hover:text-primary transition-colors"
+                    className="gap-2 rounded-full text-sm font-semibold tracking-tight text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                   >
-                    <ArrowLeft className={isArabic ? "h-4 w-4 ml-1" : "h-4 w-4 mr-1"} />
+                    <ArrowLeft
+                      className={
+                        isArabic
+                          ? "h-4 w-4 rotate-180 ml-1"
+                          : "h-4 w-4 mr-1"
+                      }
+                    />
+
                     {t("forgotPassword.backToLogin")}
                   </Button>
                 </div>
               </>
             ) : (
-              <div className="text-center py-6">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="h-10 w-10 text-green-600" />
+              <div className="py-6 text-center">
+                <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+                  <CheckCircle className="h-10 w-10" />
                 </div>
 
-                <h2 className="text-2xl font-bold mb-2">
+                <h2 className="mb-2 text-2xl font-bold text-foreground">
                   {t("forgotPassword.sentTitle")}
                 </h2>
 
-                <p className="text-muted-foreground mb-6">
+                <p className="mb-6 text-muted-foreground">
                   {t("forgotPassword.sentSubtitle")}
                 </p>
 
                 <Button
+                  type="button"
                   onClick={() => navigate("/auth")}
-                  className="w-full h-14 rounded-full text-base font-medium"
+                  className="h-14 w-full rounded-full text-base font-medium"
                 >
                   {t("forgotPassword.backToLogin")}
                 </Button>

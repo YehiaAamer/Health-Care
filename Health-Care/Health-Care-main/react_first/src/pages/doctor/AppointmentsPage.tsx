@@ -25,7 +25,6 @@ import {
   User as UserIcon,
   Video,
   X,
-  Phone,
   Eye,
   ChevronDown,
   ChevronLeft,
@@ -427,13 +426,13 @@ export default function AppointmentsPage() {
   const getStatusStyles = (status: Appointment["status"]) => {
     switch (status) {
       case "In Progress":
-        return "bg-emerald-50 text-emerald-600 border-emerald-200";
+        return "border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300";
       case "Completed":
-        return "bg-green-50 text-green-600 border-green-200";
+        return "border-green-200 bg-green-50 text-green-600 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300";
       case "Cancelled":
-        return "bg-red-50 text-red-600 border-red-100";
+        return "border-red-200 bg-red-50 text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300";
       default:
-        return "bg-amber-50 text-amber-600 border-amber-200";
+        return "border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300";
     }
   };
 
@@ -480,16 +479,16 @@ export default function AppointmentsPage() {
   return (
     <div
       dir={isArabic ? "rtl" : "ltr"}
-      className="min-h-full w-full max-w-none px-0 pb-8 pt-8 animate-in fade-in duration-700 md:pt-0"
+      className="min-h-full w-full max-w-none animate-in fade-in px-0 pb-8 pt-8 text-foreground duration-700 md:pt-0"
     >
       <div className="flex flex-col gap-7">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
               {t("doctorDashboard.appointments.title")}
             </h1>
 
-            <p className="mt-1 text-sm font-medium text-slate-500">
+            <p className="mt-1 text-sm font-medium text-muted-foreground">
               {isArabic
                 ? "عرض وإدارة جدول مواعيدك اليومية"
                 : "View and manage your daily appointment schedule"}
@@ -499,7 +498,7 @@ export default function AppointmentsPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative w-full sm:w-96">
               <Search
-                className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ${
+                className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground ${
                   isArabic ? "right-4" : "left-4"
                 }`}
               />
@@ -508,7 +507,7 @@ export default function AppointmentsPage() {
                 placeholder={t(
                   "doctorDashboard.appointments.searchPlaceholder"
                 )}
-                className={`h-12 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/50 placeholder:text-slate-400 focus-visible:ring-4 focus-visible:ring-primary/10 ${
+                className={`h-12 rounded-2xl border border-border bg-card text-sm font-semibold text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-4 focus-visible:ring-primary/10 ${
                   isArabic ? "pr-11 pl-9" : "pl-11 pr-9"
                 }`}
                 value={search}
@@ -519,7 +518,7 @@ export default function AppointmentsPage() {
                 <button
                   type="button"
                   onClick={() => setSearch("")}
-                  className={`absolute top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary ${
+                  className={`absolute top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary ${
                     isArabic ? "left-3" : "right-3"
                   }`}
                 >
@@ -537,7 +536,7 @@ export default function AppointmentsPage() {
           </div>
         </div>
 
-        <Card className="w-full rounded-3xl border border-slate-100 bg-white p-6 shadow-sm shadow-slate-200/60 transition-all duration-300 hover:shadow-md">
+        <Card className="w-full rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-sm transition-all duration-300 hover:shadow-md">
           <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -545,11 +544,11 @@ export default function AppointmentsPage() {
               </div>
 
               <div>
-                <h3 className="text-base font-bold text-slate-900">
+                <h3 className="text-base font-bold text-foreground">
                   {isArabic ? "اختيار التاريخ" : "Select Date"}
                 </h3>
 
-                <p className="text-sm font-medium text-slate-500">
+                <p className="text-sm font-medium text-muted-foreground">
                   {formattedSelectedDate}
                 </p>
               </div>
@@ -559,7 +558,7 @@ export default function AppointmentsPage() {
               type="button"
               variant="ghost"
               onClick={() => setShowCalendar((prev) => !prev)}
-              className="h-9 w-fit rounded-xl px-3 text-sm font-semibold text-slate-500 hover:bg-primary/10 hover:text-primary"
+              className="h-9 w-fit rounded-xl px-3 text-sm font-semibold text-muted-foreground hover:bg-primary/10 hover:text-primary"
             >
               {isArabic ? "عرض التقويم كامل" : "Full calendar"}
               <ChevronDown
@@ -575,7 +574,7 @@ export default function AppointmentsPage() {
               type="button"
               variant="ghost"
               onClick={() => moveWeek("prev")}
-              className="h-[76px] w-11 shrink-0 rounded-2xl text-slate-500 hover:bg-primary/10 hover:text-primary"
+              className="h-[76px] w-11 shrink-0 rounded-2xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
             >
               {isArabic ? (
                 <ChevronRight className="h-5 w-5" />
@@ -596,12 +595,12 @@ export default function AppointmentsPage() {
                     className={`rounded-2xl border px-2 py-4 text-center transition-all ${
                       selected
                         ? "border-primary bg-primary/10 text-primary shadow-sm"
-                        : "border-slate-100 bg-white hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
+                        : "border-border bg-background hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
                     }`}
                   >
                     <p
                       className={`text-xs font-semibold ${
-                        selected ? "text-primary" : "text-slate-400"
+                        selected ? "text-primary" : "text-muted-foreground"
                       }`}
                     >
                       {item.dayName}
@@ -617,7 +616,7 @@ export default function AppointmentsPage() {
               type="button"
               variant="ghost"
               onClick={() => moveWeek("next")}
-              className="h-[76px] w-11 shrink-0 rounded-2xl text-slate-500 hover:bg-primary/10 hover:text-primary"
+              className="h-[76px] w-11 shrink-0 rounded-2xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
             >
               {isArabic ? (
                 <ChevronLeft className="h-5 w-5" />
@@ -628,7 +627,7 @@ export default function AppointmentsPage() {
           </div>
 
           {showCalendar && (
-            <div className="mt-5 w-full rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div className="mt-5 w-full rounded-3xl border border-border bg-background p-4 shadow-sm">
               <Calendar
                 mode="single"
                 selected={date}
@@ -649,20 +648,20 @@ export default function AppointmentsPage() {
                   day_selected:
                     "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
                   day_today: "bg-primary/10 text-primary",
-                  day_outside: "text-slate-300 opacity-50",
-                  day_disabled: "text-slate-300 opacity-50",
+                  day_outside: "text-muted-foreground opacity-50",
+                  day_disabled: "text-muted-foreground opacity-50",
                   nav: "flex items-center gap-2",
                   nav_button:
-                    "h-9 w-9 rounded-xl border border-slate-100 bg-white text-slate-500 hover:bg-primary/10 hover:text-primary",
+                    "h-9 w-9 rounded-xl border border-border bg-background text-muted-foreground hover:bg-primary/10 hover:text-primary",
                   caption:
-                    "relative flex items-center justify-center pt-1 text-sm font-bold text-slate-900",
+                    "relative flex items-center justify-center pt-1 text-sm font-bold text-foreground",
                   caption_label: "text-sm font-bold",
                   head_cell:
-                    "flex h-9 items-center justify-center text-xs font-bold text-slate-400",
+                    "flex h-9 items-center justify-center text-xs font-bold text-muted-foreground",
                 }}
               />
 
-              <div className="mt-5 rounded-3xl bg-primary/[0.03] p-4">
+              <div className="mt-5 rounded-3xl bg-primary/[0.03] p-4 dark:bg-primary/10">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -670,11 +669,11 @@ export default function AppointmentsPage() {
                     </div>
 
                     <div>
-                      <h4 className="text-sm font-bold text-slate-900">
+                      <h4 className="text-sm font-bold text-foreground">
                         {isArabic ? "اختيار الوقت" : "Select Time"}
                       </h4>
 
-                      <p className="text-xs font-medium text-slate-500">
+                      <p className="text-xs font-medium text-muted-foreground">
                         {selectedTime
                           ? isArabic
                             ? `الوقت المختار: ${formatAppointmentTime(
@@ -700,7 +699,7 @@ export default function AppointmentsPage() {
                       className={`rounded-2xl border px-3 py-3 text-xs font-bold transition-all ${
                         selectedTime === formatAppointmentTime(time)
                           ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                          : "border-slate-100 bg-white text-slate-600 hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
+                          : "border-border bg-background text-foreground hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
                       }`}
                     >
                       {formatAppointmentTime(time)}
@@ -717,41 +716,40 @@ export default function AppointmentsPage() {
             value={filter}
             onValueChange={(value) => setFilter(value as FilterType)}
           >
-            <TabsList className="h-12 rounded-full border border-primary/20 bg-white p-1 shadow-sm">
-              <TabsTrigger
-                value="today"
-                className="rounded-full px-8 text-sm font-medium text-primary transition-all hover:bg-primary/10 hover:text-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-              >
-                {t("doctorDashboard.appointments.filterToday")}
-              </TabsTrigger>
-
-              <TabsTrigger
-                value="upcoming"
-                className="rounded-full px-8 text-sm font-medium text-primary transition-all hover:bg-primary/10 hover:text-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-              >
-                {t("doctorDashboard.appointments.filterUpcoming")}
-              </TabsTrigger>
-
-              <TabsTrigger
-                value="next"
-                className="rounded-full px-8 text-sm font-medium text-primary transition-all hover:bg-primary/10 hover:text-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-              >
-                {isArabic ? "التالي" : "Next"}
-              </TabsTrigger>
-
-              <TabsTrigger
-                value="all"
-                className="rounded-full px-8 text-sm font-medium text-primary transition-all hover:bg-primary/10 hover:text-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-              >
-                {t("doctorDashboard.appointments.filterAll")}
-              </TabsTrigger>
+            <TabsList className="h-12 rounded-full border border-primary/20 bg-card p-1 shadow-sm">
+              {[
+                {
+                  value: "today",
+                  label: t("doctorDashboard.appointments.filterToday"),
+                },
+                {
+                  value: "upcoming",
+                  label: t("doctorDashboard.appointments.filterUpcoming"),
+                },
+                {
+                  value: "next",
+                  label: isArabic ? "التالي" : "Next",
+                },
+                {
+                  value: "all",
+                  label: t("doctorDashboard.appointments.filterAll"),
+                },
+              ].map((item) => (
+                <TabsTrigger
+                  key={item.value}
+                  value={item.value}
+                  className="rounded-full px-8 text-sm font-medium text-primary transition-all hover:bg-primary/10 hover:text-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                >
+                  {item.label}
+                </TabsTrigger>
+              ))}
             </TabsList>
           </Tabs>
         </div>
 
         <div>
           {loading ? (
-            <Card className="flex min-h-[360px] items-center justify-center rounded-3xl border border-slate-100 bg-white shadow-sm">
+            <Card className="flex min-h-[360px] items-center justify-center rounded-3xl border border-border bg-card shadow-sm">
               <LoadingDots />
             </Card>
           ) : filteredAppointments.length > 0 ? (
@@ -760,7 +758,7 @@ export default function AppointmentsPage() {
                 {paginatedAppointments.map((apt) => (
                   <Card
                     key={apt.id}
-                    className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm"
+                    className="rounded-3xl border border-border bg-card p-5 text-card-foreground shadow-sm"
                   >
                     <div className="flex flex-col gap-4">
                       <div className="flex items-start justify-between gap-3">
@@ -773,13 +771,9 @@ export default function AppointmentsPage() {
                           </Avatar>
 
                           <div>
-                            <h3 className="text-sm font-bold text-slate-900">
+                            <h3 className="text-sm font-bold text-foreground">
                               {apt.patient_name}
                             </h3>
-
-                            <p className="mt-1 text-xs font-medium text-slate-500">
-                              {apt.patient_id}
-                            </p>
                           </div>
                         </div>
 
@@ -792,30 +786,30 @@ export default function AppointmentsPage() {
                         </span>
                       </div>
 
-                      <div className="grid gap-3 rounded-2xl bg-slate-50 p-4">
+                      <div className="grid gap-3 rounded-2xl bg-muted/30 p-4">
                         <div className="flex items-center justify-between gap-3">
-                          <span className="text-xs font-semibold text-slate-400">
+                          <span className="text-xs font-semibold text-muted-foreground">
                             {isArabic ? "الوقت" : "Time"}
                           </span>
 
-                          <span className="flex items-center gap-1 text-sm font-medium text-slate-700">
+                          <span className="flex items-center gap-1 text-sm font-medium text-foreground">
                             <Clock className="h-3.5 w-3.5 text-primary" />
                             {formatAppointmentTime(apt.time)}
                           </span>
                         </div>
 
                         <div>
-                          <p className="mb-1 text-xs font-semibold text-slate-400">
+                          <p className="mb-1 text-xs font-semibold text-muted-foreground">
                             {isArabic ? "سبب الزيارة" : "Visit Reason"}
                           </p>
 
-                          <p className="text-sm font-medium text-slate-700">
+                          <p className="text-sm font-medium text-foreground">
                             {apt.reason}
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+                      <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
                         {apt.status === "In Progress" && (
                           <Button
                             onClick={() => handleJoinCall(apt)}
@@ -830,16 +824,6 @@ export default function AppointmentsPage() {
                             {t("doctorDashboard.appointments.joinCall")}
                           </Button>
                         )}
-
-                        <Button className="h-10 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
-                          <Phone
-                            className={cn(
-                              "h-4 w-4",
-                              isArabic ? "ml-2" : "mr-2"
-                            )}
-                          />
-                          {isArabic ? "اتصال" : "Call"}
-                        </Button>
 
                         <Button
                           variant="outline"
@@ -860,8 +844,8 @@ export default function AppointmentsPage() {
                 ))}
               </div>
 
-              <Card className="hidden overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm md:block">
-                <div className="grid grid-cols-[1.4fr_1fr_1.4fr_0.9fr_1.2fr] border-b border-slate-100 bg-slate-50/70 px-5 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <Card className="hidden overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm md:block">
+                <div className="grid grid-cols-[1.4fr_1fr_1.4fr_0.9fr_1.2fr] border-b border-border bg-muted/40 px-5 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   <div>{isArabic ? "المريض" : "Patient"}</div>
                   <div>{isArabic ? "الوقت" : "Time"}</div>
                   <div>{isArabic ? "سبب الزيارة" : "Visit Reason"}</div>
@@ -869,11 +853,11 @@ export default function AppointmentsPage() {
                   <div>{isArabic ? "الإجراء" : "Action"}</div>
                 </div>
 
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-border">
                   {paginatedAppointments.map((apt) => (
                     <div
                       key={apt.id}
-                      className="grid grid-cols-[1.4fr_1fr_1.4fr_0.9fr_1.2fr] items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-50/70"
+                      className="grid grid-cols-[1.4fr_1fr_1.4fr_0.9fr_1.2fr] items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/30"
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <Avatar className="h-11 w-11 border border-primary/20 bg-primary/5">
@@ -884,22 +868,18 @@ export default function AppointmentsPage() {
                         </Avatar>
 
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-bold text-slate-900">
+                          <p className="truncate text-sm font-bold text-foreground">
                             {apt.patient_name}
-                          </p>
-
-                          <p className="mt-1 text-xs font-medium text-slate-500">
-                            {apt.patient_id}
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1 text-sm font-medium text-slate-600">
+                      <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground">
                         <Clock className="h-3.5 w-3.5 text-primary" />
                         {formatAppointmentTime(apt.time)}
                       </div>
 
-                      <p className="truncate text-sm font-medium text-slate-700">
+                      <p className="truncate text-sm font-medium text-foreground">
                         {apt.reason}
                       </p>
 
@@ -947,14 +927,14 @@ export default function AppointmentsPage() {
               </Card>
             </>
           ) : (
-            <Card className="flex min-h-[360px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
-              <CalendarIcon className="mb-4 h-10 w-10 text-slate-400" />
+            <Card className="flex min-h-[360px] flex-col items-center justify-center rounded-3xl border border-dashed border-border bg-card p-8 text-center shadow-sm">
+              <CalendarIcon className="mb-4 h-10 w-10 text-muted-foreground" />
 
-              <h3 className="text-base font-bold text-slate-900">
+              <h3 className="text-base font-bold text-foreground">
                 {t("doctorDashboard.appointments.empty")}
               </h3>
 
-              <p className="mt-1 text-sm font-medium text-slate-500">
+              <p className="mt-1 text-sm font-medium text-muted-foreground">
                 {isArabic
                   ? "لا توجد مواعيد مطابقة للبحث الحالي"
                   : "No appointments match your current search"}
@@ -964,14 +944,14 @@ export default function AppointmentsPage() {
         </div>
 
         {filter !== "next" && (
-          <Card className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-200/50 transition-all duration-300 hover:shadow-md">
+          <Card className="rounded-3xl border border-border bg-card p-5 text-card-foreground shadow-sm transition-all duration-300 hover:shadow-md">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h4 className="text-lg font-bold text-slate-900">
+                <h4 className="text-lg font-bold text-foreground">
                   {isArabic ? "الموعد القادم" : "Next Appointment"}
                 </h4>
 
-                <p className="text-sm font-medium text-slate-500">
+                <p className="text-sm font-medium text-muted-foreground">
                   {isArabic
                     ? "أقرب موعد نشط أو قادم"
                     : "Nearest active or upcoming appointment"}
@@ -984,7 +964,7 @@ export default function AppointmentsPage() {
             </div>
 
             {nextAppointment ? (
-              <div className="grid gap-4 rounded-2xl bg-slate-50 p-4 md:grid-cols-[1.2fr_0.7fr_1.2fr_0.8fr_1.2fr] md:items-center">
+              <div className="grid gap-4 rounded-2xl bg-muted/30 p-4 md:grid-cols-[1.2fr_0.7fr_1.2fr_0.8fr_1.2fr] md:items-center">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-11 w-11 border border-primary/20 bg-primary/5">
                     <AvatarImage src={nextAppointment.profile_picture} />
@@ -994,32 +974,28 @@ export default function AppointmentsPage() {
                   </Avatar>
 
                   <div>
-                    <p className="text-sm font-bold text-slate-900">
+                    <p className="text-sm font-bold text-foreground">
                       {nextAppointment.patient_name}
-                    </p>
-
-                    <p className="text-xs font-medium text-slate-500">
-                      {nextAppointment.patient_id}
                     </p>
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold text-slate-400">
+                  <p className="text-xs font-semibold text-muted-foreground">
                     {isArabic ? "الوقت" : "Time"}
                   </p>
 
-                  <p className="text-sm font-bold text-slate-900">
+                  <p className="text-sm font-bold text-foreground">
                     {formatAppointmentTime(nextAppointment.time)}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold text-slate-400">
+                  <p className="text-xs font-semibold text-muted-foreground">
                     {isArabic ? "سبب الزيارة" : "Visit Reason"}
                   </p>
 
-                  <p className="text-sm font-medium text-slate-700">
+                  <p className="text-sm font-medium text-foreground">
                     {nextAppointment.reason}
                   </p>
                 </div>
@@ -1041,10 +1017,10 @@ export default function AppointmentsPage() {
                 </Button>
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 p-5 text-center">
-                <Clock className="mx-auto mb-3 h-8 w-8 text-slate-400" />
+              <div className="rounded-2xl border border-dashed border-border p-5 text-center">
+                <Clock className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
 
-                <p className="text-sm font-medium text-slate-500">
+                <p className="text-sm font-medium text-muted-foreground">
                   {isArabic ? "لا يوجد موعد قادم" : "No upcoming appointment"}
                 </p>
               </div>
@@ -1058,7 +1034,7 @@ export default function AppointmentsPage() {
             size="icon"
             disabled={currentPage === 1}
             onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-            className="h-10 w-10 rounded-full border-primary/30 bg-white text-primary hover:bg-primary/10 disabled:opacity-40"
+            className="h-10 w-10 rounded-full border-primary/30 bg-card text-primary hover:bg-primary/10 disabled:opacity-40"
           >
             {isArabic ? (
               <ChevronRight className="h-4 w-4" />
@@ -1067,16 +1043,16 @@ export default function AppointmentsPage() {
             )}
           </Button>
 
-          <div className="flex h-10 min-w-[110px] items-center justify-center rounded-full border border-slate-100 bg-white px-4 text-xs font-bold text-slate-500 shadow-sm">
+          <div className="flex h-10 min-w-[110px] items-center justify-center rounded-full border border-border bg-card px-4 text-xs font-bold text-muted-foreground shadow-sm">
             {isArabic ? (
               <>
                 صفحة <span className="mx-1 text-primary">{currentPage}</span>{" "}
-                من <span className="mx-1 text-slate-700">{totalPages}</span>
+                من <span className="mx-1 text-foreground">{totalPages}</span>
               </>
             ) : (
               <>
                 Page <span className="mx-1 text-primary">{currentPage}</span>{" "}
-                of <span className="mx-1 text-slate-700">{totalPages}</span>
+                of <span className="mx-1 text-foreground">{totalPages}</span>
               </>
             )}
           </div>
@@ -1088,7 +1064,7 @@ export default function AppointmentsPage() {
             onClick={() =>
               setCurrentPage((prev) => Math.min(totalPages, prev + 1))
             }
-            className="h-10 w-10 rounded-full border-primary/30 bg-white text-primary hover:bg-primary/10 disabled:opacity-40"
+            className="h-10 w-10 rounded-full border-primary/30 bg-card text-primary hover:bg-primary/10 disabled:opacity-40"
           >
             {isArabic ? (
               <ChevronLeft className="h-4 w-4" />
@@ -1101,14 +1077,14 @@ export default function AppointmentsPage() {
 
       {showNewAppointment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <Card className="w-full max-w-xl rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl">
+          <Card className="w-full max-w-xl rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-2xl">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-xl font-bold text-slate-900">
+                <h3 className="text-xl font-bold text-foreground">
                   {isArabic ? "إضافة حجز جديد" : "Add New Appointment"}
                 </h3>
 
-                <p className="mt-1 text-sm font-medium text-slate-500">
+                <p className="mt-1 text-sm font-medium text-muted-foreground">
                   {isArabic
                     ? "أدخل بيانات الحجز وسيظهر مباشرة في القائمة."
                     : "Enter appointment details and it will appear in the schedule."}
@@ -1118,7 +1094,7 @@ export default function AppointmentsPage() {
               <button
                 type="button"
                 onClick={() => setShowNewAppointment(false)}
-                className="rounded-full p-1 text-slate-400 hover:bg-primary/10 hover:text-primary"
+                className="rounded-full p-1 text-muted-foreground hover:bg-primary/10 hover:text-primary"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1129,7 +1105,7 @@ export default function AppointmentsPage() {
                 {isArabic ? "التاريخ والوقت المختار" : "Selected Date & Time"}
               </p>
 
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm font-bold text-slate-900">
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm font-bold text-foreground">
                 <span>{formattedSelectedDate || "--"}</span>
                 <span className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground">
                   {selectedTime
@@ -1144,7 +1120,7 @@ export default function AppointmentsPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <Input
                 placeholder={isArabic ? "اسم المريض" : "Patient name"}
-                className="h-12 rounded-xl bg-white"
+                className="h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground"
                 value={newAppointment.patient_name}
                 onChange={(e) =>
                   setNewAppointment((prev) => ({
@@ -1156,7 +1132,7 @@ export default function AppointmentsPage() {
 
               <Input
                 placeholder={isArabic ? "رقم المريض" : "Patient ID"}
-                className="h-12 rounded-xl bg-white"
+                className="h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground"
                 value={newAppointment.patient_id}
                 onChange={(e) =>
                   setNewAppointment((prev) => ({
@@ -1168,7 +1144,7 @@ export default function AppointmentsPage() {
 
               <Input
                 placeholder={isArabic ? "سبب الزيارة" : "Visit reason"}
-                className="h-12 rounded-xl bg-white md:col-span-2"
+                className="h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground md:col-span-2"
                 value={newAppointment.reason}
                 onChange={(e) =>
                   setNewAppointment((prev) => ({
@@ -1203,14 +1179,14 @@ export default function AppointmentsPage() {
       <Dialog open={openProfile} onOpenChange={setOpenProfile}>
         <DialogContent
           dir={isArabic ? "rtl" : "ltr"}
-          className="max-h-[90vh] w-[92vw] overflow-y-auto rounded-3xl border border-slate-100 bg-white sm:max-w-2xl"
+          className="max-h-[90vh] w-[92vw] overflow-y-auto rounded-3xl border border-border bg-card text-card-foreground sm:max-w-2xl"
         >
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-slate-900">
+            <DialogTitle className="text-xl font-bold text-foreground">
               {isArabic ? "ملف المريض" : "Patient Profile"}
             </DialogTitle>
 
-            <DialogDescription className="text-sm font-medium text-slate-500">
+            <DialogDescription className="text-sm font-medium text-muted-foreground">
               {isArabic
                 ? "بيانات المريض وآخر التقييمات المتاحة."
                 : "Patient information and latest available assessments."}
@@ -1223,7 +1199,7 @@ export default function AppointmentsPage() {
             </div>
           ) : selectedPatient ? (
             <div className="space-y-5 py-3">
-              <div className="flex items-center gap-4 rounded-2xl bg-primary/[0.03] p-4">
+              <div className="flex items-center gap-4 rounded-2xl bg-primary/[0.03] p-4 dark:bg-primary/10">
                 <Avatar className="h-14 w-14 shrink-0 border border-primary/20 bg-primary/5">
                   <AvatarImage
                     src={
@@ -1237,56 +1213,37 @@ export default function AppointmentsPage() {
                 </Avatar>
 
                 <div className="min-w-0">
-                  <h3 className="truncate text-base font-bold text-slate-900">
+                  <h3 className="truncate text-base font-bold text-foreground">
                     {`${selectedPatient.first_name || ""} ${
                       selectedPatient.last_name || ""
                     }`.trim() ||
                       selectedAppointment?.patient_name ||
                       (isArabic ? "مريض بدون اسم" : "Unnamed Patient")}
                   </h3>
-
-                  <p className="text-sm font-medium text-slate-500">
-                    #{selectedPatient.id}
-                  </p>
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl border border-slate-100 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-primary">
-                    <Mail className="h-4 w-4" />
-                    <span className="text-xs font-bold">
-                      {isArabic ? "البريد الإلكتروني" : "Email"}
-                    </span>
-                  </div>
+              <div className="rounded-2xl border border-border bg-background/40 p-4">
+                <div className="mb-2 flex items-center gap-2 text-primary">
+                  <Mail className="h-4 w-4" />
 
-                  <p className="truncate text-sm font-semibold text-slate-900">
-                    {selectedPatient.email ||
-                      (isArabic ? "لا يوجد بريد" : "No email")}
-                  </p>
+                  <span className="text-xs font-bold">
+                    {isArabic ? "البريد الإلكتروني" : "Email"}
+                  </span>
                 </div>
 
-                <div className="rounded-2xl border border-slate-100 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-primary">
-                    <Phone className="h-4 w-4" />
-                    <span className="text-xs font-bold">
-                      {isArabic ? "رقم الهاتف" : "Phone"}
-                    </span>
-                  </div>
-
-                  <p className="text-sm font-semibold text-slate-900">
-                    {selectedPatient.profile?.phone ||
-                      (isArabic ? "لا يوجد رقم هاتف" : "No phone number")}
-                  </p>
-                </div>
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {selectedPatient.email ||
+                    (isArabic ? "لا يوجد بريد" : "No email")}
+                </p>
               </div>
 
-              <div className="rounded-2xl border border-slate-100 p-4">
+              <div className="rounded-2xl border border-border bg-background/40 p-4">
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Activity className="h-4 w-4 text-primary" />
 
-                    <h4 className="text-sm font-bold text-slate-900">
+                    <h4 className="text-sm font-bold text-foreground">
                       {isArabic ? "آخر التقييمات" : "Latest Assessments"}
                     </h4>
                   </div>
@@ -1303,14 +1260,14 @@ export default function AppointmentsPage() {
                       .map((prediction) => (
                         <div
                           key={prediction.id}
-                          className="flex flex-col gap-3 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                          className="flex flex-col gap-3 rounded-xl bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between"
                         >
                           <div>
-                            <p className="text-sm font-bold text-slate-900">
+                            <p className="text-sm font-bold text-foreground">
                               {prediction.risk_level || "Risk"}
                             </p>
 
-                            <p className="mt-1 flex items-center gap-1 text-xs font-medium text-slate-500">
+                            <p className="mt-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
                               <CalendarIcon className="h-3.5 w-3.5" />
                               {prediction.created_at
                                 ? new Date(
@@ -1329,7 +1286,7 @@ export default function AppointmentsPage() {
                       ))}
                   </div>
                 ) : (
-                  <p className="text-sm font-medium text-slate-500">
+                  <p className="text-sm font-medium text-muted-foreground">
                     {isArabic
                       ? "لا توجد تقييمات متاحة"
                       : "No assessments available"}

@@ -76,40 +76,39 @@ export default function HelpPage() {
   ];
 
   return (
-  <div
-  dir={isArabic ? "rtl" : "ltr"}
-  className="min-h-full w-full max-w-none pb-8 pt-8 font-sans animate-in fade-in duration-700 md:pt-0"
->
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+    <div
+      dir={isArabic ? "rtl" : "ltr"}
+      className="min-h-full w-full max-w-none pb-8 pt-8 font-sans text-foreground animate-in fade-in duration-700 md:pt-0"
+    >
+      <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
             {t("doctorDashboard.sidebar.help")}
           </h1>
 
-          <p className="mt-1 text-sm font-semibold text-slate-500">
+          <p className="mt-1 text-sm font-semibold text-muted-foreground">
             {isArabic
               ? "مركز الدعم والإرشادات الخاصة ببوابة الطبيب"
               : "Doctor portal support center and guidance resources"}
           </p>
         </div>
-
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid grid-cols-1 gap-6">
-          <Card className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+          <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
+            <CardHeader className="border-b border-border bg-muted/30 p-5">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                   <HelpCircle className="h-5 w-5" />
                 </div>
 
                 <div>
-                  <CardTitle className="text-lg font-bold tracking-tight text-slate-900">
+                  <CardTitle className="text-lg font-bold tracking-tight text-foreground">
                     {t("doctorDashboard.help.faqs")}
                   </CardTitle>
 
-                  <CardDescription className="mt-1 text-xs font-semibold text-slate-500">
+                  <CardDescription className="mt-1 text-xs font-semibold text-muted-foreground">
                     {t("doctorDashboard.help.faqsDesc")}
                   </CardDescription>
                 </div>
@@ -122,13 +121,13 @@ export default function HelpPage() {
                   <AccordionItem
                     key={index}
                     value={`item-${index}`}
-                    className="rounded-2xl border border-slate-100 bg-white px-4 shadow-sm"
+                    className="rounded-2xl border border-border bg-background px-4 shadow-sm"
                   >
-                    <AccordionTrigger className="py-4 text-start text-sm font-bold text-slate-900 hover:no-underline">
+                    <AccordionTrigger className="py-4 text-start text-sm font-bold text-foreground hover:no-underline">
                       {faq.question}
                     </AccordionTrigger>
 
-                    <AccordionContent className="pb-4 text-sm font-medium leading-7 text-slate-600">
+                    <AccordionContent className="pb-4 text-sm font-medium leading-7 text-muted-foreground">
                       {faq.answer}
                     </AccordionContent>
                   </AccordionItem>
@@ -137,19 +136,19 @@ export default function HelpPage() {
             </CardContent>
           </Card>
 
-          <Card className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100 bg-gradient-to-br from-primary/5 via-white to-primary/10 p-5">
+          <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
+            <CardHeader className="border-b border-border bg-gradient-to-br from-primary/5 via-background to-primary/10 p-5">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                   <Cpu className="h-5 w-5" />
                 </div>
 
                 <div>
-                  <CardTitle className="text-lg font-bold tracking-tight text-slate-900">
+                  <CardTitle className="text-lg font-bold tracking-tight text-foreground">
                     {t("doctorDashboard.help.aiExplanation")}
                   </CardTitle>
 
-                  <CardDescription className="mt-1 text-xs font-semibold text-slate-500">
+                  <CardDescription className="mt-1 text-xs font-semibold text-muted-foreground">
                     {t("doctorDashboard.help.aiExplanationDesc")}
                   </CardDescription>
                 </div>
@@ -159,11 +158,11 @@ export default function HelpPage() {
             <CardContent className="space-y-5 p-5">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="min-h-[150px] rounded-2xl border border-primary/15 bg-primary/5 p-4">
-                  <h4 className="text-sm font-bold text-slate-900">
+                  <h4 className="text-sm font-bold text-foreground">
                     {isArabic ? "وضوح النتائج" : "Clear Results"}
                   </h4>
 
-                  <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
+                  <p className="mt-2 text-sm font-medium leading-6 text-muted-foreground">
                     {isArabic
                       ? "كل تقرير يعرض نسبة الخطورة والمؤشرات السريرية الأساسية لمساعدة الطبيب على فهم الحالة بسرعة."
                       : "Each report shows the risk probability and core clinical indicators to help the doctor understand the case quickly."}
@@ -171,11 +170,11 @@ export default function HelpPage() {
                 </div>
 
                 <div className="min-h-[150px] rounded-2xl border border-primary/15 bg-primary/5 p-4">
-                  <h4 className="text-sm font-bold text-slate-900">
+                  <h4 className="text-sm font-bold text-foreground">
                     {isArabic ? "دعم القرار الطبي" : "Clinical Decision Support"}
                   </h4>
 
-                  <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
+                  <p className="mt-2 text-sm font-medium leading-6 text-muted-foreground">
                     {isArabic
                       ? "النظام يساعد في ترتيب الأولويات ومراجعة الحالات، لكنه لا يستبدل تقييم الطبيب."
                       : "The system helps prioritize and review cases, but it does not replace the doctor’s assessment."}
@@ -185,9 +184,10 @@ export default function HelpPage() {
 
               <Button
                 variant="outline"
-                className="h-11 rounded-2xl border-primary/20 bg-white px-5 text-xs font-bold text-primary shadow-sm transition-none hover:bg-white hover:text-primary"
+                className="h-11 rounded-2xl border-primary/20 bg-background px-5 text-xs font-bold text-primary shadow-sm transition-none hover:bg-primary/10 hover:text-primary"
               >
                 {isArabic ? "قراءة التوثيق التقني" : "Read Technical Documentation"}
+
                 <ExternalLink
                   className={cn("h-4 w-4", isArabic ? "mr-2" : "ml-2")}
                 />
@@ -196,18 +196,18 @@ export default function HelpPage() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 content-start">
-          <Card className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+        <div className="grid grid-cols-1 content-start gap-6">
+          <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
             <CardHeader className="p-5 text-center">
               <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-3xl bg-primary/10 text-primary">
                 <LifeBuoy className="h-7 w-7" />
               </div>
 
-              <CardTitle className="text-lg font-bold tracking-tight text-slate-900">
+              <CardTitle className="text-lg font-bold tracking-tight text-foreground">
                 {t("doctorDashboard.help.contact")}
               </CardTitle>
 
-              <CardDescription className="mt-1 text-xs font-semibold text-slate-500">
+              <CardDescription className="mt-1 text-xs font-semibold text-muted-foreground">
                 {isArabic
                   ? "اختر قناة التواصل المناسبة لك"
                   : "Choose the support channel that suits you"}
@@ -215,7 +215,7 @@ export default function HelpPage() {
             </CardHeader>
 
             <CardContent className="space-y-3 p-5 pt-0">
-              <Button className="h-11 w-full rounded-2xl bg-primary px-5 text-xs font-bold text-primary-foreground shadow-sm shadow-primary/20 transition-none hover:bg-primary">
+              <Button className="h-11 w-full rounded-2xl bg-primary px-5 text-xs font-bold text-primary-foreground shadow-sm shadow-primary/20 transition-none hover:bg-primary/90">
                 <MessageCircle
                   className={cn("h-4 w-4", isArabic ? "ml-2" : "mr-2")}
                 />
@@ -225,14 +225,14 @@ export default function HelpPage() {
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   variant="outline"
-                  className="h-11 rounded-2xl border-primary/15 bg-primary/5 text-primary transition-none hover:bg-primary/5 hover:text-primary"
+                  className="h-11 rounded-2xl border-primary/15 bg-primary/5 text-primary transition-none hover:bg-primary/10 hover:text-primary"
                 >
                   <Mail className="h-4 w-4" />
                 </Button>
 
                 <Button
                   variant="outline"
-                  className="h-11 rounded-2xl border-primary/15 bg-primary/5 text-primary transition-none hover:bg-primary/5 hover:text-primary"
+                  className="h-11 rounded-2xl border-primary/15 bg-primary/5 text-primary transition-none hover:bg-primary/10 hover:text-primary"
                 >
                   <Phone className="h-4 w-4" />
                 </Button>
@@ -240,13 +240,13 @@ export default function HelpPage() {
             </CardContent>
           </Card>
 
-          <Card className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
-              <CardTitle className="text-lg font-bold tracking-tight text-slate-900">
+          <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
+            <CardHeader className="border-b border-border bg-muted/30 p-5">
+              <CardTitle className="text-lg font-bold tracking-tight text-foreground">
                 {t("doctorDashboard.help.guides")}
               </CardTitle>
 
-              <CardDescription className="mt-1 text-xs font-semibold text-slate-500">
+              <CardDescription className="mt-1 text-xs font-semibold text-muted-foreground">
                 {isArabic ? "إرشادات سريعة للاستخدام" : "Quick usage guides"}
               </CardDescription>
             </CardHeader>
@@ -255,21 +255,21 @@ export default function HelpPage() {
               {guides.map((guide, index) => (
                 <button
                   key={index}
-                  className="flex w-full items-center justify-between rounded-2xl border border-slate-100 bg-white p-4 text-start shadow-sm transition-none hover:bg-white"
+                  className="flex w-full items-center justify-between rounded-2xl border border-border bg-background p-4 text-start shadow-sm transition-none hover:bg-primary/5"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
                       <guide.icon className="h-4 w-4" />
                     </div>
 
-                    <span className="text-sm font-bold text-slate-700">
+                    <span className="text-sm font-bold text-foreground">
                       {guide.title}
                     </span>
                   </div>
 
                   <ChevronRight
                     className={cn(
-                      "h-4 w-4 shrink-0 text-slate-300",
+                      "h-4 w-4 shrink-0 text-muted-foreground",
                       isArabic && "rotate-180"
                     )}
                   />
@@ -285,7 +285,7 @@ export default function HelpPage() {
                   {t("doctorDashboard.help.systemStatus")}
                 </p>
 
-                <p className="mt-1 text-sm font-semibold text-slate-600">
+                <p className="mt-1 text-sm font-semibold text-muted-foreground">
                   {isArabic
                     ? "كل خدمات بوابة الطبيب متاحة حالياً"
                     : "All doctor portal services are currently available"}
