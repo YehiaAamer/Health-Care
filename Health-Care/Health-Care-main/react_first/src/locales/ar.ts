@@ -225,7 +225,7 @@ collapseSidebar: "تصغير القائمة الجانبية",
     }
     
   },
-  dashboard: {
+dashboard: {
   title: "لوحة التحكم",
   welcome: "أهلاً بعودتك",
   hello: "يا",
@@ -240,7 +240,7 @@ collapseSidebar: "تصغير القائمة الجانبية",
   bookConsultation: "احجز استشارة",
   settings: "الإعدادات",
 
-riskIndicators: "مؤشرات الخطورة",
+  riskIndicators: "مؤشرات الخطورة",
   riskLow: "منخفض",
   riskMedium: "متوسط",
   riskHigh: "مرتفع",
@@ -258,9 +258,9 @@ riskIndicators: "مؤشرات الخطورة",
   savedReports: "التقارير المحفوظة",
   lastCheckup: "آخر تحليل",
 
-  analysisOverview: "نظرة عامة على تحاليل السكري لديك",
-allReports: "كل التقارير",
- weekly: "أسبوعي",
+  analysisOverview: "نظرة عامة على تحاليل السكري و القلب و الأوعية الدموية لديك",
+  allReports: "كل التقارير",
+  weekly: "أسبوعي",
   monthly: "شهري",
   latestAnalysisScore: "نتيجة آخر تحليل",
   noData: "لا توجد بيانات",
@@ -323,7 +323,82 @@ allReports: "كل التقارير",
   chartShortInsulin: "الإنسولين",
   chartShortBmi: "BMI",
   chartShortDiabetesPedigree: "الوراثة",
-  chartShortAge: "العمر"
+  chartShortAge: "العمر",
+
+  extra: {
+      averageRisk: "متوسط نسبة الخطورة",
+  latestStatus: "آخر حالة",
+    diabetes: "السكري",
+    cardiovascular: "القلب والأوعية الدموية",
+    cardioShort: "القلب",
+weeklyAverage: "المتوسط الأسبوعي",
+monthlyAverage: "متوسط التحاليل المعروضة",
+highestWeeklyRisk: "أعلى خطورة أسبوعية",
+reportsThisWeek: "تقارير هذا الأسبوع",
+reportsDisplayedMonths: "التحاليل المعروضة",
+highestDisplayedRisk: "أعلى خطورة معروضة",
+    diabetesRisk: "خطر السكري",
+    cardioRisk: "خطر القلب والأوعية الدموية",
+    cardioRiskShort: "خطر القلب",
+
+    latestDiabetesScore: "آخر نتيجة للسكري",
+    latestCardioScore: "آخر نتيجة تقديرية للقلب والأوعية الدموية",
+
+    weeklyRiskTrend: "تحليل المخاطر الأسبوعي",
+    monthlyRiskTrend: "تحليل المخاطر الشهري",
+    weeklyRiskTrendDesc: "يعرض آخر 7 أيام وتحت كل يوم متوسط نسبة التحليل",
+    monthlyRiskTrendDesc: "يعرض الشهر الحالي والشهور القادمة",
+
+    reportsDisplayedMonths: "التقارير خلال الشهور المعروضة",
+    highestDisplayedRisk: "أعلى خطورة في الشهور المعروضة",
+
+    analysisInputs: "مدخلات التحليل",
+    analysisInputsDesc:
+      "القيم المستخدمة في تحليل السكري والقلب والأوعية الدموية",
+
+    riskDistribution: "حالات الخطورة",
+    riskDistributionDesc: "تشمل السكري والقلب والأوعية الدموية",
+
+    analysisAverage: "متوسط التحليل",
+    reports: "التقارير",
+
+    riskLevels: {
+      low: "منخفض",
+      medium: "متوسط",
+      high: "عالي",
+      veryHigh: "عالي جدًا",
+    },
+
+    inputs: {
+      pregnancies: "الحمل",
+      glucose: "الجلوكوز",
+      systolic: "انقباضي",
+      diastolic: "انبساطي",
+      skinThickness: "سُمك الجلد",
+      insulin: "الأنسولين",
+      pedigree: "الوراثة",
+      age: "العمر",
+      weight: "الوزن",
+      height: "الطول",
+      cholesterol: "كوليسترول",
+    },
+
+    aria: {
+      toggleLanguage: "تغيير اللغة",
+      notifications: "الإشعارات",
+    },
+  },
+
+  cardioMessages: {
+    very_high:
+      "يشير الحساب التقديري إلى وجود خطورة عالية جدًا للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.",
+    high:
+      "يشير الحساب التقديري إلى وجود خطورة عالية للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.",
+    medium:
+      "يشير الحساب التقديري إلى وجود خطورة متوسطة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.",
+    low:
+      "يشير الحساب التقديري إلى وجود خطورة منخفضة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.",
+  },
 },
 report: {
   title: "تقرير التحليل المبدئي",

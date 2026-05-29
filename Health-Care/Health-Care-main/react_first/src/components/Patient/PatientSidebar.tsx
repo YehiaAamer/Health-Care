@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,7 @@ export default function PatientSidebar({
   const [internalMobileOpen, setInternalMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>("light");
+  const [isMounted, setIsMounted] = useState(false);
 
   const isDark = theme === "dark";
 
@@ -79,6 +81,10 @@ export default function PatientSidebar({
       : internalCollapsed;
 
   const setCollapsed = setIsDesktopSidebarCollapsed || setInternalCollapsed;
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as Theme | null;
@@ -104,6 +110,21 @@ export default function PatientSidebar({
       window.removeEventListener("openPatientSidebar", openSidebar);
     };
   }, [setMobileOpen]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalHtmlOverflow;
+    };
+  }, [mobileOpen]);
 
   const closeMobileSidebar = () => {
     setMobileOpen(false);
@@ -401,21 +422,29 @@ export default function PatientSidebar({
     </>
   );
 
+  const mobileSidebarButton =
+    isMounted && !mobileOpen
+      ? createPortal(
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setMobileOpen(true)}
+            className={cn(
+              "absolute top-5 z-[9999] h-10 w-10 rounded-xl border-0 bg-transparent text-primary shadow-none hover:bg-primary/10 hover:text-primary xl:hidden",
+              isRTL ? "right-4" : "left-4"
+            )}
+            aria-label="Open sidebar"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>,
+          document.body
+        )
+      : null;
+
   return (
     <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        onClick={() => setMobileOpen(true)}
-        className={cn(
-          "fixed top-5 z-40 h-10 w-10 rounded-xl border-0 bg-transparent text-primary shadow-none hover:bg-primary/10 hover:text-primary xl:hidden",
-          isRTL ? "right-4" : "left-4"
-        )}
-        aria-label="Open sidebar"
-      >
-        <Menu className="h-5 w-5" />
-      </Button>
+      {mobileSidebarButton}
 
       {mobileOpen && (
         <button

@@ -1,4 +1,3 @@
-// src/pages/patient/Dashboard.tsx
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,12 +14,10 @@ import {
   AlertTriangle,
   Stethoscope,
   PhoneCall,
-  TrendingUp,
-  BarChart3,
-  Bell,
   Globe,
 } from "lucide-react";
 import Header from "@/components/shared/Header";
+import NotificationBell from "@/components/shared/NotificationBell";
 import PatientSidebar from "@/components/patient/PatientSidebar";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
@@ -29,13 +26,30 @@ import { apiCall, API_ENDPOINTS } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import {
   ResponsiveContainer,
-  AreaChart,
+  Line,
   Area,
+  ComposedChart,
   CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
+
+type RiskLevel = "low" | "medium" | "high" | "very_high";
+type CardiovascularRiskLevel = RiskLevel;
+type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
+
+type CardiovascularPrediction = {
+  probability: number;
+  percentage: number;
+  risk_level: CardiovascularRiskLevel;
+  message: string;
+  z_score: number;
+  isFallback?: boolean;
+};
 
 interface Prediction {
   id: number;
@@ -51,7 +65,297 @@ interface Prediction {
   risk_level: string;
   message: string;
   created_at: string;
+
+  gender?: "male" | "female" | string;
+  systolic_blood_pressure?: number;
+  diastolic_blood_pressure?: number;
+  weight?: number;
+  height?: number;
+  cholesterol?: number;
+
+  cardiovascular_probability?: number;
+  cardiovascular_percentage?: number;
+  cardiovascular_risk_level?: string;
+  cardiovascular_message?: string;
+  cardiovascular_z_score?: number;
 }
+
+type RiskDistributionItem = {
+  key: RiskLevel;
+  name: string;
+  range: string;
+  value: number;
+  percentage: number;
+  color: string;
+};
+
+const CARDIO_COEFFICIENTS = {
+  intercept: -11.2,
+  age: 0.055,
+  gender: 0.42,
+  height: -0.012,
+  weight: 0.035,
+  ap_hi: 0.052,
+  ap_lo: 0.028,
+  cholesterol: 0.48,
+  gluc: 0.32,
+};
+
+const RISK_COLORS: Record<RiskLevel, string> = {
+  low: "#22c55e",
+  medium: "#eab308",
+  high: "#f97316",
+  very_high: "#ef4444",
+};
+
+const DIABETES_CHART_COLOR = "hsl(var(--primary))";
+const CARDIO_CHART_COLOR = "#64748b";
+
+const sigmoid = (z: number) => {
+  return 1 / (1 + Math.exp(-z));
+};
+
+const normalizeCholesterolForCardio = (cholesterol: number) => {
+  if (cholesterol >= 240) return 3;
+  if (cholesterol >= 200) return 2;
+  return 1;
+};
+
+const normalizeGlucoseForCardio = (glucose: number) => {
+  if (glucose >= 126) return 3;
+  if (glucose >= 100) return 2;
+  return 1;
+};
+
+const getRiskLevelFromPercentage = (percentage: number): RiskLevel => {
+  if (percentage >= 80) return "very_high";
+  if (percentage >= 60) return "high";
+  if (percentage >= 30) return "medium";
+  return "low";
+};
+
+const getCardioRiskLevel = (percentage: number): CardiovascularRiskLevel => {
+  return getRiskLevelFromPercentage(percentage);
+};
+
+const normalizePercentageValue = (value?: number) => {
+  if (typeof value !== "number" || Number.isNaN(value)) return null;
+
+  if (value <= 1) {
+    return Number((value * 100).toFixed(2));
+  }
+
+  return Number(value.toFixed(2));
+};
+
+const normalizeAnyRiskLevel = (riskLevel?: string): RiskLevel | "unknown" => {
+  const risk = (riskLevel || "").trim().toLowerCase();
+
+  if (
+    risk.includes("very_high") ||
+    risk.includes("very high") ||
+    risk.includes("عالي جدًا") ||
+    risk.includes("عالي جدا") ||
+    risk.includes("مرتفع جدًا") ||
+    risk.includes("مرتفع جدا")
+  ) {
+    return "very_high";
+  }
+
+  if (
+    risk.includes("high") ||
+    risk.includes("عالي") ||
+    risk.includes("مرتفع")
+  ) {
+    return "high";
+  }
+
+  if (
+    risk.includes("medium") ||
+    risk.includes("moderate") ||
+    risk.includes("متوسط")
+  ) {
+    return "medium";
+  }
+
+  if (
+    risk.includes("low") ||
+    risk.includes("منخفض") ||
+    risk.includes("قليل")
+  ) {
+    return "low";
+  }
+
+  return "unknown";
+};
+
+const normalizeGenderValue = (gender?: string) => {
+  const value = String(gender ?? "").trim().toLowerCase();
+
+  if (
+    value === "female" ||
+    value === "f" ||
+    value === "woman" ||
+    value === "girl" ||
+    value === "أنثى" ||
+    value === "انثى" ||
+    value === "بنت"
+  ) {
+    return "female";
+  }
+
+  if (
+    value === "male" ||
+    value === "m" ||
+    value === "man" ||
+    value === "boy" ||
+    value === "ذكر" ||
+    value === "راجل"
+  ) {
+    return "male";
+  }
+
+  return "unknown";
+};
+
+const shouldShowPregnanciesInput = (prediction: Prediction) => {
+  const normalizedGender = normalizeGenderValue(prediction.gender);
+
+  if (normalizedGender === "female") return true;
+  if (normalizedGender === "male") return false;
+
+  return Number(prediction.pregnancies ?? 0) > 0;
+};
+
+const normalizeCardioRiskLevel = (
+  riskLevel?: string
+): CardiovascularRiskLevel | null => {
+  const normalized = normalizeAnyRiskLevel(riskLevel);
+  return normalized === "unknown" ? null : normalized;
+};
+
+const getCardioRiskMessage = (
+  riskLevel: CardiovascularRiskLevel,
+  t: TranslateFn
+) => {
+  return t(`dashboard.cardioMessages.${riskLevel}`);
+};
+
+const calculateCardiovascularPredictionFromValues = ({
+  age,
+  gender,
+  height,
+  weight,
+  systolicBloodPressure,
+  diastolicBloodPressure,
+  cholesterol,
+  glucose,
+  t,
+  isFallback = false,
+}: {
+  age: number;
+  gender: "male" | "female";
+  height: number;
+  weight: number;
+  systolicBloodPressure: number;
+  diastolicBloodPressure: number;
+  cholesterol: number;
+  glucose: number;
+  t: TranslateFn;
+  isFallback?: boolean;
+}): CardiovascularPrediction => {
+  const genderValue = gender === "male" ? 1 : 0;
+  const cholesterolValue = normalizeCholesterolForCardio(cholesterol);
+  const glucoseValue = normalizeGlucoseForCardio(glucose);
+
+  const z =
+    CARDIO_COEFFICIENTS.intercept +
+    CARDIO_COEFFICIENTS.age * age +
+    CARDIO_COEFFICIENTS.gender * genderValue +
+    CARDIO_COEFFICIENTS.height * height +
+    CARDIO_COEFFICIENTS.weight * weight +
+    CARDIO_COEFFICIENTS.ap_hi * systolicBloodPressure +
+    CARDIO_COEFFICIENTS.ap_lo * diastolicBloodPressure +
+    CARDIO_COEFFICIENTS.cholesterol * cholesterolValue +
+    CARDIO_COEFFICIENTS.gluc * glucoseValue;
+
+  const probability = sigmoid(z);
+  const percentage = Number((probability * 100).toFixed(2));
+  const riskLevel = getCardioRiskLevel(percentage);
+
+  return {
+    probability: Number(probability.toFixed(4)),
+    percentage,
+    risk_level: riskLevel,
+    message: getCardioRiskMessage(riskLevel, t),
+    z_score: Number(z.toFixed(4)),
+    isFallback,
+  };
+};
+
+const getCardioPrediction = (
+  prediction: Prediction,
+  t: TranslateFn
+): CardiovascularPrediction => {
+  const backendPercentage =
+    normalizePercentageValue(prediction.cardiovascular_percentage) ??
+    normalizePercentageValue(prediction.cardiovascular_probability);
+
+  const backendRiskLevel = normalizeCardioRiskLevel(
+    prediction.cardiovascular_risk_level
+  );
+
+  if (backendPercentage !== null) {
+    const finalRiskLevel =
+      backendRiskLevel ?? getRiskLevelFromPercentage(backendPercentage);
+
+    return {
+      probability: Number((backendPercentage / 100).toFixed(4)),
+      percentage: backendPercentage,
+      risk_level: finalRiskLevel,
+      message:
+        prediction.cardiovascular_message ||
+        getCardioRiskMessage(finalRiskLevel, t),
+      z_score: Number(prediction.cardiovascular_z_score ?? 0),
+      isFallback: false,
+    };
+  }
+
+  const height = prediction.height ?? 170;
+
+  const calculatedWeightFromBmi = Number(
+    (Number(prediction.bmi ?? 0) * Math.pow(height / 100, 2)).toFixed(1)
+  );
+
+  const weight =
+    prediction.weight ??
+    (calculatedWeightFromBmi > 0 ? calculatedWeightFromBmi : 70);
+
+  const diastolicBloodPressure =
+    prediction.diastolic_blood_pressure ?? prediction.blood_pressure ?? 80;
+
+  const systolicBloodPressure =
+    prediction.systolic_blood_pressure ??
+    Math.min(diastolicBloodPressure + 40, 260);
+
+  const cholesterol = prediction.cholesterol ?? 180;
+
+  const normalizedGender = normalizeGenderValue(prediction.gender);
+  const gender = normalizedGender === "male" ? "male" : "female";
+
+  return calculateCardiovascularPredictionFromValues({
+    age: prediction.age,
+    gender,
+    height,
+    weight,
+    systolicBloodPressure,
+    diastolicBloodPressure,
+    cholesterol,
+    glucose: prediction.glucose,
+    t,
+    isFallback: true,
+  });
+};
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -123,70 +427,42 @@ const Dashboard = () => {
     await i18n.changeLanguage(newLang);
   };
 
-  const normalizeRiskLevel = (riskLevel?: string) => {
-    const risk = (riskLevel || "").trim().toLowerCase();
-
-    if (
-      risk.includes("very high") ||
-      risk.includes("high") ||
-      risk.includes("مرتفع جدًا") ||
-      risk.includes("مرتفع جدا") ||
-      risk.includes("مرتفع") ||
-      risk.includes("عالي")
-    ) {
-      return "high";
-    }
-
-    if (
-      risk.includes("medium") ||
-      risk.includes("moderate") ||
-      risk.includes("متوسط")
-    ) {
-      return "medium";
-    }
-
-    if (
-      risk.includes("low") ||
-      risk.includes("منخفض") ||
-      risk.includes("قليل")
-    ) {
-      return "low";
-    }
-
-    return "unknown";
-  };
-
   const getLocalizedRiskLabel = (riskLevel?: string) => {
-    const normalized = normalizeRiskLevel(riskLevel);
+    const normalized = normalizeAnyRiskLevel(riskLevel);
 
     switch (normalized) {
+      case "very_high":
+        return t("dashboard.extra.riskLevels.veryHigh");
       case "high":
-        return isArabic ? "عالي" : "High";
+        return t("dashboard.extra.riskLevels.high");
       case "medium":
-        return isArabic ? "متوسط" : "Medium";
+        return t("dashboard.extra.riskLevels.medium");
       case "low":
-        return isArabic ? "منخفض" : "Low";
+        return t("dashboard.extra.riskLevels.low");
       default:
         return "--";
     }
   };
 
   const getRiskTextClass = (riskLevel?: string) => {
-    const normalized = normalizeRiskLevel(riskLevel);
+    const normalized = normalizeAnyRiskLevel(riskLevel);
 
-    if (normalized === "high") return "text-red-500";
+    if (normalized === "very_high") return "text-red-600";
+    if (normalized === "high") return "text-orange-500";
     if (normalized === "medium") return "text-yellow-500";
     if (normalized === "low") return "text-green-500";
     return "text-muted-foreground";
   };
 
   const getRiskBadgeColor = (riskLevel?: string) => {
-    switch (normalizeRiskLevel(riskLevel)) {
+    switch (normalizeAnyRiskLevel(riskLevel)) {
       case "low":
         return "border-green-200 bg-green-100 text-green-700 hover:border-green-200 hover:bg-green-100 hover:text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300 dark:hover:bg-green-500/10 dark:hover:text-green-300";
       case "medium":
         return "border-yellow-200 bg-yellow-100 text-yellow-700 hover:border-yellow-200 hover:bg-yellow-100 hover:text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-300 dark:hover:bg-yellow-500/10 dark:hover:text-yellow-300";
       case "high":
+        return "border-orange-200 bg-orange-100 text-orange-700 hover:border-orange-200 hover:bg-orange-100 hover:text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300 dark:hover:bg-orange-500/10 dark:hover:text-orange-300";
+      case "very_high":
         return "border-red-200 bg-red-100 text-red-700 hover:border-red-200 hover:bg-red-100 hover:text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-300";
       default:
         return "border-border bg-muted text-muted-foreground hover:border-border hover:bg-muted hover:text-muted-foreground";
@@ -212,6 +488,70 @@ const Dashboard = () => {
     });
   };
 
+  const getMonthKey = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+
+    return `${year}-${month}`;
+  };
+
+  const formatMonthLabel = (date: Date) => {
+    return date.toLocaleDateString(isArabic ? "ar-EG" : "en-US", {
+      month: "short",
+    });
+  };
+
+  const getDiabetesPercentage = (prediction: Prediction) => {
+    return normalizePercentageValue(prediction.probability) ?? 0;
+  };
+
+  const getEffectiveDiabetesRiskLevel = (prediction: Prediction): RiskLevel => {
+    const percentage = getDiabetesPercentage(prediction);
+    return getRiskLevelFromPercentage(percentage);
+  };
+
+  const getAverageValue = (values: number[]) => {
+    if (!values.length) return null;
+
+    return Number(
+      (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2)
+    );
+  };
+
+  const getHighestRiskFromPredictions = (sourcePredictions: Prediction[]) => {
+    if (!sourcePredictions.length) {
+      return {
+        percentage: 0,
+        level: "unknown" as RiskLevel | "unknown",
+      };
+    }
+
+    let highestPercentage = 0;
+    let highestLevel: RiskLevel | "unknown" = "unknown";
+
+    sourcePredictions.forEach((prediction) => {
+      const diabetesPercentage = getDiabetesPercentage(prediction);
+      const diabetesLevel = getEffectiveDiabetesRiskLevel(prediction);
+
+      if (diabetesPercentage > highestPercentage) {
+        highestPercentage = diabetesPercentage;
+        highestLevel = diabetesLevel;
+      }
+
+      const cardio = getCardioPrediction(prediction, t);
+
+      if (cardio.percentage > highestPercentage) {
+        highestPercentage = cardio.percentage;
+        highestLevel = cardio.risk_level;
+      }
+    });
+
+    return {
+      percentage: Number(highestPercentage.toFixed(2)),
+      level: highestLevel,
+    };
+  };
+
   const formattedDateTime = currentDateTime.toLocaleString(
     isArabic ? "ar-EG" : "en-US",
     {
@@ -233,100 +573,411 @@ const Dashboard = () => {
       .replace(/\s+/g, " ");
   };
 
-  const getTopRiskIndicators = (prediction: Prediction) => {
-    const indicators = [
-      {
-        key: "pregnancies",
-        label: t("dashboard.pregnancies"),
-        value: prediction.pregnancies,
-      },
-      {
-        key: "glucose",
-        label: t("dashboard.glucose"),
-        value: prediction.glucose,
-      },
-      {
-        key: "blood_pressure",
-        label: t("dashboard.bloodPressure"),
-        value: prediction.blood_pressure,
-      },
-      {
-        key: "skin_thickness",
-        label: t("dashboard.skinThickness"),
-        value: prediction.skin_thickness,
-      },
-      {
-        key: "insulin",
-        label: t("dashboard.insulin"),
-        value: prediction.insulin,
-      },
-      {
-        key: "bmi",
-        label: t("dashboard.bmi"),
-        value: Number(prediction.bmi),
-      },
-      {
-        key: "diabetes_pedigree_function",
-        label: t("dashboard.diabetesPedigree"),
-        value: Number(prediction.diabetes_pedigree_function),
-      },
-      {
-        key: "age",
-        label: t("dashboard.age"),
-        value: prediction.age,
-      },
-    ];
-
-    return indicators.sort((a, b) => b.value - a.value).slice(0, 3);
-  };
-
   const latestPrediction = predictions[0];
 
-  const latestRiskTextColor = useMemo(() => {
-    if (!latestPrediction) return "text-foreground";
-    return getRiskTextClass(latestPrediction.risk_level);
+  const latestCardioPrediction = useMemo(() => {
+    if (!latestPrediction) return null;
+    return getCardioPrediction(latestPrediction, t);
+  }, [latestPrediction, t]);
+
+  const latestDiabetesRiskLevel = useMemo(() => {
+    if (!latestPrediction) return null;
+    return getEffectiveDiabetesRiskLevel(latestPrediction);
   }, [latestPrediction]);
+
+  const latestRiskTextColor = useMemo(() => {
+    if (!latestDiabetesRiskLevel) return "text-foreground";
+    return getRiskTextClass(latestDiabetesRiskLevel);
+  }, [latestDiabetesRiskLevel]);
+
+  const latestCardioRiskTextColor = useMemo(() => {
+    if (!latestCardioPrediction) return "text-foreground";
+    return getRiskTextClass(latestCardioPrediction.risk_level);
+  }, [latestCardioPrediction]);
 
   const averageRisk = useMemo(() => {
     if (!predictions.length) return 0;
-    const total = predictions.reduce((sum, pred) => sum + pred.probability, 0);
+
+    const total = predictions.reduce((sum, pred) => {
+      return sum + getDiabetesPercentage(pred);
+    }, 0);
+
     return total / predictions.length;
   }, [predictions]);
+
+  const averageCardioRisk = useMemo(() => {
+    if (!predictions.length) return 0;
+
+    const total = predictions.reduce((sum, pred) => {
+      return sum + getCardioPrediction(pred, t).percentage;
+    }, 0);
+
+    return total / predictions.length;
+  }, [predictions, t]);
 
   const rangePredictions = useMemo(() => {
     if (!selectedRange) return [];
 
     const now = new Date();
-    const days = selectedRange === "weekly" ? 7 : 30;
 
-    const startDate = new Date(now);
-    startDate.setHours(0, 0, 0, 0);
-    startDate.setDate(now.getDate() - days);
+    if (selectedRange === "weekly") {
+      const startDate = new Date(now);
+      startDate.setHours(0, 0, 0, 0);
+      startDate.setDate(now.getDate() - 27);
+
+      return [...predictions]
+        .filter(
+          (pred) => new Date(pred.created_at).getTime() >= startDate.getTime()
+        )
+        .sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+    }
+
+    const startDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     return [...predictions]
-      .filter(
-        (pred) => new Date(pred.created_at).getTime() >= startDate.getTime()
-      )
+      .filter((pred) => {
+        const date = new Date(pred.created_at).getTime();
+
+        return date >= startDate.getTime() && date < endDate.getTime();
+      })
       .sort(
         (a, b) =>
-          new Date(a.created_at).getTime() -
-          new Date(b.created_at).getTime()
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
   }, [predictions, selectedRange]);
+
+  const inputsChartData = useMemo(() => {
+    if (!latestPrediction) return [];
+
+    const isFemale = shouldShowPregnanciesInput(latestPrediction);
+
+    const systolicBloodPressure =
+      latestPrediction.systolic_blood_pressure ??
+      Math.min((latestPrediction.blood_pressure ?? 80) + 40, 260);
+
+    const diastolicBloodPressure =
+      latestPrediction.diastolic_blood_pressure ??
+      latestPrediction.blood_pressure;
+
+    const height = latestPrediction.height ?? 170;
+
+    const calculatedWeightFromBmi = Number(
+      (Number(latestPrediction.bmi ?? 0) * Math.pow(height / 100, 2)).toFixed(1)
+    );
+
+    const weight =
+      latestPrediction.weight ??
+      (calculatedWeightFromBmi > 0 ? calculatedWeightFromBmi : 70);
+
+    const cholesterol = latestPrediction.cholesterol ?? 180;
+
+    return [
+      ...(isFemale
+        ? [
+            {
+              key: "pregnancies",
+              inputLabel: t("dashboard.extra.inputs.pregnancies"),
+              displayValue: formatNumber(latestPrediction.pregnancies ?? 0),
+              diabetesValue: latestPrediction.pregnancies ?? 0,
+              cardioValue: null,
+            },
+          ]
+        : []),
+
+      {
+        key: "glucose",
+        inputLabel: t("dashboard.extra.inputs.glucose"),
+        displayValue: formatNumber(latestPrediction.glucose),
+        diabetesValue: latestPrediction.glucose,
+        cardioValue: latestPrediction.glucose,
+      },
+
+      {
+        key: "systolic_bp",
+        inputLabel: t("dashboard.extra.inputs.systolic"),
+        displayValue: formatNumber(systolicBloodPressure),
+        diabetesValue: null,
+        cardioValue: systolicBloodPressure,
+      },
+
+      {
+        key: "diastolic_bp",
+        inputLabel: t("dashboard.extra.inputs.diastolic"),
+        displayValue: formatNumber(diastolicBloodPressure),
+        diabetesValue: null,
+        cardioValue: diastolicBloodPressure,
+      },
+
+      {
+        key: "skin_thickness",
+        inputLabel: t("dashboard.extra.inputs.skinThickness"),
+        displayValue: formatNumber(latestPrediction.skin_thickness),
+        diabetesValue: latestPrediction.skin_thickness,
+        cardioValue: null,
+      },
+
+      {
+        key: "insulin",
+        inputLabel: t("dashboard.extra.inputs.insulin"),
+        displayValue: formatNumber(latestPrediction.insulin),
+        diabetesValue: latestPrediction.insulin,
+        cardioValue: null,
+      },
+
+      {
+        key: "pedigree",
+        inputLabel: t("dashboard.extra.inputs.pedigree"),
+        displayValue: formatNumber(
+          Number(latestPrediction.diabetes_pedigree_function),
+          {
+            minimumFractionDigits: 3,
+            maximumFractionDigits: 3,
+          }
+        ),
+        diabetesValue: Number(latestPrediction.diabetes_pedigree_function),
+        cardioValue: null,
+      },
+
+      {
+        key: "age",
+        inputLabel: t("dashboard.extra.inputs.age"),
+        displayValue: formatNumber(latestPrediction.age),
+        diabetesValue: latestPrediction.age,
+        cardioValue: latestPrediction.age,
+      },
+
+      {
+        key: "weight",
+        inputLabel: t("dashboard.extra.inputs.weight"),
+        displayValue: formatNumber(weight, {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        }),
+        diabetesValue: weight,
+        cardioValue: weight,
+      },
+
+      {
+        key: "height",
+        inputLabel: t("dashboard.extra.inputs.height"),
+        displayValue: formatNumber(height),
+        diabetesValue: height,
+        cardioValue: height,
+      },
+
+      {
+        key: "cholesterol",
+        inputLabel: t("dashboard.extra.inputs.cholesterol"),
+        displayValue: formatNumber(cholesterol),
+        diabetesValue: null,
+        cardioValue: cholesterol,
+      },
+    ];
+  }, [latestPrediction, isArabic, t]);
+
+  const riskDistributionData = useMemo<RiskDistributionItem[]>(() => {
+    const sourcePredictions = selectedRange ? rangePredictions : predictions;
+
+    const counts: Record<RiskLevel, number> = {
+      low: 0,
+      medium: 0,
+      high: 0,
+      very_high: 0,
+    };
+
+    sourcePredictions.forEach((pred) => {
+      const diabetesRisk = getEffectiveDiabetesRiskLevel(pred);
+      const cardioRisk = getCardioPrediction(pred, t).risk_level;
+
+      counts[diabetesRisk] += 1;
+      counts[cardioRisk] += 1;
+    });
+
+    const totalRiskCount =
+      counts.low + counts.medium + counts.high + counts.very_high;
+
+    const getRiskDistributionPercentage = (value: number) => {
+      if (!totalRiskCount) return 0;
+
+      return Number(((value / totalRiskCount) * 100).toFixed(0));
+    };
+
+    return [
+      {
+        key: "low",
+        name: t("dashboard.extra.riskLevels.low"),
+        range: "0 - 30",
+        value: counts.low,
+        percentage: getRiskDistributionPercentage(counts.low),
+        color: RISK_COLORS.low,
+      },
+      {
+        key: "medium",
+        name: t("dashboard.extra.riskLevels.medium"),
+        range: "30 - 60",
+        value: counts.medium,
+        percentage: getRiskDistributionPercentage(counts.medium),
+        color: RISK_COLORS.medium,
+      },
+      {
+        key: "high",
+        name: t("dashboard.extra.riskLevels.high"),
+        range: "60 - 80",
+        value: counts.high,
+        percentage: getRiskDistributionPercentage(counts.high),
+        color: RISK_COLORS.high,
+      },
+      {
+        key: "very_high",
+        name: t("dashboard.extra.riskLevels.veryHigh"),
+        range: "80 - 100",
+        value: counts.very_high,
+        percentage: getRiskDistributionPercentage(counts.very_high),
+        color: RISK_COLORS.very_high,
+      },
+    ];
+  }, [predictions, rangePredictions, selectedRange, t]);
+
+  const rangeSummary = useMemo(() => {
+    if (!selectedRange) return null;
+
+    const totalRiskValues = rangePredictions.flatMap((prediction) => {
+      const cardio = getCardioPrediction(prediction, t);
+
+      return [getDiabetesPercentage(prediction), cardio.percentage];
+    });
+
+    const average =
+      totalRiskValues.length > 0
+        ? totalRiskValues.reduce((sum, value) => sum + value, 0) /
+          totalRiskValues.length
+        : 0;
+
+    const highestRisk = getHighestRiskFromPredictions(rangePredictions);
+
+    return {
+      average: Number(average.toFixed(2)),
+      reports: rangePredictions.length,
+      highestPercentage: highestRisk.percentage,
+      highestLevel: highestRisk.level,
+    };
+  }, [rangePredictions, selectedRange, t]);
+
+  const rangeTrendChartData = useMemo(() => {
+    if (!selectedRange) return [];
+
+    const now = new Date();
+
+    if (selectedRange === "weekly") {
+      return Array.from({ length: 4 }, (_, index) => {
+        const weekStart = new Date(now);
+        weekStart.setHours(0, 0, 0, 0);
+        weekStart.setDate(now.getDate() - (27 - index * 7));
+
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 7);
+
+        const weekPredictions = predictions.filter((prediction) => {
+          const predictionTime = new Date(prediction.created_at).getTime();
+
+          return (
+            predictionTime >= weekStart.getTime() &&
+            predictionTime < weekEnd.getTime()
+          );
+        });
+
+        const diabetesValues = weekPredictions.map(getDiabetesPercentage);
+
+        const cardioValues = weekPredictions.map(
+          (prediction) => getCardioPrediction(prediction, t).percentage
+        );
+
+        const diabetesAverage = getAverageValue(diabetesValues);
+        const cardioAverage = getAverageValue(cardioValues);
+
+        const allWeeklyValues = [...diabetesValues, ...cardioValues];
+        const weeklyAverage = getAverageValue(allWeeklyValues);
+
+        return {
+          key: `week-${index + 1}`,
+          label: `${isArabic ? "الأسبوع" : "Week"} ${formatNumber(index + 1)}`,
+          diabetesRisk: diabetesAverage,
+          cardioRisk: cardioAverage,
+          averageRisk: weeklyAverage,
+          averageLabel:
+            weeklyAverage === null
+              ? "--"
+              : `${formatNumber(weeklyAverage, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}%`,
+          reports: weekPredictions.length,
+        };
+      });
+    }
+
+    const monthSlots = Array.from({ length: 6 }, (_, index) => {
+      return new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
+    });
+
+    return monthSlots.map((monthDate) => {
+      const monthKey = getMonthKey(monthDate);
+
+      const monthPredictions = predictions.filter((prediction) => {
+        const predictionDate = new Date(prediction.created_at);
+
+        return getMonthKey(predictionDate) === monthKey;
+      });
+
+      const diabetesValues = monthPredictions.map(getDiabetesPercentage);
+
+      const cardioValues = monthPredictions.map(
+        (prediction) => getCardioPrediction(prediction, t).percentage
+      );
+
+      const diabetesAverage = getAverageValue(diabetesValues);
+      const cardioAverage = getAverageValue(cardioValues);
+
+      const allMonthlyValues = [...diabetesValues, ...cardioValues];
+      const monthlyAverage = getAverageValue(allMonthlyValues);
+
+      return {
+        key: monthKey,
+        label: formatMonthLabel(monthDate),
+        diabetesRisk: diabetesAverage,
+        cardioRisk: cardioAverage,
+        averageRisk: monthlyAverage,
+        averageLabel:
+          monthlyAverage === null
+            ? "--"
+            : `${formatNumber(monthlyAverage, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}%`,
+        reports: monthPredictions.length,
+      };
+    });
+  }, [predictions, selectedRange, isArabic, t]);
 
   const searchedPredictions = useMemo(() => {
     const query = normalizeSearchText(searchTerm);
 
     const sortedPredictions = [...predictions].sort(
       (a, b) =>
-        new Date(b.created_at).getTime() -
-        new Date(a.created_at).getTime()
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
     if (!query) return sortedPredictions.slice(0, 3);
 
     return sortedPredictions
       .filter((pred) => {
+        const cardio = getCardioPrediction(pred, t);
+        const diabetesRiskLevel = getEffectiveDiabetesRiskLevel(pred);
+
         const localizedDate = new Date(pred.created_at).toLocaleDateString(
           isArabic ? "ar-SA" : "en-US"
         );
@@ -342,11 +993,14 @@ const Dashboard = () => {
             pred.bmi,
             pred.diabetes_pedigree_function,
             pred.age,
-            pred.probability,
-            pred.probability?.toFixed?.(2),
-            pred.risk_level,
-            getLocalizedRiskLabel(pred.risk_level),
+            getDiabetesPercentage(pred),
+            diabetesRiskLevel,
+            getLocalizedRiskLabel(diabetesRiskLevel),
             pred.message,
+            cardio.percentage,
+            cardio.risk_level,
+            getLocalizedRiskLabel(cardio.risk_level),
+            cardio.message,
             localizedDate,
           ].join(" ")
         );
@@ -355,105 +1009,6 @@ const Dashboard = () => {
       })
       .slice(0, 3);
   }, [predictions, searchTerm, isArabic, t]);
-
-  const rangeAverageRisk = useMemo(() => {
-    if (!rangePredictions.length) return 0;
-
-    const total = rangePredictions.reduce(
-      (sum, pred) => sum + pred.probability,
-      0
-    );
-
-    return total / rangePredictions.length;
-  }, [rangePredictions]);
-
-  const highestRangeRisk = useMemo(() => {
-    if (!rangePredictions.length) return null;
-    return [...rangePredictions].sort((a, b) => b.probability - a.probability)[0];
-  }, [rangePredictions]);
-
-  const trendChartData = useMemo(() => {
-    if (!rangePredictions.length) return [];
-
-    return rangePredictions.map((item, index) => ({
-      index: index + 1,
-      dateLabel: new Date(item.created_at).toLocaleDateString(
-        isArabic ? "ar-SA" : "en-US",
-        selectedRange === "weekly"
-          ? { month: "numeric", day: "numeric" }
-          : { month: "short", day: "numeric" }
-      ),
-      probability: Number(item.probability.toFixed(2)),
-      fullDate: new Date(item.created_at).toLocaleString(
-        isArabic ? "ar-SA" : "en-US",
-        {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }
-      ),
-      riskLevel: getLocalizedRiskLabel(item.risk_level),
-    }));
-  }, [rangePredictions, isArabic, selectedRange, t]);
-
-  const vitalsChartData = useMemo(() => {
-    if (!latestPrediction) return [];
-
-    return [
-      {
-        label: t("dashboard.chartShortPregnancies"),
-        fullLabel: t("dashboard.pregnancies"),
-        value: latestPrediction.pregnancies,
-      },
-      {
-        label: t("dashboard.chartShortGlucose"),
-        fullLabel: t("dashboard.glucose"),
-        value: latestPrediction.glucose,
-      },
-      {
-        label: t("dashboard.chartShortBloodPressure"),
-        fullLabel: t("dashboard.bloodPressure"),
-        value: latestPrediction.blood_pressure,
-      },
-      {
-        label: t("dashboard.chartShortSkinThickness"),
-        fullLabel: t("dashboard.skinThickness"),
-        value: latestPrediction.skin_thickness,
-      },
-      {
-        label: t("dashboard.chartShortInsulin"),
-        fullLabel: t("dashboard.insulin"),
-        value: latestPrediction.insulin,
-      },
-      {
-        label: t("dashboard.chartShortBmi"),
-        fullLabel: t("dashboard.bmi"),
-        value: Number(latestPrediction.bmi),
-      },
-      {
-        label: t("dashboard.chartShortDiabetesPedigree"),
-        fullLabel: t("dashboard.diabetesPedigree"),
-        value: Number(latestPrediction.diabetes_pedigree_function),
-      },
-      {
-        label: t("dashboard.chartShortAge"),
-        fullLabel: t("dashboard.age"),
-        value: latestPrediction.age,
-      },
-    ];
-  }, [latestPrediction, t]);
-
-  const chartStrokeColor = useMemo(() => {
-    if (!latestPrediction) return "#10b981";
-
-    const normalized = normalizeRiskLevel(latestPrediction.risk_level);
-
-    if (normalized === "high") return "#ef4444";
-    if (normalized === "medium") return "#eab308";
-    return "#10b981";
-  }, [latestPrediction]);
 
   const desktopContentOffsetClass = isArabic
     ? isDesktopSidebarCollapsed
@@ -467,6 +1022,211 @@ const Dashboard = () => {
 
   const smoothSectionClass =
     "animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out";
+
+  const diabetesLabel = t("dashboard.extra.diabetes");
+  const cardioLabel = t("dashboard.extra.cardiovascular");
+
+  const latestScoresBlock = (
+    <div className="flex flex-wrap items-center justify-start gap-x-4 gap-y-2 text-left">
+      <div className="flex flex-wrap items-center justify-start gap-1.5">
+        <span className="text-[11px] font-semibold text-muted-foreground">
+          {t("dashboard.extra.latestDiabetesScore")}
+        </span>
+
+        <span className="text-[11px] font-bold text-foreground">
+          {latestPrediction
+            ? `${formatNumber(getDiabetesPercentage(latestPrediction), {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}%`
+            : "--"}
+        </span>
+
+        {latestPrediction && latestDiabetesRiskLevel && (
+          <Badge
+            className={`border px-2 py-0 text-[10px] transition-none ${getRiskBadgeColor(
+              latestDiabetesRiskLevel
+            )}`}
+          >
+            {getLocalizedRiskLabel(latestDiabetesRiskLevel)}
+          </Badge>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-start gap-1.5">
+        <span className="text-[11px] font-semibold text-muted-foreground">
+          {t("dashboard.extra.latestCardioScore")}
+        </span>
+
+        <span className="text-[11px] font-bold text-foreground">
+          {latestCardioPrediction
+            ? `${formatNumber(latestCardioPrediction.percentage, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}%`
+            : "--"}
+        </span>
+
+        {latestCardioPrediction && (
+          <Badge
+            className={`border px-2 py-0 text-[10px] transition-none ${getRiskBadgeColor(
+              latestCardioPrediction.risk_level
+            )}`}
+          >
+            {getLocalizedRiskLabel(latestCardioPrediction.risk_level)}
+          </Badge>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderInputAxisTick = ({
+    x,
+    y,
+    payload,
+  }: {
+    x: number;
+    y: number;
+    payload: { value: string };
+  }) => {
+    const item = inputsChartData.find((input) => input.key === payload.value);
+
+    if (!item) return null;
+
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          x={0}
+          y={0}
+          textAnchor="middle"
+          fill="hsl(var(--muted-foreground))"
+          fontSize={9}
+        >
+          <tspan x="0" dy="0">
+            {item.inputLabel}
+          </tspan>
+          <tspan x="0" dy="14" fontWeight={700} fill="hsl(var(--foreground))">
+            {item.displayValue}
+          </tspan>
+        </text>
+      </g>
+    );
+  };
+
+  const renderRangeAxisTick = ({
+    x,
+    y,
+    payload,
+  }: {
+    x: number;
+    y: number;
+    payload: { value: string };
+  }) => {
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          x={0}
+          y={0}
+          textAnchor="middle"
+          fill="hsl(var(--muted-foreground))"
+          fontSize={10}
+        >
+          <tspan x="0" dy="0">
+            {payload.value}
+          </tspan>
+        </text>
+      </g>
+    );
+  };
+
+  const renderRiskPieLabel = ({
+    cx,
+    cy,
+    midAngle,
+    innerRadius,
+    outerRadius,
+    percent,
+    name,
+  }: {
+    cx: number;
+    cy: number;
+    midAngle: number;
+    innerRadius: number;
+    outerRadius: number;
+    percent: number;
+    name: string;
+  }) => {
+    if (!percent || percent <= 0) return null;
+
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.58;
+    const x = cx + radius * Math.cos((-midAngle * Math.PI) / 180);
+    const y = cy + radius * Math.sin((-midAngle * Math.PI) / 180);
+
+    return (
+      <text
+        x={x}
+        y={y}
+        fill="#ffffff"
+        textAnchor="middle"
+        dominantBaseline="central"
+        className="text-[10px] font-bold"
+      >
+        {name}
+      </text>
+    );
+  };
+
+  const buildReportState = (pred: Prediction) => {
+    const cardio = getCardioPrediction(pred, t);
+    const diabetesPercentage = getDiabetesPercentage(pred);
+    const diabetesRiskLevel = getEffectiveDiabetesRiskLevel(pred);
+
+    const height = pred.height ?? 170;
+
+    const calculatedWeightFromBmi = Number(
+      (Number(pred.bmi ?? 0) * Math.pow(height / 100, 2)).toFixed(1)
+    );
+
+    const weight =
+      pred.weight ?? (calculatedWeightFromBmi > 0 ? calculatedWeightFromBmi : 70);
+
+    return {
+      formData: {
+        gender: pred.gender,
+        pregnancies: pred.pregnancies,
+        glucose: pred.glucose,
+        bloodPressure: pred.blood_pressure,
+        systolicBloodPressure: pred.systolic_blood_pressure,
+        diastolicBloodPressure:
+          pred.diastolic_blood_pressure ?? pred.blood_pressure,
+        skinThickness: pred.skin_thickness,
+        insulin: pred.insulin,
+        weight,
+        height,
+        cholesterol: pred.cholesterol,
+        bmi: pred.bmi,
+        diabetesPedigreeFunction: pred.diabetes_pedigree_function,
+        age: pred.age,
+      },
+      probability: diabetesPercentage,
+      riskLevel: getLocalizedRiskLabel(diabetesRiskLevel),
+      message: pred.message,
+      predictionId: pred.id,
+
+      diabetesPrediction: {
+        probability: diabetesPercentage,
+        risk_level: diabetesRiskLevel,
+        message: pred.message,
+        prediction_id: pred.id,
+      },
+
+      cardiovascularPrediction: cardio,
+    };
+  };
+
+  const visibleRiskDistributionData = riskDistributionData.filter(
+    (item) => item.value > 0
+  );
 
   return (
     <div
@@ -521,20 +1281,12 @@ const Dashboard = () => {
                       size="icon"
                       onClick={handleToggleLanguage}
                       className="h-10 w-10 rounded-full text-primary hover:bg-primary/10 hover:text-primary"
-                      aria-label="Toggle language"
+                      aria-label={t("dashboard.extra.aria.toggleLanguage")}
                     >
                       <Globe className="h-5 w-5" />
                     </Button>
 
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-10 w-10 rounded-full text-primary hover:bg-primary/10 hover:text-primary"
-                      aria-label="Notifications"
-                    >
-                      <Bell className="h-5 w-5" />
-                    </Button>
+                    <NotificationBell isArabic={isArabic} />
                   </div>
                 </div>
 
@@ -545,20 +1297,15 @@ const Dashboard = () => {
                     size="icon"
                     onClick={handleToggleLanguage}
                     className="hidden h-10 w-10 rounded-full text-primary hover:bg-primary/10 hover:text-primary lg:inline-flex"
-                    aria-label="Toggle language"
+                    aria-label={t("dashboard.extra.aria.toggleLanguage")}
                   >
                     <Globe className="h-5 w-5" />
                   </Button>
 
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="hidden h-10 w-10 rounded-full text-primary hover:bg-primary/10 hover:text-primary lg:inline-flex"
-                    aria-label="Notifications"
-                  >
-                    <Bell className="h-5 w-5" />
-                  </Button>
+                  <NotificationBell
+                    isArabic={isArabic}
+                    className="hidden lg:block"
+                  />
 
                   <div className="relative w-full min-w-0">
                     <Search
@@ -609,40 +1356,97 @@ const Dashboard = () => {
                 <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                   <Activity className="h-5 w-5 text-primary" />
                 </div>
-                <p className="mb-1.5 text-sm text-muted-foreground">
-                  {t("dashboard.averageRisk")}
+
+                <p className="mb-3 text-sm text-muted-foreground">
+                  {t("dashboard.extra.averageRisk")}
                 </p>
-                <h3 className="text-2xl font-bold text-foreground">
-                  {predictions.length
-                    ? `${formatNumber(averageRisk, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}%`
-                    : "--"}
-                </h3>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {diabetesLabel}
+                    </span>
+
+                    <span className="text-xl font-bold text-foreground">
+                      {predictions.length
+                        ? `${formatNumber(averageRisk, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}%`
+                        : "--"}
+                    </span>
+                  </div>
+
+                  <div className="h-px bg-border" />
+
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {cardioLabel}
+                    </span>
+
+                    <span className="text-xl font-bold text-foreground">
+                      {predictions.length
+                        ? `${formatNumber(averageCardioRisk, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}%`
+                        : "--"}
+                    </span>
+                  </div>
+                </div>
               </Card>
 
               <Card className="group rounded-[18px] border border-border bg-card p-4 text-card-foreground shadow-sm transition-colors duration-200 hover:border-primary/25 hover:bg-primary/5">
                 <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                   <ShieldCheck className="h-5 w-5 text-primary" />
                 </div>
-                <p className="mb-1.5 text-sm text-muted-foreground">
-                  {t("dashboard.latestStatus")}
+
+                <p className="mb-3 text-sm text-muted-foreground">
+                  {t("dashboard.extra.latestStatus")}
                 </p>
-                <h3 className={`text-2xl font-bold ${latestRiskTextColor}`}>
-                  {latestPrediction
-                    ? getLocalizedRiskLabel(latestPrediction.risk_level)
-                    : "--"}
-                </h3>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {diabetesLabel}
+                    </span>
+
+                    <span className={`text-xl font-bold ${latestRiskTextColor}`}>
+                      {latestDiabetesRiskLevel
+                        ? getLocalizedRiskLabel(latestDiabetesRiskLevel)
+                        : "--"}
+                    </span>
+                  </div>
+
+                  <div className="h-px bg-border" />
+
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {cardioLabel}
+                    </span>
+
+                    <span
+                      className={`text-xl font-bold ${latestCardioRiskTextColor}`}
+                    >
+                      {latestCardioPrediction
+                        ? getLocalizedRiskLabel(
+                            latestCardioPrediction.risk_level
+                          )
+                        : "--"}
+                    </span>
+                  </div>
+                </div>
               </Card>
 
               <Card className="group rounded-[18px] border border-border bg-card p-4 text-card-foreground shadow-sm transition-colors duration-200 hover:border-primary/25 hover:bg-primary/5">
                 <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                   <FileText className="h-5 w-5 text-primary" />
                 </div>
+
                 <p className="mb-1.5 text-sm text-muted-foreground">
                   {t("dashboard.savedReports")}
                 </p>
+
                 <h3 className="text-2xl font-bold text-foreground">
                   {formatNumber(predictions.length)}
                 </h3>
@@ -652,13 +1456,13 @@ const Dashboard = () => {
                 <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                   <Clock3 className="h-5 w-5 text-primary" />
                 </div>
+
                 <p className="mb-1.5 text-sm text-muted-foreground">
                   {t("dashboard.lastCheckup")}
                 </p>
+
                 <h3 className="text-xl font-bold text-foreground">
-                  {latestPrediction
-                    ? formatDate(latestPrediction.created_at)
-                    : "--"}
+                  {latestPrediction ? formatDate(latestPrediction.created_at) : "--"}
                 </h3>
               </Card>
             </section>
@@ -684,9 +1488,7 @@ const Dashboard = () => {
                     )}
 
                     <Button
-                      variant={
-                        selectedRange === "weekly" ? "default" : "outline"
-                      }
+                      variant={selectedRange === "weekly" ? "default" : "outline"}
                       size="sm"
                       onClick={() =>
                         setSelectedRange((prev) =>
@@ -698,9 +1500,7 @@ const Dashboard = () => {
                     </Button>
 
                     <Button
-                      variant={
-                        selectedRange === "monthly" ? "default" : "outline"
-                      }
+                      variant={selectedRange === "monthly" ? "default" : "outline"}
                       size="sm"
                       onClick={() =>
                         setSelectedRange((prev) =>
@@ -713,414 +1513,684 @@ const Dashboard = () => {
                   </div>
                 </div>
 
-                {selectedRange && (
-                  <div className="mb-4 rounded-[20px] border border-border bg-gradient-to-b from-primary/5 via-background to-background p-3 md:p-4">
-                    <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.25fr_.75fr]">
-                      <div className="rounded-[20px] border border-border bg-card p-3 text-card-foreground md:p-4">
-                        <div className="mb-3 flex items-center gap-2">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
-                            <TrendingUp className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <h4 className="font-semibold text-foreground">
-                              {selectedRange === "weekly"
-                                ? t("dashboard.weekly")
-                                : t("dashboard.monthly")}
-                            </h4>
-                            <p className="text-xs text-muted-foreground">
-                              {selectedRange === "weekly"
-                                ? t("dashboard.last7Days")
-                                : t("dashboard.last30Days")}
-                            </p>
-                          </div>
+                <div className="mb-4 rounded-[20px] border border-border bg-gradient-to-b from-primary/5 via-background to-background p-3 md:p-4">
+                  <div className="space-y-4">
+                    {inputsChartData.length > 0 ? (
+                      <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-[1.35fr_.65fr]">
+                        <div className="h-full rounded-[20px] border border-border bg-card p-3 text-card-foreground shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-4 md:p-5">
+                          {selectedRange && rangeSummary ? (
+                            <>
+                              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                  <h4 className="font-semibold text-foreground">
+                                    {selectedRange === "weekly"
+                                      ? t("dashboard.extra.weeklyRiskTrend")
+                                      : t("dashboard.extra.monthlyRiskTrend")}
+                                  </h4>
+
+                                  <p className="text-xs text-muted-foreground">
+                                    {selectedRange === "weekly"
+                                      ? t("dashboard.extra.weeklyRiskTrendDesc")
+                                      : t("dashboard.extra.monthlyRiskTrendDesc")}
+                                  </p>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                  <span className="inline-flex items-center gap-2">
+                                    <span
+                                      className="h-2.5 w-2.5 rounded-full"
+                                      style={{
+                                        backgroundColor: DIABETES_CHART_COLOR,
+                                      }}
+                                    />
+                                    {diabetesLabel}
+                                  </span>
+
+                                  <span className="inline-flex items-center gap-2">
+                                    <span
+                                      className="h-2.5 w-2.5 rounded-full"
+                                      style={{
+                                        backgroundColor: CARDIO_CHART_COLOR,
+                                      }}
+                                    />
+                                    {cardioLabel}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                <div className="rounded-2xl border border-border bg-primary/5 p-3 transition-all duration-300 hover:border-primary/25 hover:bg-primary/10 hover:shadow-sm">
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    {selectedRange === "weekly"
+                                      ? t("dashboard.extra.weeklyAverage")
+                                      : t("dashboard.extra.monthlyAverage")}
+                                  </p>
+
+                                  <h5 className="mt-1 text-2xl font-bold text-foreground">
+                                    {`${formatNumber(rangeSummary.average, {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}%`}
+                                  </h5>
+                                </div>
+
+                                <div className="rounded-2xl border border-border bg-primary/5 p-3 transition-all duration-300 hover:border-primary/25 hover:bg-primary/10 hover:shadow-sm">
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    {selectedRange === "weekly"
+                                      ? t("dashboard.extra.reportsThisWeek")
+                                      : t("dashboard.extra.reportsDisplayedMonths")}
+                                  </p>
+
+                                  <h5 className="mt-1 text-2xl font-bold text-foreground">
+                                    {formatNumber(rangeSummary.reports)}
+                                  </h5>
+                                </div>
+
+                                <div className="rounded-2xl border border-border bg-primary/5 p-3 transition-all duration-300 hover:border-primary/25 hover:bg-primary/10 hover:shadow-sm">
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    {selectedRange === "weekly"
+                                      ? t("dashboard.extra.highestWeeklyRisk")
+                                      : t("dashboard.extra.highestDisplayedRisk")}
+                                  </p>
+
+                                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                                    <h5 className="text-2xl font-bold text-foreground">
+                                      {`${formatNumber(
+                                        rangeSummary.highestPercentage,
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }
+                                      )}%`}
+                                    </h5>
+
+                                    <span
+                                      className={`text-sm font-bold ${getRiskTextClass(
+                                        rangeSummary.highestLevel
+                                      )}`}
+                                    >
+                                      {getLocalizedRiskLabel(
+                                        rangeSummary.highestLevel
+                                      )}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="h-[330px] w-full overflow-visible">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <ComposedChart
+                                    data={rangeTrendChartData}
+                                    margin={{
+                                      top: 14,
+                                      right: 38,
+                                      left: 8,
+                                      bottom: 28,
+                                    }}
+                                  >
+                                    <defs>
+                                      <linearGradient
+                                        id="diabetesRiskShadow"
+                                        x1="0"
+                                        y1="0"
+                                        x2="0"
+                                        y2="1"
+                                      >
+                                        <stop
+                                          offset="0%"
+                                          stopColor={DIABETES_CHART_COLOR}
+                                          stopOpacity={0.26}
+                                        />
+                                        <stop
+                                          offset="75%"
+                                          stopColor={DIABETES_CHART_COLOR}
+                                          stopOpacity={0.04}
+                                        />
+                                        <stop
+                                          offset="100%"
+                                          stopColor={DIABETES_CHART_COLOR}
+                                          stopOpacity={0}
+                                        />
+                                      </linearGradient>
+
+                                      <linearGradient
+                                        id="cardioRiskShadow"
+                                        x1="0"
+                                        y1="0"
+                                        x2="0"
+                                        y2="1"
+                                      >
+                                        <stop
+                                          offset="0%"
+                                          stopColor={CARDIO_CHART_COLOR}
+                                          stopOpacity={0.24}
+                                        />
+                                        <stop
+                                          offset="75%"
+                                          stopColor={CARDIO_CHART_COLOR}
+                                          stopOpacity={0.04}
+                                        />
+                                        <stop
+                                          offset="100%"
+                                          stopColor={CARDIO_CHART_COLOR}
+                                          stopOpacity={0}
+                                        />
+                                      </linearGradient>
+                                    </defs>
+
+                                    <CartesianGrid
+                                      strokeDasharray="4 4"
+                                      vertical={false}
+                                      stroke="hsl(var(--border))"
+                                    />
+
+                                    <XAxis
+                                      dataKey="label"
+                                      tickLine={false}
+                                      axisLine={false}
+                                      interval={0}
+                                      height={52}
+                                      tickMargin={14}
+                                      padding={{ left: 24, right: 24 }}
+                                      tick={renderRangeAxisTick}
+                                    />
+
+                                    <YAxis
+                                      tickLine={false}
+                                      axisLine={false}
+                                      width={38}
+                                      tickMargin={8}
+                                      domain={[0, 100]}
+                                      tick={{
+                                        fontSize: 10,
+                                        fill: "hsl(var(--muted-foreground))",
+                                      }}
+                                      tickFormatter={(value) => `${value}%`}
+                                    />
+
+                                    <Tooltip
+                                      cursor={{
+                                        stroke: "hsl(var(--border))",
+                                        strokeDasharray: "4 4",
+                                      }}
+                                      contentStyle={{
+                                        borderRadius: "14px",
+                                        border: "1px solid hsl(var(--border))",
+                                        background: "hsl(var(--card))",
+                                        color: "hsl(var(--card-foreground))",
+                                        boxShadow:
+                                          "0 14px 35px rgba(15,23,42,0.18)",
+                                      }}
+                                      labelStyle={{
+                                        color: "hsl(var(--foreground))",
+                                      }}
+                                      itemStyle={{
+                                        color: "hsl(var(--foreground))",
+                                      }}
+                                      formatter={(
+                                        value: number | null,
+                                        name: string
+                                      ) => [
+                                        value === null
+                                          ? "--"
+                                          : `${formatNumber(Number(value), {
+                                              minimumFractionDigits: 2,
+                                              maximumFractionDigits: 2,
+                                            })}%`,
+                                        name === "cardioRisk"
+                                          ? cardioLabel
+                                          : name === "diabetesRisk"
+                                          ? diabetesLabel
+                                          : t("dashboard.extra.analysisAverage"),
+                                      ]}
+                                      labelFormatter={(label) => {
+                                        const point = rangeTrendChartData.find(
+                                          (item) => item.label === label
+                                        );
+
+                                        if (!point) return label;
+
+                                        return `${label} - ${t(
+                                          "dashboard.extra.analysisAverage"
+                                        )}: ${point.averageLabel} - ${t(
+                                          "dashboard.extra.reports"
+                                        )}: ${formatNumber(point.reports)}`;
+                                      }}
+                                    />
+
+                                    <Area
+                                      type="monotone"
+                                      dataKey="diabetesRisk"
+                                      stroke="none"
+                                      fill="url(#diabetesRiskShadow)"
+                                      connectNulls
+                                      isAnimationActive={true}
+                                      animationBegin={80}
+                                      animationDuration={650}
+                                      animationEasing="ease-out"
+                                    />
+
+                                    <Area
+                                      type="monotone"
+                                      dataKey="cardioRisk"
+                                      stroke="none"
+                                      fill="url(#cardioRiskShadow)"
+                                      connectNulls
+                                      isAnimationActive={true}
+                                      animationBegin={120}
+                                      animationDuration={650}
+                                      animationEasing="ease-out"
+                                    />
+
+                                    <Line
+                                      type="monotone"
+                                      dataKey="diabetesRisk"
+                                      stroke={DIABETES_CHART_COLOR}
+                                      strokeWidth={3}
+                                      connectNulls
+                                      isAnimationActive={true}
+                                      animationBegin={140}
+                                      animationDuration={650}
+                                      animationEasing="ease-out"
+                                      dot={{
+                                        r: 3,
+                                        strokeWidth: 2,
+                                        fill: "hsl(var(--background))",
+                                        stroke: DIABETES_CHART_COLOR,
+                                      }}
+                                      activeDot={{
+                                        r: 5,
+                                        strokeWidth: 2,
+                                        fill: "hsl(var(--background))",
+                                        stroke: DIABETES_CHART_COLOR,
+                                      }}
+                                    />
+
+                                    <Line
+                                      type="monotone"
+                                      dataKey="cardioRisk"
+                                      stroke={CARDIO_CHART_COLOR}
+                                      strokeWidth={3}
+                                      connectNulls
+                                      isAnimationActive={true}
+                                      animationBegin={180}
+                                      animationDuration={650}
+                                      animationEasing="ease-out"
+                                      dot={{
+                                        r: 3,
+                                        strokeWidth: 2,
+                                        fill: "hsl(var(--background))",
+                                        stroke: CARDIO_CHART_COLOR,
+                                      }}
+                                      activeDot={{
+                                        r: 5,
+                                        strokeWidth: 2,
+                                        fill: "hsl(var(--background))",
+                                        stroke: CARDIO_CHART_COLOR,
+                                      }}
+                                    />
+                                  </ComposedChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                  <h4 className="font-semibold text-foreground">
+                                    {t("dashboard.extra.analysisInputs")}
+                                  </h4>
+
+                                  <p className="text-xs text-muted-foreground">
+                                    {t("dashboard.extra.analysisInputsDesc")}
+                                  </p>
+                                </div>
+
+                                <div className="flex max-w-full flex-col items-start gap-2 sm:items-end">
+                                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                    <span className="inline-flex items-center gap-2">
+                                      <span
+                                        className="h-2.5 w-2.5 rounded-full"
+                                        style={{
+                                          backgroundColor: DIABETES_CHART_COLOR,
+                                        }}
+                                      />
+                                      {diabetesLabel}
+                                    </span>
+
+                                    <span className="inline-flex items-center gap-2">
+                                      <span
+                                        className="h-2.5 w-2.5 rounded-full"
+                                        style={{
+                                          backgroundColor: CARDIO_CHART_COLOR,
+                                        }}
+                                      />
+                                      {cardioLabel}
+                                    </span>
+                                  </div>
+
+                                  {latestScoresBlock}
+                                </div>
+                              </div>
+
+                              <div className="h-[380px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <ComposedChart
+                                    data={inputsChartData}
+                                    margin={{
+                                      top: 18,
+                                      right: 30,
+                                      left: 18,
+                                      bottom: 38,
+                                    }}
+                                  >
+                                    <defs>
+                                      <linearGradient
+                                        id="diabetesInputShadow"
+                                        x1="0"
+                                        y1="0"
+                                        x2="0"
+                                        y2="1"
+                                      >
+                                        <stop
+                                          offset="0%"
+                                          stopColor={DIABETES_CHART_COLOR}
+                                          stopOpacity={0.24}
+                                        />
+                                        <stop
+                                          offset="80%"
+                                          stopColor={DIABETES_CHART_COLOR}
+                                          stopOpacity={0.04}
+                                        />
+                                        <stop
+                                          offset="100%"
+                                          stopColor={DIABETES_CHART_COLOR}
+                                          stopOpacity={0}
+                                        />
+                                      </linearGradient>
+
+                                      <linearGradient
+                                        id="cardioInputShadow"
+                                        x1="0"
+                                        y1="0"
+                                        x2="0"
+                                        y2="1"
+                                      >
+                                        <stop
+                                          offset="0%"
+                                          stopColor={CARDIO_CHART_COLOR}
+                                          stopOpacity={0.22}
+                                        />
+                                        <stop
+                                          offset="80%"
+                                          stopColor={CARDIO_CHART_COLOR}
+                                          stopOpacity={0.04}
+                                        />
+                                        <stop
+                                          offset="100%"
+                                          stopColor={CARDIO_CHART_COLOR}
+                                          stopOpacity={0}
+                                        />
+                                      </linearGradient>
+                                    </defs>
+
+                                    <CartesianGrid
+                                      strokeDasharray="4 4"
+                                      vertical={false}
+                                      stroke="hsl(var(--border))"
+                                    />
+
+                                    <XAxis
+                                      dataKey="key"
+                                      tickLine={false}
+                                      axisLine={false}
+                                      interval={0}
+                                      height={78}
+                                      tickMargin={10}
+                                      tick={renderInputAxisTick}
+                                    />
+
+                                    <YAxis
+                                      tickLine={false}
+                                      axisLine={false}
+                                      width={38}
+                                      tickMargin={8}
+                                      tick={{
+                                        fontSize: 10,
+                                        fill: "hsl(var(--muted-foreground))",
+                                      }}
+                                    />
+
+                                    <Tooltip
+                                      cursor={{
+                                        stroke: "hsl(var(--border))",
+                                        strokeDasharray: "4 4",
+                                      }}
+                                      contentStyle={{
+                                        borderRadius: "14px",
+                                        border: "1px solid hsl(var(--border))",
+                                        background: "hsl(var(--card))",
+                                        color: "hsl(var(--card-foreground))",
+                                        boxShadow:
+                                          "0 14px 35px rgba(15,23,42,0.18)",
+                                      }}
+                                      labelStyle={{
+                                        color: "hsl(var(--foreground))",
+                                      }}
+                                      itemStyle={{
+                                        color: "hsl(var(--foreground))",
+                                      }}
+                                      formatter={(value: number, name: string) => [
+                                        formatNumber(Number(value), {
+                                          minimumFractionDigits: 0,
+                                          maximumFractionDigits: 3,
+                                        }),
+                                        name === "cardioValue"
+                                          ? cardioLabel
+                                          : diabetesLabel,
+                                      ]}
+                                      labelFormatter={(key) => {
+                                        const item = inputsChartData.find(
+                                          (input) => input.key === key
+                                        );
+
+                                        return item
+                                          ? `${item.inputLabel}: ${item.displayValue}`
+                                          : "";
+                                      }}
+                                    />
+
+                                    <Area
+                                      type="monotone"
+                                      dataKey="diabetesValue"
+                                      stroke="none"
+                                      fill="url(#diabetesInputShadow)"
+                                      connectNulls
+                                      isAnimationActive={true}
+                                      animationBegin={80}
+                                      animationDuration={650}
+                                      animationEasing="ease-out"
+                                    />
+
+                                    <Area
+                                      type="monotone"
+                                      dataKey="cardioValue"
+                                      stroke="none"
+                                      fill="url(#cardioInputShadow)"
+                                      connectNulls
+                                      isAnimationActive={true}
+                                      animationBegin={120}
+                                      animationDuration={650}
+                                      animationEasing="ease-out"
+                                    />
+
+                                    <Line
+                                      type="monotone"
+                                      dataKey="diabetesValue"
+                                      stroke={DIABETES_CHART_COLOR}
+                                      strokeWidth={3}
+                                      connectNulls
+                                      isAnimationActive={true}
+                                      animationBegin={140}
+                                      animationDuration={650}
+                                      animationEasing="ease-out"
+                                      dot={{
+                                        r: 3,
+                                        strokeWidth: 2,
+                                        fill: "hsl(var(--background))",
+                                        stroke: DIABETES_CHART_COLOR,
+                                      }}
+                                      activeDot={{
+                                        r: 5,
+                                        strokeWidth: 2,
+                                        fill: "hsl(var(--background))",
+                                        stroke: DIABETES_CHART_COLOR,
+                                      }}
+                                    />
+
+                                    <Line
+                                      type="monotone"
+                                      dataKey="cardioValue"
+                                      stroke={CARDIO_CHART_COLOR}
+                                      strokeWidth={3}
+                                      connectNulls
+                                      isAnimationActive={true}
+                                      animationBegin={180}
+                                      animationDuration={650}
+                                      animationEasing="ease-out"
+                                      dot={{
+                                        r: 3,
+                                        strokeWidth: 2,
+                                        fill: "hsl(var(--background))",
+                                        stroke: CARDIO_CHART_COLOR,
+                                      }}
+                                      activeDot={{
+                                        r: 5,
+                                        strokeWidth: 2,
+                                        fill: "hsl(var(--background))",
+                                        stroke: CARDIO_CHART_COLOR,
+                                      }}
+                                    />
+                                  </ComposedChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </>
+                          )}
                         </div>
 
-                        {trendChartData.length > 0 ? (
-                          <div className="h-[210px] w-full sm:h-[240px] md:h-[270px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <AreaChart
-                                data={trendChartData}
-                                margin={{
-                                  top: 14,
-                                  right: 18,
-                                  left: 6,
-                                  bottom: 4,
-                                }}
-                              >
-                                <defs>
-                                  <linearGradient
-                                    id="riskShadow"
-                                    x1="0"
-                                    y1="0"
-                                    x2="0"
-                                    y2="1"
-                                  >
-                                    <stop
-                                      offset="5%"
-                                      stopColor="hsl(var(--primary))"
-                                      stopOpacity={0.35}
-                                    />
-                                    <stop
-                                      offset="95%"
-                                      stopColor="hsl(var(--primary))"
-                                      stopOpacity={0.03}
-                                    />
-                                  </linearGradient>
-                                </defs>
-
-                                <CartesianGrid
-                                  strokeDasharray="4 4"
-                                  vertical={false}
-                                  stroke="hsl(var(--border))"
-                                />
-
-                                <XAxis
-                                  dataKey="dateLabel"
-                                  tickLine={false}
-                                  axisLine={false}
-                                  interval="preserveStartEnd"
-                                  minTickGap={8}
-                                  tickMargin={8}
-                                  tick={{
-                                    fontSize: 10,
-                                    fill: "hsl(var(--muted-foreground))",
-                                  }}
-                                />
-
-                                <YAxis
-                                  tickLine={false}
-                                  axisLine={false}
-                                  domain={[0, 100]}
-                                  width={42}
-                                  tickMargin={8}
-                                  tick={{
-                                    fontSize: 11,
-                                    fill: "hsl(var(--muted-foreground))",
-                                  }}
-                                />
-
-                                <Tooltip
-                                  cursor={{
-                                    stroke: "hsl(var(--border))",
-                                    strokeDasharray: "4 4",
-                                  }}
-                                  contentStyle={{
-                                    borderRadius: "14px",
-                                    border: "1px solid hsl(var(--border))",
-                                    background: "hsl(var(--card))",
-                                    color: "hsl(var(--card-foreground))",
-                                    boxShadow:
-                                      "0 10px 30px rgba(0,0,0,0.18)",
-                                  }}
-                                  labelStyle={{
-                                    color: "hsl(var(--foreground))",
-                                  }}
-                                  itemStyle={{
-                                    color: "hsl(var(--foreground))",
-                                  }}
-                                  formatter={(value: number) => [
-                                    `${value}%`,
-                                    t("dashboard.riskTooltip"),
-                                  ]}
-                                  labelFormatter={(_, payload) =>
-                                    payload?.[0]?.payload?.fullDate || ""
-                                  }
-                                />
-
-                                <Area
-                                  type="monotone"
-                                  dataKey="probability"
-                                  stroke="hsl(var(--primary))"
-                                  fill="url(#riskShadow)"
-                                  strokeWidth={3}
-                                  isAnimationActive={true}
-                                  animationBegin={120}
-                                  animationDuration={650}
-                                  animationEasing="ease-out"
-                                  dot={{
-                                    r: 3,
-                                    strokeWidth: 2,
-                                    fill: "hsl(var(--background))",
-                                    stroke: "hsl(var(--primary))",
-                                  }}
-                                  activeDot={{
-                                    r: 5,
-                                    strokeWidth: 2,
-                                    fill: "hsl(var(--background))",
-                                    stroke: "hsl(var(--primary))",
-                                  }}
-                                />
-                              </AreaChart>
-                            </ResponsiveContainer>
-                          </div>
-                        ) : (
-                          <div className="flex h-[210px] items-center justify-center rounded-2xl border border-dashed border-border bg-muted/20 px-6 text-center sm:h-[240px] md:h-[270px]">
+                        <div className="flex h-full flex-col rounded-[20px] border border-border bg-card p-3 text-card-foreground shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-4 md:p-5">
+                          <div className="mb-3 flex items-center justify-between gap-3">
                             <div>
-                              <BarChart3 className="mx-auto mb-3 h-9 w-9 text-muted-foreground" />
-                              <p className="mb-1 font-medium text-foreground">
-                                {selectedRange === "weekly"
-                                  ? t("dashboard.noWeeklyReportsTitle")
-                                  : t("dashboard.noMonthlyReportsTitle")}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {selectedRange === "weekly"
-                                  ? t("dashboard.noWeeklyReportsDesc")
-                                  : t("dashboard.noMonthlyReportsDesc")}
+                              <h4 className="font-semibold text-foreground">
+                                {t("dashboard.extra.riskDistribution")}
+                              </h4>
+
+                              <p className="text-xs text-muted-foreground">
+                                {t("dashboard.extra.riskDistributionDesc")}
                               </p>
                             </div>
-                          </div>
-                        )}
-                      </div>
 
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                        <Card className="rounded-[18px] border border-border bg-card p-3 text-card-foreground shadow-none">
-                          <div className="flex items-center gap-3">
                             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                               <Activity className="h-5 w-5 text-primary" />
                             </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">
-                                {selectedRange === "weekly"
-                                  ? t("dashboard.weeklyAverage")
-                                  : t("dashboard.monthlyAverage")}
-                              </p>
-                              <h4 className="text-xl font-bold text-foreground">
-                                {rangePredictions.length
-                                  ? `${formatNumber(rangeAverageRisk, {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })}%`
-                                  : "--"}
-                              </h4>
-                            </div>
-                          </div>
-                        </Card>
-
-                        <Card className="rounded-[18px] border border-border bg-card p-3 text-card-foreground shadow-none">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
-                              <FileText className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">
-                                {selectedRange === "weekly"
-                                  ? t("dashboard.reportsThisWeek")
-                                  : t("dashboard.reportsThisMonth")}
-                              </p>
-                              <h4 className="text-xl font-bold text-foreground">
-                                {formatNumber(rangePredictions.length)}
-                              </h4>
-                            </div>
-                          </div>
-                        </Card>
-
-                        <Card className="rounded-[18px] border border-border bg-card p-3 text-card-foreground shadow-none">
-                          <div className="mb-2 flex items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
-                              <ShieldCheck className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">
-                                {selectedRange === "weekly"
-                                  ? t("dashboard.highestWeeklyRisk")
-                                  : t("dashboard.highestMonthlyRisk")}
-                              </p>
-                              <h4 className="text-xl font-bold text-foreground">
-                                {highestRangeRisk
-                                  ? `${formatNumber(
-                                      highestRangeRisk.probability,
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )}%`
-                                  : "--"}
-                              </h4>
-                            </div>
                           </div>
 
-                          {highestRangeRisk && (
-                            <Badge
-                              className={`border text-xs transition-none ${getRiskBadgeColor(
-                                highestRangeRisk.risk_level
-                              )}`}
+                          <div className="grid flex-1 grid-cols-1 items-center gap-3 md:grid-cols-[0.9fr_1.1fr] xl:grid-cols-1 2xl:grid-cols-[0.9fr_1.1fr]">
+                            <div
+                              className={`space-y-2.5 ${
+                                isArabic
+                                  ? "order-2 md:order-1 xl:order-2 2xl:order-1 text-right"
+                                  : "order-1 text-left"
+                              }`}
                             >
-                              {getLocalizedRiskLabel(
-                                highestRangeRisk.risk_level
-                              )}
-                            </Badge>
-                          )}
-                        </Card>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="mb-4 rounded-[20px] border border-border bg-gradient-to-b from-primary/5 via-background to-background p-3 md:p-4">
-                  <div className="space-y-4">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <p className="mb-1.5 text-sm text-muted-foreground">
-                          {t("dashboard.latestAnalysisScore")}
-                        </p>
-
-                        <div className="flex flex-wrap items-center gap-3">
-                          <h2 className="text-3xl font-bold text-foreground md:text-4xl">
-                            {latestPrediction
-                              ? `${formatNumber(latestPrediction.probability, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}%`
-                              : "--"}
-                          </h2>
-
-                          {latestPrediction && (
-                            <Badge
-                              className={`border text-xs transition-none ${getRiskBadgeColor(
-                                latestPrediction.risk_level
-                              )}`}
-                            >
-                              {getLocalizedRiskLabel(
-                                latestPrediction.risk_level
-                              )}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className={isArabic ? "md:text-left" : "md:text-right"}>
-                        <p className="mb-1.5 text-sm text-muted-foreground">
-                          {t("dashboard.recentAnalyses")}
-                        </p>
-                        <p className="text-2xl font-bold text-primary">
-                          {searchTerm
-                            ? formatNumber(displayedPredictions.length)
-                            : selectedRange
-                            ? formatNumber(rangePredictions.length)
-                            : latestPrediction
-                            ? "1"
-                            : "0"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {vitalsChartData.length > 0 ? (
-                      <div className="rounded-[20px] border border-border bg-card p-3 text-card-foreground sm:p-4 md:p-5">
-                        <div className="h-[210px] w-full sm:h-[240px] md:h-[280px]">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart
-                              data={vitalsChartData}
-                              margin={{
-                                top: 14,
-                                right: 18,
-                                left: 6,
-                                bottom: 4,
-                              }}
-                            >
-                              <defs>
-                                <linearGradient
-                                  id="vitalsShadow"
-                                  x1="0"
-                                  y1="0"
-                                  x2="0"
-                                  y2="1"
+                              {riskDistributionData.map((item) => (
+                                <div
+                                  key={item.key}
+                                  className="flex items-center justify-between gap-3"
                                 >
-                                  <stop
-                                    offset="5%"
-                                    stopColor={chartStrokeColor}
-                                    stopOpacity={0.35}
+                                  <div
+                                    className={`flex min-w-0 items-center gap-2 ${
+                                      isArabic ? "flex-row-reverse" : ""
+                                    }`}
+                                  >
+                                    <span
+                                      className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                                      style={{ backgroundColor: item.color }}
+                                    />
+
+                                    <p className="truncate text-sm font-semibold text-foreground">
+                                      {item.range}
+                                    </p>
+                                  </div>
+
+                                  <span className="shrink-0 text-sm font-bold text-muted-foreground">
+                                    {item.percentage}%
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div
+                              className={`h-[330px] w-full ${
+                                isArabic
+                                  ? "order-1 md:order-2 xl:order-1 2xl:order-2"
+                                  : "order-2"
+                              }`}
+                            >
+                              <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                  <Pie
+                                    data={
+                                      visibleRiskDistributionData.length
+                                        ? visibleRiskDistributionData
+                                        : riskDistributionData
+                                    }
+                                    dataKey="value"
+                                    nameKey="name"
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={42}
+                                    outerRadius={118}
+                                    paddingAngle={1}
+                                    stroke="hsl(var(--card))"
+                                    strokeWidth={2}
+                                    labelLine={false}
+                                    label={renderRiskPieLabel}
+                                  >
+                                    {(visibleRiskDistributionData.length
+                                      ? visibleRiskDistributionData
+                                      : riskDistributionData
+                                    ).map((item) => (
+                                      <Cell key={item.key} fill={item.color} />
+                                    ))}
+                                  </Pie>
+
+                                  <Tooltip
+                                    contentStyle={{
+                                      borderRadius: "14px",
+                                      border: "1px solid hsl(var(--border))",
+                                      background: "hsl(var(--card))",
+                                      color: "hsl(var(--card-foreground))",
+                                      boxShadow:
+                                        "0 10px 30px rgba(0,0,0,0.18)",
+                                    }}
+                                    formatter={(value: number, name: string) => {
+                                      const item = riskDistributionData.find(
+                                        (riskItem) => riskItem.name === name
+                                      );
+
+                                      return [
+                                        item
+                                          ? `${item.percentage}%`
+                                          : formatNumber(value),
+                                        name,
+                                      ];
+                                    }}
                                   />
-                                  <stop
-                                    offset="95%"
-                                    stopColor={chartStrokeColor}
-                                    stopOpacity={0.03}
-                                  />
-                                </linearGradient>
-                              </defs>
-
-                              <CartesianGrid
-                                strokeDasharray="4 4"
-                                vertical={false}
-                                stroke="hsl(var(--border))"
-                              />
-
-                              <XAxis
-                                dataKey="label"
-                                tickLine={false}
-                                axisLine={false}
-                                interval={0}
-                                minTickGap={0}
-                                height={34}
-                                tickMargin={8}
-                                tick={{
-                                  fontSize: 9,
-                                  fill: "hsl(var(--muted-foreground))",
-                                }}
-                              />
-
-                              <YAxis
-                                tickLine={false}
-                                axisLine={false}
-                                width={42}
-                                tickMargin={8}
-                                tick={{
-                                  fontSize: 11,
-                                  fill: "hsl(var(--muted-foreground))",
-                                }}
-                              />
-
-                              <Tooltip
-                                cursor={{
-                                  stroke: "hsl(var(--border))",
-                                  strokeDasharray: "4 4",
-                                }}
-                                contentStyle={{
-                                  borderRadius: "14px",
-                                  border: "1px solid hsl(var(--border))",
-                                  background: "hsl(var(--card))",
-                                  color: "hsl(var(--card-foreground))",
-                                  boxShadow: "0 10px 30px rgba(0,0,0,0.18)",
-                                }}
-                                labelStyle={{
-                                  color: "hsl(var(--foreground))",
-                                }}
-                                itemStyle={{
-                                  color: "hsl(var(--foreground))",
-                                }}
-                                formatter={(value: number) => [
-                                  value,
-                                  t("dashboard.valueLabel"),
-                                ]}
-                                labelFormatter={(_, payload) =>
-                                  payload?.[0]?.payload?.fullLabel || ""
-                                }
-                              />
-
-                              <Area
-                                type="monotone"
-                                dataKey="value"
-                                stroke={chartStrokeColor}
-                                fill="url(#vitalsShadow)"
-                                strokeWidth={3}
-                                isAnimationActive={true}
-                                animationBegin={120}
-                                animationDuration={650}
-                                animationEasing="ease-out"
-                                dot={{
-                                  r: 3,
-                                  strokeWidth: 2,
-                                  fill: "hsl(var(--background))",
-                                  stroke: chartStrokeColor,
-                                }}
-                                activeDot={{
-                                  r: 5,
-                                  strokeWidth: 2,
-                                  fill: "hsl(var(--background))",
-                                  stroke: chartStrokeColor,
-                                }}
-                              />
-                            </AreaChart>
-                          </ResponsiveContainer>
+                                </PieChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -1183,7 +2253,7 @@ const Dashboard = () => {
                   <>
                     <div className="hidden w-full overflow-hidden lg:block">
                       <div className="w-full overflow-hidden rounded-[20px] border border-border bg-card">
-                        <div className="grid grid-cols-[minmax(220px,2fr)_minmax(180px,1.45fr)_minmax(110px,1.05fr)_minmax(120px,1.1fr)] gap-4 border-b border-border bg-muted/30 px-5 py-4 text-sm font-semibold text-muted-foreground">
+                        <div className="grid grid-cols-[minmax(250px,2fr)_minmax(180px,1.25fr)_minmax(110px,1fr)_minmax(120px,1fr)] gap-4 border-b border-border bg-muted/30 px-5 py-4 text-sm font-semibold text-muted-foreground">
                           <span className="text-start">
                             {t("dashboard.recentAnalyses")}
                           </span>
@@ -1199,12 +2269,48 @@ const Dashboard = () => {
                         </div>
 
                         {displayedPredictions.map((pred) => {
-                          const topIndicators = getTopRiskIndicators(pred);
+                          const cardio = getCardioPrediction(pred, t);
+                          const diabetesPercentage = getDiabetesPercentage(pred);
+                          const diabetesRiskLevel =
+                            getEffectiveDiabetesRiskLevel(pred);
+
+                          const height = pred.height ?? 170;
+
+                          const calculatedWeightFromBmi = Number(
+                            (
+                              Number(pred.bmi ?? 0) *
+                              Math.pow(height / 100, 2)
+                            ).toFixed(1)
+                          );
+
+                          const weight =
+                            pred.weight ??
+                            (calculatedWeightFromBmi > 0
+                              ? calculatedWeightFromBmi
+                              : 70);
+
+                          const topIndicators = [
+                            {
+                              key: "glucose",
+                              label: t("dashboard.glucose"),
+                              value: pred.glucose,
+                            },
+                            {
+                              key: "weight",
+                              label: t("dashboard.extra.inputs.weight"),
+                              value: weight,
+                            },
+                            {
+                              key: "height",
+                              label: t("dashboard.extra.inputs.height"),
+                              value: height,
+                            },
+                          ];
 
                           return (
                             <div
                               key={pred.id}
-                              className="grid grid-cols-[minmax(220px,2fr)_minmax(180px,1.45fr)_minmax(110px,1.05fr)_minmax(120px,1.1fr)] items-center gap-4 border-t border-border px-5 py-4 hover:bg-muted/20"
+                              className="grid grid-cols-[minmax(250px,2fr)_minmax(180px,1.25fr)_minmax(110px,1fr)_minmax(120px,1fr)] items-center gap-4 border-t border-border px-5 py-4 hover:bg-muted/20"
                             >
                               <div className="min-w-0">
                                 <div className="flex items-center gap-3">
@@ -1212,25 +2318,40 @@ const Dashboard = () => {
                                     <Activity className="h-5 w-5 text-primary" />
                                   </div>
 
-                                  <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <p className="truncate font-semibold text-foreground">
-                                        {t("dashboard.infectionProbability")}:{" "}
-                                        {formatNumber(pred.probability, {
-                                          minimumFractionDigits: 2,
-                                          maximumFractionDigits: 2,
-                                        })}
-                                        %
-                                      </p>
+                                  <div className="grid grid-cols-[minmax(0,auto)_max-content] items-center gap-x-2 gap-y-2">
+                                    <p className="truncate font-semibold text-foreground">
+                                      {t("dashboard.extra.diabetesRisk")}:{" "}
+                                      {formatNumber(diabetesPercentage, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                      %
+                                    </p>
 
-                                      <Badge
-                                        className={`border text-xs transition-none ${getRiskBadgeColor(
-                                          pred.risk_level
-                                        )}`}
-                                      >
-                                        {getLocalizedRiskLabel(pred.risk_level)}
-                                      </Badge>
-                                    </div>
+                                    <Badge
+                                      className={`justify-self-start border text-xs transition-none ${getRiskBadgeColor(
+                                        diabetesRiskLevel
+                                      )}`}
+                                    >
+                                      {getLocalizedRiskLabel(diabetesRiskLevel)}
+                                    </Badge>
+
+                                    <p className="truncate font-semibold text-foreground">
+                                      {t("dashboard.extra.cardioRisk")}:{" "}
+                                      {formatNumber(cardio.percentage, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                      %
+                                    </p>
+
+                                    <Badge
+                                      className={`justify-self-start border text-xs transition-none ${getRiskBadgeColor(
+                                        cardio.risk_level
+                                      )}`}
+                                    >
+                                      {getLocalizedRiskLabel(cardio.risk_level)}
+                                    </Badge>
                                   </div>
                                 </div>
                               </div>
@@ -1263,31 +2384,10 @@ const Dashboard = () => {
                               </div>
 
                               <div className="flex items-center justify-center gap-2">
-                                <Link
-                                  to="/report"
-                                  state={{
-                                    formData: {
-                                      pregnancies: pred.pregnancies,
-                                      glucose: pred.glucose,
-                                      bloodPressure: pred.blood_pressure,
-                                      skinThickness: pred.skin_thickness,
-                                      insulin: pred.insulin,
-                                      bmi: pred.bmi,
-                                      diabetesPedigreeFunction:
-                                        pred.diabetes_pedigree_function,
-                                      age: pred.age,
-                                    },
-                                    probability: pred.probability,
-                                    riskLevel: getLocalizedRiskLabel(
-                                      pred.risk_level
-                                    ),
-                                    message: pred.message,
-                                    predictionId: pred.id,
-                                  }}
-                                >
+                                <Link to="/report" state={buildReportState(pred)}>
                                   <Button
-                                    variant="ghost"
-                                    className="h-10 whitespace-nowrap hover:bg-primary/10 hover:text-primary"
+                                    type="button"
+                                    className="h-10 whitespace-nowrap rounded-full bg-primary px-6 font-semibold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md"
                                   >
                                     {t("dashboard.viewReport")}
                                   </Button>
@@ -1301,7 +2401,25 @@ const Dashboard = () => {
 
                     <div className="grid gap-3 lg:hidden">
                       {displayedPredictions.map((pred) => {
-                        const topIndicators = getTopRiskIndicators(pred);
+                        const cardio = getCardioPrediction(pred, t);
+                        const diabetesPercentage = getDiabetesPercentage(pred);
+                        const diabetesRiskLevel =
+                          getEffectiveDiabetesRiskLevel(pred);
+
+                        const height = pred.height ?? 170;
+
+                        const calculatedWeightFromBmi = Number(
+                          (
+                            Number(pred.bmi ?? 0) *
+                            Math.pow(height / 100, 2)
+                          ).toFixed(1)
+                        );
+
+                        const weight =
+                          pred.weight ??
+                          (calculatedWeightFromBmi > 0
+                            ? calculatedWeightFromBmi
+                            : 70);
 
                         return (
                           <div
@@ -1314,10 +2432,10 @@ const Dashboard = () => {
                               </div>
 
                               <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="grid grid-cols-[minmax(0,auto)_max-content] items-center gap-x-2 gap-y-2">
                                   <p className="font-semibold leading-snug text-foreground">
-                                    {t("dashboard.infectionProbability")}:{" "}
-                                    {formatNumber(pred.probability, {
+                                    {t("dashboard.extra.diabetesRisk")}:{" "}
+                                    {formatNumber(diabetesPercentage, {
                                       minimumFractionDigits: 2,
                                       maximumFractionDigits: 2,
                                     })}
@@ -1325,33 +2443,63 @@ const Dashboard = () => {
                                   </p>
 
                                   <Badge
-                                    className={`border text-xs transition-none ${getRiskBadgeColor(
-                                      pred.risk_level
+                                    className={`justify-self-start border text-xs transition-none ${getRiskBadgeColor(
+                                      diabetesRiskLevel
                                     )}`}
                                   >
-                                    {getLocalizedRiskLabel(pred.risk_level)}
+                                    {getLocalizedRiskLabel(diabetesRiskLevel)}
+                                  </Badge>
+
+                                  <p className="font-semibold leading-snug text-foreground">
+                                    {t("dashboard.extra.cardioRiskShort")}:{" "}
+                                    {formatNumber(cardio.percentage, {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}
+                                    %
+                                  </p>
+
+                                  <Badge
+                                    className={`justify-self-start border text-xs transition-none ${getRiskBadgeColor(
+                                      cardio.risk_level
+                                    )}`}
+                                  >
+                                    {getLocalizedRiskLabel(cardio.risk_level)}
                                   </Badge>
                                 </div>
 
                                 <div className="mt-3 rounded-xl bg-muted/30 p-3">
-                                  <p className="mb-2 text-xs text-muted-foreground">
+                                  <p className="mb-1 text-xs text-muted-foreground">
                                     {t("dashboard.riskIndicators")}
                                   </p>
 
                                   <div className="flex flex-col gap-1 text-sm">
-                                    {topIndicators.map((indicator) => (
-                                      <div
-                                        key={indicator.key}
-                                        className="flex min-w-0 items-center gap-2"
-                                      >
-                                        <span className="whitespace-nowrap font-medium text-foreground">
-                                          {indicator.label}:
-                                        </span>
-                                        <span className="whitespace-nowrap text-muted-foreground">
-                                          {formatNumber(indicator.value)}
-                                        </span>
-                                      </div>
-                                    ))}
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-foreground">
+                                        {t("dashboard.glucose")}:
+                                      </span>
+                                      <span className="text-muted-foreground">
+                                        {formatNumber(pred.glucose)}
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-foreground">
+                                        {t("dashboard.extra.inputs.weight")}:
+                                      </span>
+                                      <span className="text-muted-foreground">
+                                        {formatNumber(weight)}
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-foreground">
+                                        {t("dashboard.extra.inputs.height")}:
+                                      </span>
+                                      <span className="text-muted-foreground">
+                                        {formatNumber(height)}
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
 
@@ -1368,32 +2516,10 @@ const Dashboard = () => {
                                 </div>
 
                                 <div className="mt-3">
-                                  <Link
-                                    to="/report"
-                                    state={{
-                                      formData: {
-                                        pregnancies: pred.pregnancies,
-                                        glucose: pred.glucose,
-                                        bloodPressure: pred.blood_pressure,
-                                        skinThickness: pred.skin_thickness,
-                                        insulin: pred.insulin,
-                                        bmi: pred.bmi,
-                                        diabetesPedigreeFunction:
-                                          pred.diabetes_pedigree_function,
-                                        age: pred.age,
-                                      },
-                                      probability: pred.probability,
-                                      riskLevel: getLocalizedRiskLabel(
-                                        pred.risk_level
-                                      ),
-                                      message: pred.message,
-                                      predictionId: pred.id,
-                                    }}
-                                  >
+                                  <Link to="/report" state={buildReportState(pred)}>
                                     <Button
                                       type="button"
-                                      variant="ghost"
-                                      className="h-10 w-full hover:bg-primary/10 hover:text-primary"
+                                      className="h-10 w-full rounded-full bg-primary font-semibold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md"
                                     >
                                       {t("dashboard.viewReport")}
                                     </Button>

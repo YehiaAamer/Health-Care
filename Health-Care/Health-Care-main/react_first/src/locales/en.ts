@@ -254,7 +254,8 @@ dashboard: {
   previousReports: "Previous Reports",
   bookConsultation: "Book Consultation",
   settings: "Settings",
-riskIndicators: "Risk Indicators",
+
+  riskIndicators: "Risk Indicators",
   riskLow: "Low",
   riskMedium: "Medium",
   riskHigh: "High",
@@ -273,8 +274,8 @@ riskIndicators: "Risk Indicators",
   savedReports: "Saved Reports",
   lastCheckup: "Last Checkup",
 
-  analysisOverview: "Overview of your diabetes analyses",
-allReports: "All Reports",
+  analysisOverview: "Overview of your diabetes and Cardiovascular analyses",
+  allReports: "All Reports",
   weekly: "Weekly",
   monthly: "Monthly",
   latestAnalysisScore: "Latest Analysis Score",
@@ -338,9 +339,83 @@ allReports: "All Reports",
   chartShortInsulin: "Insulin",
   chartShortBmi: "BMI",
   chartShortDiabetesPedigree: "DPF",
-  chartShortAge: "Age"
-},
+  chartShortAge: "Age",
 
+  extra: {
+      averageRisk: "Average Risk",
+  latestStatus: "Latest Status",
+    diabetes: "Diabetes",
+    cardiovascular: "Cardiovascular",
+    cardioShort: "Cardio",
+weeklyAverage: "Weekly average",
+monthlyAverage: "Average of displayed analyses",
+highestWeeklyRisk: "Highest weekly risk",
+reportsThisWeek: "Reports this week",
+reportsDisplayedMonths: "Displayed analyses",
+highestDisplayedRisk: "Highest displayed risk",
+    diabetesRisk: "Diabetes Risk",
+    cardioRisk: "Cardiovascular Risk",
+    cardioRiskShort: "Cardio Risk",
+
+    latestDiabetesScore: "Latest Diabetes Score",
+    latestCardioScore: "Latest Cardiovascular Score",
+
+    weeklyRiskTrend: "Weekly Risk Trend",
+    monthlyRiskTrend: "Monthly Risk Trend",
+    weeklyRiskTrendDesc:
+      "Shows the last 7 days with each day's average score under it",
+    monthlyRiskTrendDesc: "Shows the current month and upcoming months",
+
+    reportsDisplayedMonths: "Reports In Displayed Months",
+    highestDisplayedRisk: "Highest Displayed Risk",
+
+    analysisInputs: "Analysis Inputs",
+    analysisInputsDesc: "Values used for diabetes and cardiovascular analysis",
+
+    riskDistribution: "Risk Distribution",
+    riskDistributionDesc: "Includes diabetes and cardiovascular",
+
+    analysisAverage: "Average",
+    reports: "Reports",
+
+    riskLevels: {
+      low: "Low",
+      medium: "Medium",
+      high: "High",
+      veryHigh: "Very High",
+    },
+
+    inputs: {
+      pregnancies: "Preg.",
+      glucose: "Glucose",
+      systolic: "Sys. BP",
+      diastolic: "Dia. BP",
+      skinThickness: "Skin",
+      insulin: "Insulin",
+      pedigree: "Pedigree",
+      age: "Age",
+      weight: "Weight",
+      height: "Height",
+      cholesterol: "Chol.",
+    },
+
+    aria: {
+      toggleLanguage: "Toggle language",
+      notifications: "Notifications",
+    },
+  },
+
+  cardioMessages: {
+    very_high:
+      "The estimated calculation indicates a very high cardiovascular risk based on the available clinical indicators.",
+    high:
+      "The estimated calculation indicates a high cardiovascular risk based on the available clinical indicators.",
+    medium:
+      "The estimated calculation indicates a moderate cardiovascular risk based on the available clinical indicators.",
+    low:
+      "The estimated calculation indicates a low cardiovascular risk based on the available clinical indicators.",
+  },
+},
 report: {
   title: "Preliminary Analysis Report",
 
