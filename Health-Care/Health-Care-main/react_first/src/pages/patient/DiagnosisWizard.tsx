@@ -119,122 +119,7 @@ type CardiovascularPrediction = {
 
 const DESKTOP_HEADER_HEIGHT = 72;
 
-const CARDIO_COEFFICIENTS = {
-  intercept: -11.2,
-  age: 0.055,
-  gender: 0.42,
-  height: -0.012,
-  weight: 0.035,
-  ap_hi: 0.052,
-  ap_lo: 0.028,
-  cholesterol: 0.48,
-  gluc: 0.32,
-};
-
-const sigmoid = (z: number) => {
-  return 1 / (1 + Math.exp(-z));
-};
-
-const getCardioRiskLevel = (percentage: number): CardiovascularRiskLevel => {
-  if (percentage >= 80) return "very_high";
-  if (percentage >= 60) return "high";
-  if (percentage >= 30) return "medium";
-  return "low";
-};
-
-const getCardioRiskMessage = (
-  riskLevel: CardiovascularRiskLevel,
-  isArabic: boolean
-) => {
-  if (isArabic) {
-    switch (riskLevel) {
-      case "very_high":
-        return "يشير النموذج إلى وجود خطورة عالية جدًا للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة.";
-      case "high":
-        return "يشير النموذج إلى وجود خطورة عالية للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة.";
-      case "medium":
-        return "يشير النموذج إلى وجود خطورة متوسطة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة.";
-      case "low":
-        return "يشير النموذج إلى وجود خطورة منخفضة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة.";
-      default:
-        return "تم إنشاء توقع خطورة القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة.";
-    }
-  }
-
-  switch (riskLevel) {
-    case "very_high":
-      return "The model indicates a very high cardiovascular risk based on the provided clinical indicators.";
-    case "high":
-      return "The model indicates a high cardiovascular risk based on the provided clinical indicators.";
-    case "medium":
-      return "The model indicates a moderate cardiovascular risk based on the provided clinical indicators.";
-    case "low":
-      return "The model indicates a low cardiovascular risk based on the provided clinical indicators.";
-    default:
-      return "The model generated a cardiovascular risk prediction based on the provided clinical indicators.";
-  }
-};
-
-const normalizeCholesterolForCardio = (cholesterol: number) => {
-  if (cholesterol >= 240) return 3;
-  if (cholesterol >= 200) return 2;
-  return 1;
-};
-
-const normalizeGlucoseForCardio = (glucose: number) => {
-  if (glucose >= 126) return 3;
-  if (glucose >= 100) return 2;
-  return 1;
-};
-
-const calculateCardiovascularPrediction = ({
-  age,
-  gender,
-  height,
-  weight,
-  systolicBloodPressure,
-  diastolicBloodPressure,
-  cholesterol,
-  glucose,
-  isArabic,
-}: {
-  age: number;
-  gender: "male" | "female";
-  height: number;
-  weight: number;
-  systolicBloodPressure: number;
-  diastolicBloodPressure: number;
-  cholesterol: number;
-  glucose: number;
-  isArabic: boolean;
-}): CardiovascularPrediction => {
-  const genderValue = gender === "male" ? 1 : 0;
-  const cholesterolValue = normalizeCholesterolForCardio(cholesterol);
-  const glucoseValue = normalizeGlucoseForCardio(glucose);
-
-  const z =
-    CARDIO_COEFFICIENTS.intercept +
-    CARDIO_COEFFICIENTS.age * age +
-    CARDIO_COEFFICIENTS.gender * genderValue +
-    CARDIO_COEFFICIENTS.height * height +
-    CARDIO_COEFFICIENTS.weight * weight +
-    CARDIO_COEFFICIENTS.ap_hi * systolicBloodPressure +
-    CARDIO_COEFFICIENTS.ap_lo * diastolicBloodPressure +
-    CARDIO_COEFFICIENTS.cholesterol * cholesterolValue +
-    CARDIO_COEFFICIENTS.gluc * glucoseValue;
-
-  const probability = sigmoid(z);
-  const percentage = Number((probability * 100).toFixed(2));
-  const riskLevel = getCardioRiskLevel(percentage);
-
-  return {
-    probability: Number(probability.toFixed(4)),
-    percentage,
-    risk_level: riskLevel,
-    message: getCardioRiskMessage(riskLevel, isArabic),
-    z_score: Number(z.toFixed(4)),
-  };
-};
+// Backend handles cardiovascular prediction logic
 
 export default function DiagnosisWizard() {
   const navigate = useNavigate();
@@ -323,42 +208,36 @@ export default function DiagnosisWizard() {
     setIsLoading(true);
 
     try {
-      const heightInMeters = values.height / 100;
-
-      const calculatedBmi = Number(
-        (values.weight / (heightInMeters * heightInMeters)).toFixed(1)
-      );
-
-      const cardiovascularPrediction = calculateCardiovascularPrediction({
-        age: values.age,
-        gender: values.gender,
-        height: values.height,
-        weight: values.weight,
-        systolicBloodPressure: values.systolicBloodPressure,
-        diastolicBloodPressure: values.diastolicBloodPressure,
-        cholesterol: values.cholesterol,
-        glucose: values.glucose,
-        isArabic,
-      });
-
       const backendData = {
         gender: values.gender,
+        age: values.age,
         pregnancies: values.gender === "female" ? values.pregnancies : 0,
         glucose: values.glucose,
-        blood_pressure: values.diastolicBloodPressure,
-        skin_thickness: values.skinThickness,
+        systolicBloodPressure: values.systolicBloodPressure,
+        diastolicBloodPressure: values.diastolicBloodPressure,
+        skinThickness: values.skinThickness,
         insulin: values.insulin,
-        bmi: calculatedBmi,
-        diabetes_pedigree_function: values.diabetesPedigreeFunction,
-        age: values.age,
+        weight: values.weight,
+        height: values.height,
+        cholesterol: values.cholesterol,
+        diabetesPedigreeFunction: values.diabetesPedigreeFunction,
       };
 
       const result = await apiCall<{
-        probability: number;
-        risk_level: string;
-        message: string;
-        prediction_id?: number;
-      }>(API_ENDPOINTS.PREDICT, {
+        session_id: string;
+        diabetes: {
+          prediction_id: number;
+          probability: number;
+          risk_level: string;
+          message: string;
+        };
+        cardiovascular: {
+          prediction_id: number;
+          probability: number;
+          risk_level: string;
+          message: string;
+        };
+      }>(API_ENDPOINTS.PREDICT_V2, {
         method: "POST",
         body: JSON.stringify(backendData),
       });
@@ -381,22 +260,16 @@ export default function DiagnosisWizard() {
             cholesterol: values.cholesterol,
             diabetesPedigreeFunction: values.diabetesPedigreeFunction,
             age: values.age,
-            bmi: calculatedBmi,
           },
 
-          probability: result.probability,
-          riskLevel: result.risk_level,
-          message: result.message,
-          predictionId: result.prediction_id,
+          probability: result.diabetes.probability,
+          riskLevel: result.diabetes.risk_level,
+          message: result.diabetes.message,
+          predictionId: result.diabetes.prediction_id,
+          sessionId: result.session_id,
 
-          diabetesPrediction: {
-            probability: result.probability,
-            risk_level: result.risk_level,
-            message: result.message,
-            prediction_id: result.prediction_id,
-          },
-
-          cardiovascularPrediction,
+          diabetesPrediction: result.diabetes,
+          cardiovascularPrediction: result.cardiovascular,
         },
       });
     } catch (error) {

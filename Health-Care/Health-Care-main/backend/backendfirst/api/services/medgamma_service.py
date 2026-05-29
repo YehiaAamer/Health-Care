@@ -146,36 +146,167 @@ def get_medical_interpretation(features: Dict, probability: float, risk_level: s
 # Chatbot Function
 # ═══════════════════════════════════════════════════════════════
 
-def chatbot_chat(features: Dict, probability: float, risk_level: str,
-                question: str, conversation_history: Optional[List[Dict]] = None) -> str:
+MEDICAL_KEYWORDS = [
+    "سكر",
+    "سكري",
+    "قلب",
+    "ضغط",
+    "كوليسترول",
+    "تحاليل",
+    "تحليل",
+    "تقرير",
+    "مرض",
+    "اعراض",
+    "تشخيص",
+    "صحة",
+    "سخونة",
+    "الم",
+    "علاج",
+    "دواء",
+    "توصية",
+    "نصيحة",
+    "خطر",
+    "نسبة",
+    "امراض",
+    "نظام",
+    "طبيب",
+    "مستشفى",
+    "عوامل",
+    "مؤشر",
+    "وزن",
+    "طول",
+    "جلوكوز",
+    "بدانة",
+    "سمنة",
+    "رياضة",
+    "تمرين",
+    "دقات",
+    "نبض",
+    "عيادة",
+    "prediction",
+    "risk",
+    "diabetes",
+    "cardio",
+    "cardiovascular",
+    "glucose",
+    "cholesterol",
+    "blood pressure",
+    "health",
+    "symptom",
+    "treat",
+    "medicine",
+    "doctor",
+    "report",
+    "analyse",
+    "analysis",
+]
+
+def is_medical_query(message: str) -> bool:
+    message = message.lower()
+    return any(keyword in message for keyword in MEDICAL_KEYWORDS)
+
+
+def chatbot_chat(diabetes_prediction, cardio_prediction,
+                 question: str, conversation_history: Optional[List[Dict]] = None) -> str:
     """
     محادثة مع Chatbot الطبي - نسخة سريعة
-    
-    Args:
-        features: dict يحتوي على المقاييس الطبية
-        probability: نسبة الاحتمال من XGBoost
-        risk_level: مستوى المخاطر من XGBoost
-        question: سؤال المستخدم
-        conversation_history: تاريخ المحادثة (اختياري)
-        
-    Returns:
-        str: رد الموديل
     """
-    user_prompt = CHATBOT_USER_PROMPT.format(
-        glucose=features.get('glucose', 85),
-        blood_pressure=features.get('blood_pressure', 70),
-        bmi=features.get('bmi', 25),
-        age=features.get('age', 35),
-        probability=probability,
-        risk_level=risk_level,
-        question=question
-    )
+    if is_medical_query(question):
+        diab_prob = f"{diabetes_prediction.probability}%" if diabetes_prediction else "غير متوفر"
+        diab_risk = diabetes_prediction.risk_level if diabetes_prediction else "غير متوفر"
+        
+        cardio_prob = f"{cardio_prediction.probability}%" if cardio_prediction else "غير متوفر"
+        cardio_risk = cardio_prediction.risk_level if cardio_prediction else "غير متوفر"
+        
+        # Base patient metrics
+        age = "غير متوفر"
+        glucose = "غير متوفر"
+        bmi = "غير متوفر"
+        
+        if diabetes_prediction:
+            age = diabetes_prediction.age
+            glucose = diabetes_prediction.glucose
+            bmi = diabetes_prediction.bmi
+        elif cardio_prediction:
+            age = cardio_prediction.age
+            glucose = cardio_prediction.glucose
+            bmi = cardio_prediction.bmi
+            
+        # Extra cardiovascular metrics
+        extra = cardio_prediction.extra_fields if (cardio_prediction and cardio_prediction.extra_fields) else {}
+        cholesterol = extra.get('cholesterol', 'غير متوفر')
+        systolic_bp = extra.get('systolic_bp', 'غير متوفر')
+        diastolic_bp = extra.get('diastolic_bp', 'غير متوفر')
+        
+        def format_bool(val):
+            if val is None:
+                return "غير متوفر"
+            return "نعم" if val else "لا"
+            
+        smoke = format_bool(extra.get('smoke'))
+        alcohol = format_bool(extra.get('alcohol'))
+        phys_act = format_bool(extra.get('physical_activity'))
+
+        user_prompt = f"""You are an advanced AI healthcare assistant.
+
+Analyze BOTH diabetes and cardiovascular disease risks together.
+
+Patient's Specific Question:
+{question}
+
+Patient Diabetes Prediction:
+- Probability: {diab_prob}
+- Risk Level: {diab_risk}
+
+Patient Cardiovascular Prediction:
+- Probability: {cardio_prob}
+- Risk Level: {cardio_risk}
+
+Shared Patient Health Data:
+- Age: {age}
+- Glucose: {glucose}
+- BMI: {bmi}
+
+Additional Cardiovascular Data:
+- Cholesterol: {cholesterol}
+- Systolic BP: {systolic_bp}
+- Diastolic BP: {diastolic_bp}
+- Smoking: {smoke}
+- Alcohol: {alcohol}
+- Physical Activity: {phys_act}
+
+Requirements:
+1. Address the patient's specific question directly.
+2. Explain the relationship between diabetes and cardiovascular disease.
+3. Analyze the combined risk profile.
+4. Explain the most dangerous indicators.
+5. Provide lifestyle recommendations.
+6. Suggest preventive actions.
+7. Mention warning signs that require medical attention.
+8. Respond in Arabic.
+9. Keep the tone professional but easy to understand.
+
+Return a clean structured response."""
+        system_prompt = CHATBOT_SYSTEM_PROMPT
+    else:
+        user_prompt = f"""You are a friendly and helpful medical chatbot assistant.
+The patient is sending a casual or conversational message: "{question}"
+
+Rules:
+1. Respond in a friendly, conversational, and helpful manner in Arabic.
+2. Keep the response very short and natural (under 20-30 words).
+3. Do NOT include any specific diabetes analysis, cardiovascular analysis, recommendations, or medical warnings.
+4. Offer to help them with their health predictions, analyze their results, or answer medical questions if they have any.
+"""
+        system_prompt = """أنت مساعد طبي ذكي وودود ولطيف.
+أجب بشكل طبيعي وقصير وودود باللغة العربية.
+لا تقدم أي تحليلات طبية أو تحذيرات أو توصيات هنا إلا إذا سُئلت عن ذلك."""
     
     # تجاهل conversation history للسرعة (للمرة الأولى)
     result = _call_ollama_text(
         OLLAMA_MODEL,
         user_prompt,
-        CHATBOT_SYSTEM_PROMPT,
+        system_prompt,
         timeout=30  # 30 ثانية فقط - أسرع
     )
     

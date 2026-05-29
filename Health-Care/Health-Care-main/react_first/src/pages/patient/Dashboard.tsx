@@ -65,6 +65,8 @@ interface Prediction {
   risk_level: string;
   message: string;
   created_at: string;
+  disease_type?: string;
+  session_id?: string;
 
   gender?: "male" | "female" | string;
   systolic_blood_pressure?: number;
@@ -295,8 +297,34 @@ const calculateCardiovascularPredictionFromValues = ({
 
 const getCardioPrediction = (
   prediction: Prediction,
-  t: TranslateFn
+  t: TranslateFn,
+  allPredictions?: Prediction[]
 ): CardiovascularPrediction => {
+  // Try to find sibling cardiovascular record via session_id
+  if (prediction.session_id && allPredictions) {
+    const siblingCardio = allPredictions.find(
+      (p) => p.session_id === prediction.session_id && p.disease_type === "cardiovascular"
+    );
+    if (siblingCardio) {
+      const backendPercentage = normalizePercentageValue(siblingCardio.probability);
+      const backendRiskLevel = normalizeCardioRiskLevel(siblingCardio.risk_level);
+      if (backendPercentage !== null) {
+        const finalRiskLevel =
+          backendRiskLevel ?? getRiskLevelFromPercentage(backendPercentage);
+        return {
+          probability: Number((backendPercentage / 100).toFixed(4)),
+          percentage: backendPercentage,
+          risk_level: finalRiskLevel,
+          message:
+            siblingCardio.message ||
+            getCardioRiskMessage(finalRiskLevel, t),
+          z_score: 0,
+          isFallback: false,
+        };
+      }
+    }
+  }
+
   const backendPercentage =
     normalizePercentageValue(prediction.cardiovascular_percentage) ??
     normalizePercentageValue(prediction.cardiovascular_probability);
@@ -394,13 +422,15 @@ const Dashboard = () => {
           method: "GET",
         });
 
-        setPredictions(
-          (data.predictions || []).sort(
+        const filtered = (data.predictions || [])
+          .filter((p) => !p.disease_type || p.disease_type === "diabetes")
+          .sort(
             (a, b) =>
               new Date(b.created_at).getTime() -
               new Date(a.created_at).getTime()
-          )
-        );
+          );
+
+        setPredictions(filtered);
       } catch (err) {
         console.error("Error fetching predictions:", err);
         setError(t("dashboard.fetchError"));

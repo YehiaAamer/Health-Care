@@ -70,6 +70,9 @@ interface Prediction {
   cardiovascular_risk_level?: string;
   cardiovascular_message?: string;
   cardiovascular_z_score?: number;
+
+  disease_type?: "diabetes" | "cardiovascular";
+  session_id?: string;
 }
 
 const DESKTOP_HEADER_HEIGHT = 72;
@@ -264,8 +267,32 @@ const calculateCardiovascularPredictionFromValues = ({
 
 const getCardioPrediction = (
   prediction: Prediction,
-  isArabic: boolean
+  isArabic: boolean,
+  allPredictions?: Prediction[]
 ): CardiovascularPrediction => {
+  // If we have a session_id, find the cardiovascular prediction record with this session_id
+  if (prediction.session_id && allPredictions) {
+    const siblingCardio = allPredictions.find(
+      (p) => p.session_id === prediction.session_id && p.disease_type === "cardiovascular"
+    );
+    if (siblingCardio) {
+      const backendPercentage = normalizePercentageValue(siblingCardio.probability);
+      const backendRiskLevel = normalizeCardioRiskLevel(siblingCardio.risk_level);
+      if (backendPercentage !== null && backendRiskLevel) {
+        return {
+          probability: Number((backendPercentage / 100).toFixed(4)),
+          percentage: backendPercentage,
+          risk_level: backendRiskLevel,
+          message:
+            siblingCardio.message ||
+            getCardioRiskMessage(backendRiskLevel, isArabic),
+          z_score: 0,
+          isFallback: false,
+        };
+      }
+    }
+  }
+
   const backendPercentage =
     normalizePercentageValue(prediction.cardiovascular_percentage) ??
     normalizePercentageValue(prediction.cardiovascular_probability);
@@ -320,6 +347,7 @@ const getCardioPrediction = (
     isFallback: true,
   });
 };
+
 
 export default function PastReports() {
   const { user, isAuthenticated } = useAuth();
@@ -534,17 +562,19 @@ export default function PastReports() {
   };
 
   const sortedPredictions = useMemo(() => {
-    return [...predictions].sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+    return [...predictions]
+      .filter((p) => !p.disease_type || p.disease_type === "diabetes")
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
   }, [predictions]);
 
   const filteredPredictions = useMemo(() => {
     const query = normalizeText(searchTerm);
 
     return sortedPredictions.filter((pred) => {
-      const cardio = getCardioPrediction(pred, isArabic);
+      const cardio = getCardioPrediction(pred, isArabic, predictions);
 
       const diabetesRiskLevel = normalizeAnyRiskLevel(pred.risk_level);
       const cardioRiskLevel = normalizeAnyRiskLevel(cardio.risk_level);
@@ -625,6 +655,7 @@ export default function PastReports() {
     });
   }, [
     sortedPredictions,
+    predictions,
     searchTerm,
     diabetesRiskFilter,
     cardioRiskFilter,
@@ -647,10 +678,11 @@ export default function PastReports() {
 
     return (
       sortedPredictions.reduce((sum, prediction) => {
-        return sum + getCardioPrediction(prediction, isArabic).percentage;
+        return sum + getCardioPrediction(prediction, isArabic, predictions).percentage;
       }, 0) / sortedPredictions.length
     );
-  }, [sortedPredictions, isArabic]);
+  }, [sortedPredictions, predictions, isArabic]);
+
 
   const latestDate = sortedPredictions[0]
     ? new Date(sortedPredictions[0].created_at).toLocaleDateString(
@@ -1122,11 +1154,12 @@ export default function PastReports() {
                           {paginatedPredictions.map((pred) => {
                             const tone = getProbabilityTone();
                             const topIndicators = getTopRiskIndicators(pred);
-                            const cardio = getCardioPrediction(pred, isArabic);
+                            const cardio = getCardioPrediction(pred, isArabic, predictions);
                             const reportValues =
                               getReportValuesForNavigation(pred);
                             const diabetesPercentage =
                               getDiabetesPercentage(pred);
+
 
                             return (
                               <div
@@ -1283,11 +1316,12 @@ export default function PastReports() {
                       <div className="grid gap-4 xl:hidden">
                         {paginatedPredictions.map((pred) => {
                           const topIndicators = getTopRiskIndicators(pred);
-                          const cardio = getCardioPrediction(pred, isArabic);
+                          const cardio = getCardioPrediction(pred, isArabic, predictions);
                           const reportValues =
                             getReportValuesForNavigation(pred);
                           const diabetesPercentage =
                             getDiabetesPercentage(pred);
+
 
                           return (
                             <article

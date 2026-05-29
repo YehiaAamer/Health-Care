@@ -7,7 +7,7 @@ import { Send, Loader2, X, Minus } from "lucide-react";
 import Lottie from "lottie-react";
 import chatbot from "@/assets/chatbot.json";
 import { useAuth } from "@/hooks/useAuth";
-import { apiCall } from "@/lib/api";
+import { apiCall, API_ENDPOINTS } from "@/lib/api";
 import { toast } from "sonner";
 
 interface ChatMessage {
@@ -301,7 +301,7 @@ const ChatBot = () => {
       if (user) {
         try {
           const data = await apiCall<{ predictions: any[] }>(
-            `${import.meta.env.VITE_API_URL}/api/predictions/`,
+            API_ENDPOINTS.GET_PREDICTIONS,
             { method: "GET" }
           );
 
@@ -332,15 +332,13 @@ const ChatBot = () => {
     setIsLoading(true);
 
     try {
-      const predId = predictionId || 1;
-
       const response = await apiCall<{
         bot_response: string;
         conversation_id: number;
-      }>(`${import.meta.env.VITE_API_URL}/api/chatbot/`, {
+      }>("/api/chatbot/", { // Assuming API_ENDPOINTS.CHATBOT is defined as "/api/chatbot/"
         method: "POST",
         body: JSON.stringify({
-          prediction_id: predId,
+          ...(predictionId ? { prediction_id: predictionId } : {}),
           message: userMsg,
           conversation_id: conversationId || undefined,
         }),
@@ -515,9 +513,8 @@ const ChatBot = () => {
       {isChatOpen && chatPosition && (
         <div
           dir={i18n.language === "ar" ? "rtl" : "ltr"}
-          className={`fixed z-[999] w-[calc(100vw-1.5rem)] sm:w-[430px] md:w-[470px] bg-background/95 backdrop-blur-xl border border-border/60 rounded-[30px] shadow-[0_20px_60px_rgba(0,0,0,0.18)] overflow-hidden transition-[height] duration-300 flex flex-col ${
-            isMinimized ? "h-[84px]" : "h-[640px]"
-          }`}
+          className={`fixed z-[999] w-[calc(100vw-1.5rem)] sm:w-[430px] md:w-[470px] bg-background/95 backdrop-blur-xl border border-border/60 rounded-[30px] shadow-[0_20px_60px_rgba(0,0,0,0.18)] overflow-hidden transition-[height] duration-300 flex flex-col ${isMinimized ? "h-[84px]" : "h-[640px]"
+            }`}
           style={{
             left: chatPosition.x,
             top: chatPosition.y,
@@ -581,16 +578,14 @@ const ChatBot = () => {
                   {messages.map((msg, index) => (
                     <div
                       key={index}
-                      className={`flex ${
-                        msg.role === "user" ? "justify-end" : "justify-start"
-                      }`}
+                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
+                        }`}
                     >
                       <div
-                        className={`max-w-[84%] px-4 py-3 shadow-sm ${
-                          msg.role === "user"
-                            ? "bg-primary text-primary-foreground rounded-[26px] rounded-br-md"
-                            : "bg-accent text-accent-foreground rounded-[26px] rounded-bl-md"
-                        }`}
+                        className={`max-w-[84%] px-4 py-3 shadow-sm ${msg.role === "user"
+                          ? "bg-primary text-primary-foreground rounded-[26px] rounded-br-md"
+                          : "bg-accent text-accent-foreground rounded-[26px] rounded-bl-md"
+                          }`}
                       >
                         <p className="text-sm leading-6 whitespace-pre-wrap">
                           {msg.content}

@@ -8,6 +8,7 @@ from .views.patient_views import (
     feature_importance,
     chatbot_predict,
     get_conversation_history,
+    predict_v2,
 )
 from .views.auth_views import register, login, logout, get_current_user, update_profile, delete_profile_picture, password_reset_request, password_reset_confirm
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -30,6 +31,7 @@ urlpatterns = [
     # Prediction Endpoints (XGBoost Only)
     # ────────────────────────────────────────────────
     path('predict/', predict_diabetes, name='predict_diabetes'),
+    path('predict/v2/', predict_v2, name='predict_v2'),
     path('predictions/', get_past_predictions, name='get_past_predictions'),
     path('history/', get_all_predictions, name='get_all_predictions'),
     path('feature-importance/', feature_importance, name='feature_importance'),

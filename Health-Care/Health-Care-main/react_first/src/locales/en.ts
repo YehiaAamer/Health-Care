@@ -359,15 +359,11 @@ highestDisplayedRisk: "Highest displayed risk",
 
     latestDiabetesScore: "Latest Diabetes Score",
     latestCardioScore: "Latest Cardiovascular Score",
-
     weeklyRiskTrend: "Weekly Risk Trend",
     monthlyRiskTrend: "Monthly Risk Trend",
     weeklyRiskTrendDesc:
       "Shows the last 7 days with each day's average score under it",
     monthlyRiskTrendDesc: "Shows the current month and upcoming months",
-
-    reportsDisplayedMonths: "Reports In Displayed Months",
-    highestDisplayedRisk: "Highest Displayed Risk",
 
     analysisInputs: "Analysis Inputs",
     analysisInputsDesc: "Values used for diabetes and cardiovascular analysis",
