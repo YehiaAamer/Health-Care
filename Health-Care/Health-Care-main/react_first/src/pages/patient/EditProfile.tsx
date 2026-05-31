@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { apiCall } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -147,16 +148,6 @@ export default function EditProfile() {
     setError(null);
 
     try {
-      const storedTokens = localStorage.getItem("auth_tokens");
-      let accessToken = "";
-
-      if (storedTokens) {
-        const tokens = JSON.parse(storedTokens);
-        accessToken = tokens.access;
-      }
-
-      let response: Response;
-
       if (profilePicture) {
         const formDataPayload = new FormData();
 
@@ -170,20 +161,16 @@ export default function EditProfile() {
 
         formDataPayload.append("profile_picture", profilePicture);
 
-        response = await fetch(`${import.meta.env.VITE_API_URL}/api/profile/`, {
+        const result = await apiCall<{ user: any; message: string }>("/api/profile/", {
           method: "PUT",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
           body: formDataPayload,
         });
+
+        if (result.user) updateUser(result.user);
+        toast.success(result.message || t("editProfile.toasts.updateSuccess"));
       } else {
-        response = await fetch(`${import.meta.env.VITE_API_URL}/api/profile/`, {
+        const result = await apiCall<{ user: any; message: string }>("/api/profile/", {
           method: "PUT",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             first_name: formData.first_name,
             last_name: formData.last_name,
@@ -191,24 +178,11 @@ export default function EditProfile() {
             phone: formData.phone || "",
           }),
         });
+
+        if (result.user) updateUser(result.user);
+        toast.success(result.message || t("editProfile.toasts.updateSuccess"));
       }
 
-      const responseText = await response.text();
-
-      if (!response.ok) {
-        const errorData = JSON.parse(responseText);
-        throw new Error(
-          errorData.error || t("editProfile.toasts.updateFailed")
-        );
-      }
-
-      const result = JSON.parse(responseText);
-
-      if (result.user) {
-        updateUser(result.user);
-      }
-
-      toast.success(result.message || t("editProfile.toasts.updateSuccess"));
       navigate("/dashboard");
     } catch (err) {
       console.error("❌ Error:", err);

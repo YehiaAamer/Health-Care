@@ -21,8 +21,11 @@ import Header from "@/components/shared/Header";
 import Footer from "@/components/shared/Footer";
 import { useTranslation } from "react-i18next";
 
+type RiskLevel = "low" | "medium" | "high" | "very_high";
+
 type RiskTone = {
   level: string;
+  normalizedLevel: RiskLevel;
   message: string;
   color: string;
   textClass: string;
@@ -50,6 +53,23 @@ type PredictionCardProps = {
 
 const DESKTOP_HEADER_HEIGHT = 72;
 
+const normalizePercentageValue = (value?: number) => {
+  if (typeof value !== "number" || Number.isNaN(value)) return 0;
+
+  if (value <= 1) {
+    return Number((value * 100).toFixed(2));
+  }
+
+  return Number(value.toFixed(2));
+};
+
+const getRiskLevelFromPercentage = (percentage: number): RiskLevel => {
+  if (percentage >= 80) return "very_high";
+  if (percentage >= 60) return "high";
+  if (percentage >= 30) return "medium";
+  return "low";
+};
+
 export default function Report() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -66,15 +86,16 @@ export default function Report() {
 
   const cardiovascularPrediction = result.cardiovascularPrediction || null;
 
-  const probability = Number(
-    diabetesPrediction?.probability ?? result.probability ?? 0
+  const probability = normalizePercentageValue(
+    Number(diabetesPrediction?.probability ?? result.probability ?? 0)
   );
 
-  const cardiovascularProbability = Number(
-    cardiovascularPrediction?.percentage ??
-      (cardiovascularPrediction?.probability
-        ? cardiovascularPrediction.probability * 100
-        : 0)
+  const cardiovascularProbability = normalizePercentageValue(
+    Number(
+      cardiovascularPrediction?.percentage ??
+        cardiovascularPrediction?.probability ??
+        0
+    )
   );
 
   const formData = result.formData || {};
@@ -92,113 +113,39 @@ export default function Report() {
     }
   }, [diabetesPrediction?.probability, navigate]);
 
-  const riskTone = useMemo((): RiskTone => {
-    if (probability > 50) {
-      return {
-        level: isArabic ? "عالي" : "High",
-        message:
-          probability > 70
-            ? t("report.resultMessages.high", {
-                probability: probability.toFixed(1),
-              })
-            : t("report.resultMessages.mediumHigh", {
-                probability: probability.toFixed(1),
-              }),
-        color: "#ef4444",
-        textClass: "text-red-600 dark:text-red-300",
-        badgeClass:
-          "border-red-200 bg-red-100 text-red-700 hover:border-red-200 hover:bg-red-100 hover:text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-300",
-        softBg: "bg-red-500/10",
-      };
+  const getLocalizedRiskLabelByLevel = (level: RiskLevel) => {
+    switch (level) {
+      case "very_high":
+        return isArabic ? "عالي جدًا" : "Very High";
+      case "high":
+        return isArabic ? "عالي" : "High";
+      case "medium":
+        return isArabic ? "متوسط" : "Medium";
+      case "low":
+      default:
+        return isArabic ? "منخفض" : "Low";
     }
-
-    if (probability > 20) {
-      return {
-        level: isArabic ? "متوسط" : "Medium",
-        message: t("report.resultMessages.moderate", {
-          probability: probability.toFixed(1),
-        }),
-        color: "#eab308",
-        textClass: "text-yellow-600 dark:text-yellow-300",
-        badgeClass:
-          "border-yellow-200 bg-yellow-100 text-yellow-700 hover:border-yellow-200 hover:bg-yellow-100 hover:text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-300 dark:hover:bg-yellow-500/10 dark:hover:text-yellow-300",
-        softBg: "bg-yellow-500/10",
-      };
-    }
-
-    return {
-      level: isArabic ? "منخفض" : "Low",
-      message: t("report.resultMessages.low", {
-        probability: probability.toFixed(1),
-      }),
-      color: "#22c55e",
-      textClass: "text-green-600 dark:text-green-300",
-      badgeClass:
-        "border-green-200 bg-green-100 text-green-700 hover:border-green-200 hover:bg-green-100 hover:text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300 dark:hover:bg-green-500/10 dark:hover:text-green-300",
-      softBg: "bg-green-500/10",
-    };
-  }, [probability, t, isArabic]);
-
-  const getCardioResultMessage = (cardioProbability: number) => {
-    const percentage = cardioProbability.toFixed(1);
-
-    if (cardioProbability >= 80) {
-      return isArabic
-        ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: عالي جدًا. قد تشمل عوامل الخطر ارتفاع ضغط الدم، ارتفاع الكوليسترول، زيادة الوزن، ارتفاع السكر، أو وجود مؤشرات قوية على إجهاد القلب والأوعية الدموية. يُنصح بمراجعة طبيب القلب أو الباطنة في أقرب وقت وإجراء فحوصات إضافية.`
-        : `Risk probability: ${percentage}% - Risk level: Very High. Risk factors may include high blood pressure, high cholesterol, excess weight, elevated glucose, or strong indicators of cardiovascular strain. Medical review with a cardiologist or internal medicine specialist is recommended as soon as possible, along with further tests.`;
-    }
-
-    if (cardioProbability >= 60) {
-      return isArabic
-        ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: مرتفع. قد تشمل عوامل الخطر ارتفاع ضغط الدم، زيادة الكوليسترول، زيادة الوزن، ارتفاع السكر، أو ضعف نمط الحياة الصحي. يُنصح بمراجعة طبيب وإجراء فحوصات إضافية لمتابعة عوامل الخطورة.`
-        : `Risk probability: ${percentage}% - Risk level: High. Risk factors may include high blood pressure, elevated cholesterol, excess weight, elevated glucose, or unhealthy lifestyle patterns. Medical review and additional tests are recommended to monitor risk factors.`;
-    }
-
-    if (cardioProbability >= 30) {
-      return isArabic
-        ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: متوسط. قد تشمل عوامل الخطر بداية ارتفاع ضغط الدم، زيادة بسيطة في الوزن، ارتفاع الكوليسترول، أو ارتفاع السكر بدرجة متوسطة. يُنصح بتحسين نمط الحياة ومتابعة المؤشرات الصحية بشكل دوري.`
-        : `Risk probability: ${percentage}% - Risk level: Medium. Risk factors may include early blood pressure elevation, mild excess weight, elevated cholesterol, or moderate glucose elevation. Lifestyle improvement and periodic health monitoring are recommended.`;
-    }
-
-    return isArabic
-      ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: منخفض. لا تظهر المؤشرات المدخلة خطورة مرتفعة حاليًا على القلب والأوعية الدموية، لكن يُنصح بالحفاظ على نمط حياة صحي ومتابعة ضغط الدم والكوليسترول والسكر بشكل دوري.`
-      : `Risk probability: ${percentage}% - Risk level: Low. The submitted indicators do not currently show high cardiovascular risk, but maintaining a healthy lifestyle and periodically monitoring blood pressure, cholesterol, and glucose is recommended.`;
   };
 
-  const cardioTone = useMemo((): RiskTone => {
-    const normalizedRisk = String(cardiovascularPrediction?.risk_level || "")
-      .toLowerCase()
-      .replace(/\s|-/g, "_");
+  const getRiskToneFromPercentage = (
+    riskProbability: number,
+    type: "diabetes" | "cardio"
+  ): RiskTone => {
+    const level = getRiskLevelFromPercentage(riskProbability);
+    const percentage = riskProbability.toFixed(1);
 
-    const isVeryHigh =
-      normalizedRisk === "very_high" ||
-      normalizedRisk === "veryhigh" ||
-      cardiovascularProbability >= 80;
-
-    const isHigh =
-      normalizedRisk === "high" || cardiovascularProbability >= 60;
-
-    const isMedium =
-      normalizedRisk === "medium" ||
-      normalizedRisk === "moderate" ||
-      cardiovascularProbability >= 30;
-
-    if (isVeryHigh) {
+    if (level === "very_high") {
       return {
-        level: isArabic ? "عالي جدًا" : "Very High",
-        message: getCardioResultMessage(cardiovascularProbability),
-        color: "#dc2626",
-        textClass: "text-red-700 dark:text-red-300",
-        badgeClass:
-          "border-red-200 bg-red-100 text-red-700 hover:border-red-200 hover:bg-red-100 hover:text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-300",
-        softBg: "bg-red-500/10",
-      };
-    }
-
-    if (isHigh) {
-      return {
-        level: isArabic ? "عالي" : "High",
-        message: getCardioResultMessage(cardiovascularProbability),
+        normalizedLevel: "very_high",
+        level: getLocalizedRiskLabelByLevel("very_high"),
+        message:
+          type === "diabetes"
+            ? isArabic
+              ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: عالي جدًا. النتيجة تشير إلى خطورة مرتفعة جدًا بناءً على البيانات المدخلة، ويُنصح بمراجعة طبيب مختص في أقرب وقت ومتابعة المؤشرات الصحية بدقة.`
+              : `Risk probability: ${percentage}% - Risk level: Very High. The result indicates a very high risk based on the submitted data. Medical review with a specialist is strongly recommended as soon as possible.`
+            : isArabic
+            ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: عالي جدًا. قد تشمل عوامل الخطر ارتفاع ضغط الدم، ارتفاع الكوليسترول، زيادة الوزن، ارتفاع السكر، أو وجود مؤشرات قوية على إجهاد القلب والأوعية الدموية. يُنصح بمراجعة طبيب القلب أو الباطنة في أقرب وقت وإجراء فحوصات إضافية.`
+            : `Risk probability: ${percentage}% - Risk level: Very High. Risk factors may include high blood pressure, high cholesterol, excess weight, elevated glucose, or strong indicators of cardiovascular strain. Medical review with a cardiologist or internal medicine specialist is recommended as soon as possible.`,
         color: "#ef4444",
         textClass: "text-red-600 dark:text-red-300",
         badgeClass:
@@ -207,10 +154,38 @@ export default function Report() {
       };
     }
 
-    if (isMedium) {
+    if (level === "high") {
       return {
-        level: isArabic ? "متوسط" : "Medium",
-        message: getCardioResultMessage(cardiovascularProbability),
+        normalizedLevel: "high",
+        level: getLocalizedRiskLabelByLevel("high"),
+        message:
+          type === "diabetes"
+            ? isArabic
+              ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: عالي. النتيجة تشير إلى خطورة عالية، ويُنصح بمراجعة الطبيب ووضع خطة متابعة واضحة.`
+              : `Risk probability: ${percentage}% - Risk level: High. The result indicates high risk. Medical follow-up and a clear monitoring plan are recommended.`
+            : isArabic
+            ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: مرتفع. قد تشمل عوامل الخطر ارتفاع ضغط الدم، زيادة الكوليسترول، زيادة الوزن، ارتفاع السكر، أو ضعف نمط الحياة الصحي. يُنصح بمراجعة طبيب وإجراء فحوصات إضافية لمتابعة عوامل الخطورة.`
+            : `Risk probability: ${percentage}% - Risk level: High. Risk factors may include high blood pressure, elevated cholesterol, excess weight, elevated glucose, or unhealthy lifestyle patterns. Medical review and additional tests are recommended.`,
+        color: "#f97316",
+        textClass: "text-orange-600 dark:text-orange-300",
+        badgeClass:
+          "border-orange-200 bg-orange-100 text-orange-700 hover:border-orange-200 hover:bg-orange-100 hover:text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300 dark:hover:bg-orange-500/10 dark:hover:text-orange-300",
+        softBg: "bg-orange-500/10",
+      };
+    }
+
+    if (level === "medium") {
+      return {
+        normalizedLevel: "medium",
+        level: getLocalizedRiskLabelByLevel("medium"),
+        message:
+          type === "diabetes"
+            ? isArabic
+              ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: متوسط. النتيجة تحتاج إلى متابعة وتحسين نمط الحياة ومراقبة المؤشرات الصحية بشكل دوري.`
+              : `Risk probability: ${percentage}% - Risk level: Medium. The result requires follow-up, lifestyle improvement, and periodic health monitoring.`
+            : isArabic
+            ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: متوسط. قد تشمل عوامل الخطر بداية ارتفاع ضغط الدم، زيادة بسيطة في الوزن، ارتفاع الكوليسترول، أو ارتفاع السكر بدرجة متوسطة. يُنصح بتحسين نمط الحياة ومتابعة المؤشرات الصحية بشكل دوري.`
+            : `Risk probability: ${percentage}% - Risk level: Medium. Risk factors may include early blood pressure elevation, mild excess weight, elevated cholesterol, or moderate glucose elevation. Lifestyle improvement and periodic monitoring are recommended.`,
         color: "#eab308",
         textClass: "text-yellow-600 dark:text-yellow-300",
         badgeClass:
@@ -220,18 +195,44 @@ export default function Report() {
     }
 
     return {
-      level: isArabic ? "منخفض" : "Low",
-      message: getCardioResultMessage(cardiovascularProbability),
+      normalizedLevel: "low",
+      level: getLocalizedRiskLabelByLevel("low"),
+      message:
+        type === "diabetes"
+          ? isArabic
+            ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: منخفض. النتيجة لا تشير إلى خطورة مرتفعة حاليًا، مع أهمية الحفاظ على نمط حياة صحي والمتابعة الدورية.`
+            : `Risk probability: ${percentage}% - Risk level: Low. The result does not currently indicate high risk, while maintaining a healthy lifestyle and periodic monitoring remains important.`
+          : isArabic
+          ? `احتمالية الإصابة: ${percentage}% - مستوى المخاطر: منخفض. لا تظهر المؤشرات المدخلة خطورة مرتفعة حاليًا على القلب والأوعية الدموية، لكن يُنصح بالحفاظ على نمط حياة صحي ومتابعة ضغط الدم والكوليسترول والسكر بشكل دوري.`
+          : `Risk probability: ${percentage}% - Risk level: Low. The submitted indicators do not currently show high cardiovascular risk, but maintaining a healthy lifestyle and periodically monitoring blood pressure, cholesterol, and glucose is recommended.`,
       color: "#22c55e",
       textClass: "text-green-600 dark:text-green-300",
       badgeClass:
         "border-green-200 bg-green-100 text-green-700 hover:border-green-200 hover:bg-green-100 hover:text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300 dark:hover:bg-green-500/10 dark:hover:text-green-300",
       softBg: "bg-green-500/10",
     };
-  }, [cardiovascularPrediction, cardiovascularProbability, isArabic]);
+  };
+
+  const riskTone = useMemo((): RiskTone => {
+    return getRiskToneFromPercentage(probability, "diabetes");
+  }, [probability, isArabic]);
+
+  const cardioTone = useMemo((): RiskTone => {
+    return getRiskToneFromPercentage(cardiovascularProbability, "cardio");
+  }, [cardiovascularProbability, isArabic]);
 
   const getToneVisuals = (tone: RiskTone): ToneVisuals => {
-    if (tone.color === "#eab308") {
+    if (tone.normalizedLevel === "low") {
+      return {
+        ringClass: "ring-green-100 dark:ring-green-500/20",
+        borderClass: "border-green-100 dark:border-green-500/20",
+        gradientClass:
+          "from-green-50 via-card to-card dark:from-green-500/10 dark:via-card dark:to-card",
+        chartRestColor: "hsl(var(--muted))",
+      };
+    }
+
+    if (tone.normalizedLevel === "medium") {
       return {
         ringClass: "ring-yellow-100 dark:ring-yellow-500/20",
         borderClass: "border-yellow-100 dark:border-yellow-500/20",
@@ -241,12 +242,12 @@ export default function Report() {
       };
     }
 
-    if (tone.color === "#22c55e") {
+    if (tone.normalizedLevel === "high") {
       return {
-        ringClass: "ring-green-100 dark:ring-green-500/20",
-        borderClass: "border-green-100 dark:border-green-500/20",
+        ringClass: "ring-orange-100 dark:ring-orange-500/20",
+        borderClass: "border-orange-100 dark:border-orange-500/20",
         gradientClass:
-          "from-green-50 via-card to-card dark:from-green-500/10 dark:via-card dark:to-card",
+          "from-orange-50 via-card to-card dark:from-orange-500/10 dark:via-card dark:to-card",
         chartRestColor: "hsl(var(--muted))",
       };
     }
@@ -282,7 +283,25 @@ export default function Report() {
   ];
 
   const recommendations = useMemo(() => {
-    if (probability > 70) {
+    const level = getRiskLevelFromPercentage(probability);
+
+    if (level === "very_high") {
+      return isArabic
+        ? [
+            "ينصح بمراجعة طبيب مختص في أقرب وقت لتقييم عوامل الخطورة بدقة.",
+            "متابعة السكر التراكمي وسكر الدم الصائم ضرورية لتأكيد الحالة.",
+            "تقليل السكريات والكربوهيدرات البسيطة خطوة مهمة جدًا في هذه المرحلة.",
+            "أي أعراض غير طبيعية مثل العطش الشديد أو فقدان الوزن أو الإرهاق تحتاج لتقييم طبي.",
+          ]
+        : [
+            "Medical review with a specialist is strongly recommended as soon as possible.",
+            "HbA1c and fasting glucose follow-up are important to confirm the condition.",
+            "Reducing sugars and simple carbohydrates is very important at this stage.",
+            "Symptoms such as excessive thirst, weight loss, or fatigue require medical assessment.",
+          ];
+    }
+
+    if (level === "high") {
       return [
         t("report.recommendations.high.1"),
         t("report.recommendations.high.2"),
@@ -291,16 +310,7 @@ export default function Report() {
       ];
     }
 
-    if (probability > 50) {
-      return [
-        t("report.recommendations.mediumHigh.1"),
-        t("report.recommendations.mediumHigh.2"),
-        t("report.recommendations.mediumHigh.3"),
-        t("report.recommendations.mediumHigh.4"),
-      ];
-    }
-
-    if (probability > 20) {
+    if (level === "medium") {
       return [
         t("report.recommendations.moderate.1"),
         t("report.recommendations.moderate.2"),
@@ -315,29 +325,14 @@ export default function Report() {
       t("report.recommendations.low.3"),
       t("report.recommendations.low.4"),
     ];
-  }, [probability, t]);
+  }, [probability, t, isArabic]);
 
   const cardioRecommendations = useMemo(() => {
     if (!cardiovascularPrediction) return [];
 
-    const normalizedRisk = String(cardiovascularPrediction?.risk_level || "")
-      .toLowerCase()
-      .replace(/\s|-/g, "_");
+    const level = getRiskLevelFromPercentage(cardiovascularProbability);
 
-    const isVeryHigh =
-      normalizedRisk === "very_high" ||
-      normalizedRisk === "veryhigh" ||
-      cardiovascularProbability >= 80;
-
-    const isHigh =
-      normalizedRisk === "high" || cardiovascularProbability >= 60;
-
-    const isMedium =
-      normalizedRisk === "medium" ||
-      normalizedRisk === "moderate" ||
-      cardiovascularProbability >= 30;
-
-    if (isVeryHigh) {
+    if (level === "very_high") {
       return isArabic
         ? [
             "ينصح بمراجعة طبيب القلب أو الباطنة في أقرب وقت لتقييم عوامل الخطورة.",
@@ -353,7 +348,7 @@ export default function Report() {
           ];
     }
 
-    if (isHigh) {
+    if (level === "high") {
       return isArabic
         ? [
             "النتيجة تشير إلى خطورة عالية، ويفضل مراجعة الطبيب لوضع خطة متابعة واضحة.",
@@ -369,7 +364,7 @@ export default function Report() {
           ];
     }
 
-    if (isMedium) {
+    if (level === "medium") {
       return isArabic
         ? [
             "النتيجة متوسطة، وينصح بتحسين نمط الحياة ومتابعة المؤشرات بشكل دوري.",
@@ -531,17 +526,19 @@ export default function Report() {
   };
 
   const getPdfRiskLevel = (riskProbability: number) => {
-    if (riskProbability > 70) return "High";
-    if (riskProbability > 50) return "High";
-    if (riskProbability > 20) return "Medium";
-    return "Low";
-  };
+    const level = getRiskLevelFromPercentage(riskProbability);
 
-  const getPdfCardioRiskLevel = (cardioProbability: number) => {
-    if (cardioProbability >= 80) return "Very High";
-    if (cardioProbability >= 60) return "High";
-    if (cardioProbability >= 30) return "Medium";
-    return "Low";
+    switch (level) {
+      case "very_high":
+        return "Very High";
+      case "high":
+        return "High";
+      case "medium":
+        return "Medium";
+      case "low":
+      default:
+        return "Low";
+    }
   };
 
   const filteredFormEntries = Object.entries(formData).filter(([key]) => {
@@ -590,7 +587,7 @@ export default function Report() {
       };
 
       const diabetesPdfLevel = getPdfRiskLevel(probability);
-      const cardioPdfLevel = getPdfCardioRiskLevel(cardiovascularProbability);
+      const cardioPdfLevel = getPdfRiskLevel(cardiovascularProbability);
 
       const currentDate = new Date().toLocaleDateString("en-US", {
         year: "numeric",

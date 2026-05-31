@@ -15,7 +15,7 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.conf import settings
 from django.urls import reverse
-from ..models import UserProfile
+from ..models import UserProfile, DoctorProfile
 import cloudinary.uploader
 import cloudinary
 import re
@@ -87,6 +87,13 @@ def register(request):
         last_name = request.data.get('last_name', '').strip()
         role = request.data.get('role', UserProfile.ROLE_PATIENT).strip().lower()
 
+        # Read specialties: accept a list or a single string (e.g. "diabetes")
+        raw_specialties = request.data.get('specialties', None) or request.data.get('doctorSpecialty', None)
+        if isinstance(raw_specialties, str):
+            raw_specialties = [raw_specialties] if raw_specialties else []
+        elif not isinstance(raw_specialties, list):
+            raw_specialties = []
+
         # ─────────────────────────────────────────────
         # 1. التحقق من البيانات المطلوبة
         # ─────────────────────────────────────────────
@@ -145,10 +152,16 @@ def register(request):
         
         # جلب البروفايل الذي تم إنشاؤه بواسطة الـ signal
         profile = UserProfile.objects.get(user=user)
+        doctor_profile_obj = getattr(user, 'doctorprofile', None)
+
         if role in [UserProfile.ROLE_PATIENT, UserProfile.ROLE_DOCTOR]:
             profile.role = role
             if role == UserProfile.ROLE_DOCTOR:
                 profile.doctor_status = UserProfile.DOCTOR_APPROVED
+                if doctor_profile_obj:
+                    # Save specialties; default to ["diabetes"] if none provided
+                    doctor_profile_obj.specialties = raw_specialties if raw_specialties else ["diabetes"]
+                    doctor_profile_obj.save()
             profile.save()
 
         return Response({
@@ -163,6 +176,7 @@ def register(request):
                 "phone": profile.phone if profile and profile.phone else None,
                 "role": profile.role if profile else UserProfile.ROLE_PATIENT,
                 "doctor_status": profile.doctor_status if profile else None,
+                "specialties": doctor_profile_obj.get_specialties() if doctor_profile_obj and profile and profile.role == UserProfile.ROLE_DOCTOR else [],
             },
             "tokens": tokens
         }, status=status.HTTP_201_CREATED)
@@ -220,6 +234,7 @@ def login(request):
         # إرجاع الـ tokens
         tokens = get_tokens_for_user(user)
         profile = getattr(user, 'profile', None)
+        doctor_profile_obj = getattr(user, 'doctorprofile', None)
 
         return Response({
             "message": "تم تسجيل الدخول بنجاح",
@@ -236,6 +251,7 @@ def login(request):
                 "phone": profile.phone if profile and profile.phone else None,
                 "role": profile.role if profile else UserProfile.ROLE_PATIENT,
                 "doctor_status": profile.doctor_status if profile else None,
+                "specialties": doctor_profile_obj.get_specialties() if doctor_profile_obj and profile and profile.role == UserProfile.ROLE_DOCTOR else [],
             },
             "tokens": tokens
         }, status=status.HTTP_200_OK)
@@ -256,6 +272,7 @@ def get_current_user(request):
     """الحصول على بيانات المستخدم الحالي"""
     user = request.user
     profile = getattr(user, 'profile', None)
+    doctor_profile_obj = getattr(user, 'doctorprofile', None)
     return Response({
         "id": user.id,
         "email": user.email,
@@ -269,6 +286,7 @@ def get_current_user(request):
         "phone": profile.phone if profile and profile.phone else None,
         "role": profile.role if profile else UserProfile.ROLE_PATIENT,
         "doctor_status": profile.doctor_status if profile else None,
+        "specialties": doctor_profile_obj.get_specialties() if doctor_profile_obj and profile and profile.role == UserProfile.ROLE_DOCTOR else [],
     })
 
 
@@ -387,6 +405,7 @@ def update_profile(request):
             profile.save()
 
         user.save()
+        doctor_profile_obj = getattr(user, 'doctorprofile', None)
 
         logger.info(f"[PROFILE UPDATE] Success - User updated: {user.email}")
 
@@ -403,6 +422,7 @@ def update_profile(request):
                 "phone": profile.phone if profile and profile.phone else None,
                 "role": profile.role if profile else UserProfile.ROLE_PATIENT,
                 "doctor_status": profile.doctor_status if profile else None,
+                "specialties": doctor_profile_obj.get_specialties() if doctor_profile_obj and profile and profile.role == UserProfile.ROLE_DOCTOR else [],
             }
         }, status=status.HTTP_200_OK)
 

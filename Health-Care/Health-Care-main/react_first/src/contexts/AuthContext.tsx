@@ -19,6 +19,7 @@ export interface User {
   phone?: string | null;
   role?: "patient" | "doctor" | "admin";
   doctor_status?: "pending" | "approved" | "rejected" | "suspended" | null;
+  specialties?: string[];
 }
 
 export interface TokenPair {
@@ -38,7 +39,8 @@ export interface AuthContextType {
     password: string,
     firstName: string,
     lastName: string,
-    role?: string
+    role?: string,
+    doctorSpecialty?: string
   ) => Promise<User>;
   login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
@@ -128,7 +130,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       password: string,
       firstName: string,
       lastName: string,
-      role?: string
+      role?: string,
+      doctorSpecialty?: string
     ) => {
       setIsLoading(true);
       setError(null);
@@ -148,6 +151,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             first_name: firstName,
             last_name: lastName,
             role: role || 'patient',
+            ...(role === 'doctor' && doctorSpecialty ? { doctorSpecialty } : {}),
           }),
         });
 

@@ -28,6 +28,9 @@ def doctor_dashboard_stats(request):
     Returns aggregated stats for the doctor dashboard cards.
     """
     doctor = request.user
+    profile = getattr(doctor, 'profile', None)
+    doctor_profile_obj = getattr(doctor, 'doctorprofile', None)
+    specialties = doctor_profile_obj.get_allowed_disease_types() if doctor_profile_obj else ["diabetes"]
 
     # Get assigned patients
     assignments = DoctorPatientAssignment.objects.filter(
@@ -38,8 +41,11 @@ def doctor_dashboard_stats(request):
     patient_ids = assignments.values_list("patient_user_id", flat=True)
     patient_count = len(patient_ids)
 
-    # Predictions from assigned patients
-    predictions = Prediction.objects.filter(patient_user_id__in=patient_ids)
+    # Predictions from assigned patients filtered by this doctor's specialties
+    predictions = Prediction.objects.filter(
+        patient_user_id__in=patient_ids,
+        disease_type__in=specialties,
+    )
     total_predictions = predictions.count()
     pending_reviews = predictions.filter(review_status="pending").count()
 
@@ -78,6 +84,7 @@ def doctor_dashboard_stats(request):
         "high_risk_count": high_risk_count,
         "unread_notifications": unread_notifications,
         "unread_messages": unread_messages,
+        "specialties": specialties,
     })
 
 
@@ -93,6 +100,10 @@ def pending_predictions(request):
     Returns predictions from assigned patients that need review.
     """
     doctor = request.user
+    profile = getattr(doctor, 'profile', None)
+    doctor_profile_obj = getattr(doctor, 'doctorprofile', None)
+    specialties = doctor_profile_obj.get_allowed_disease_types() if doctor_profile_obj else ["diabetes"]
+
     patient_ids = DoctorPatientAssignment.objects.filter(
         doctor_user=doctor,
         status="active",
@@ -100,7 +111,11 @@ def pending_predictions(request):
 
     predictions = (
         Prediction.objects
-        .filter(patient_user_id__in=patient_ids, review_status="pending")
+        .filter(
+            patient_user_id__in=patient_ids,
+            review_status="pending",
+            disease_type__in=specialties,
+        )
         .select_related("patient_user")
         .order_by("-created_at")[:20]
     )
@@ -123,6 +138,8 @@ def pending_predictions(request):
             "bmi": pred.bmi,
             "age": pred.age,
             "review_status": pred.review_status,
+            "disease_type": pred.disease_type,
+            "extra_fields": pred.extra_fields,
             "created_at": pred.created_at.isoformat(),
             "patient_name": f"{patient.first_name} {patient.last_name}".strip() or patient.username,
         })
@@ -138,15 +155,25 @@ def all_patient_predictions(request):
     Returns all predictions from assigned patients with optional filtering.
     """
     doctor = request.user
+    profile = getattr(doctor, 'profile', None)
+    doctor_profile_obj = getattr(doctor, 'doctorprofile', None)
+    specialties = doctor_profile_obj.get_allowed_disease_types() if doctor_profile_obj else ["diabetes"]
+
     risk_level = request.query_params.get("risk_level")
     review_status = request.query_params.get("review_status")
+    disease_type = request.query_params.get("disease_type")
 
     patient_ids = DoctorPatientAssignment.objects.filter(
         doctor_user=doctor,
         status="active",
     ).values_list("patient_user_id", flat=True)
 
-    predictions = Prediction.objects.filter(patient_user_id__in=patient_ids).select_related("patient_user")
+    # Start filtered by specialties; allow ?disease_type to narrow further
+    active_specialties = [disease_type] if disease_type else specialties
+    predictions = Prediction.objects.filter(
+        patient_user_id__in=patient_ids,
+        disease_type__in=active_specialties,
+    ).select_related("patient_user")
 
     if risk_level:
         predictions = predictions.filter(risk_level__iexact=risk_level)
@@ -173,6 +200,8 @@ def all_patient_predictions(request):
             "probability": pred.probability,
             "risk_level": pred.risk_level,
             "review_status": pred.review_status,
+            "disease_type": pred.disease_type,
+            "extra_fields": pred.extra_fields,
             "created_at": pred.created_at.isoformat(),
             "message": pred.message,
         })
@@ -260,16 +289,31 @@ def review_prediction(request, prediction_id):
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def risk_distribution(request):
     """
-    GET /api/doctor/risk-distribution/
+    GET /api/doctor/risk-distribution/?disease_type=diabetes
     Returns aggregated risk level counts for the donut chart.
     """
     doctor = request.user
+    doctor_profile_obj = getattr(doctor, 'doctorprofile', None)
+    specialties = doctor_profile_obj.get_allowed_disease_types() if doctor_profile_obj else ["diabetes"]
+
+    raw_disease_type = request.query_params.get("disease_type")
+    # If no param is provided, default to the doctor's primary specialty if available, or 'diabetes'
+    if not raw_disease_type:
+        disease_type = specialties[0] if specialties else Prediction.DISEASE_DIABETES
+    else:
+        disease_type = raw_disease_type
+
     patient_ids = DoctorPatientAssignment.objects.filter(
         doctor_user=doctor,
         status="active",
     ).values_list("patient_user_id", flat=True)
 
-    predictions = Prediction.objects.filter(patient_user_id__in=patient_ids)
+    # Clean double filtering: Must belong to doctor's assigned patients AND allowed specialties
+    predictions = Prediction.objects.filter(
+        patient_user_id__in=patient_ids,
+        disease_type=disease_type,
+        disease_type__in=specialties,
+    )
 
     # Categorize by probability thresholds
     low = predictions.filter(probability__lt=25).count()
@@ -279,10 +323,10 @@ def risk_distribution(request):
 
     return Response({
         "distribution": [
-            {"level": "منخفض", "level_en": "Low", "count": low, "color": "#22c55e"},
-            {"level": "متوسط", "level_en": "Medium", "count": medium, "color": "#eab308"},
-            {"level": "مرتفع", "level_en": "High", "count": high, "color": "#f97316"},
-            {"level": "مرتفع جداً", "level_en": "Very High", "count": very_high, "color": "#ef4444"},
+            {"level": "Low", "level_en": "Low", "count": low, "color": "#22c55e"},
+            {"level": "Medium", "level_en": "Medium", "count": medium, "color": "#eab308"},
+            {"level": "High", "level_en": "High", "count": high, "color": "#f97316"},
+            {"level": "Very High", "level_en": "Very High", "count": very_high, "color": "#ef4444"},
         ],
         "total": low + medium + high + very_high,
     })
@@ -450,6 +494,10 @@ def recent_activity(request):
     Returns a combined feed of recent events.
     """
     doctor = request.user
+    profile = getattr(doctor, 'profile', None)
+    doctor_profile_obj = getattr(doctor, 'doctorprofile', None)
+    specialties = doctor_profile_obj.get_allowed_disease_types() if doctor_profile_obj else ["diabetes"]
+
     patient_ids = DoctorPatientAssignment.objects.filter(
         doctor_user=doctor,
         status="active",
@@ -457,10 +505,13 @@ def recent_activity(request):
 
     activities = []
 
-    # Recent predictions from patients
+    # Recent predictions from patients filtered by doctor specialties
     recent_predictions = (
         Prediction.objects
-        .filter(patient_user_id__in=patient_ids)
+        .filter(
+            patient_user_id__in=patient_ids,
+            disease_type__in=specialties,
+        )
         .select_related("patient_user")
         .order_by("-created_at")[:5]
     )
@@ -565,6 +616,7 @@ def doctor_profile(request):
     """
     doctor = request.user
     profile = getattr(doctor, "profile", None)
+    doctor_profile_obj = getattr(doctor, "doctorprofile", None)
 
     patient_count = DoctorPatientAssignment.objects.filter(
         doctor_user=doctor, status="active"
@@ -583,6 +635,7 @@ def doctor_profile(request):
         "profile_picture": profile.profile_picture if profile else None,
         "role": profile.role if profile else "doctor",
         "doctor_status": profile.doctor_status if profile else None,
+        "specialties": doctor_profile_obj.get_allowed_disease_types() if doctor_profile_obj else ["diabetes"],
         "patient_count": patient_count,
         "review_count": review_count,
         "date_joined": doctor.date_joined.isoformat(),

@@ -93,16 +93,31 @@ export default function DoctorDashboard() {
     const fetchDashboardData = async () => {
       try {
         const statsRes: any = await apiCall(API_ENDPOINTS.DOCTOR_DASHBOARD);
+        const resolvedSpecialty = statsRes?.specialties?.[0] || 'diabetes';
+
+        if (isMounted) {
+          setStats(statsRes?.stats || statsRes?.dashboard || statsRes || null);
+        }
+
+        const riskRes: any = await apiCall(
+          `${API_ENDPOINTS.DOCTOR_RISK_DISTRIBUTION}?disease_type=${resolvedSpecialty}`
+        );
 
         if (!isMounted) return;
 
-        setStats(statsRes?.stats || statsRes?.dashboard || statsRes || null);
+        setRiskData(
+          riskRes?.risk_distribution ||
+            riskRes?.distribution_data ||
+            riskRes?.riskData ||
+            riskRes ||
+            null
+        );
       } catch (error) {
         console.error("Failed to load dashboard stats", error);
         toast.error("Failed to load dashboard stats");
       } finally {
         if (isMounted) {
-          setLoading((prev) => ({ ...prev, stats: false }));
+          setLoading((prev) => ({ ...prev, stats: false, riskData: false }));
         }
       }
 
@@ -128,29 +143,6 @@ export default function DoctorDashboard() {
       } finally {
         if (isMounted) {
           setLoading((prev) => ({ ...prev, predictions: false }));
-        }
-      }
-
-      try {
-        const riskRes: any = await apiCall(
-          API_ENDPOINTS.DOCTOR_RISK_DISTRIBUTION
-        );
-
-        if (!isMounted) return;
-
-        setRiskData(
-          riskRes?.risk_distribution ||
-            riskRes?.distribution_data ||
-            riskRes?.riskData ||
-            riskRes ||
-            null
-        );
-      } catch (error) {
-        console.error("Failed to load risk data", error);
-        setRiskData(null);
-      } finally {
-        if (isMounted) {
-          setLoading((prev) => ({ ...prev, riskData: false }));
         }
       }
 
@@ -216,43 +208,48 @@ export default function DoctorDashboard() {
   };
 
   const getRiskClasses = (level: string) => {
-    switch (level?.toLowerCase()) {
-      case "high":
-      case "very high":
-        return {
-          text: "text-red-600 dark:text-red-300",
-          bg: "bg-red-50 dark:bg-red-500/10",
-          border: "border-red-100 dark:border-red-500/30",
-          badge:
-            "bg-red-50 text-red-600 border-red-100 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30",
-        };
+    const normalized = level?.toLowerCase()?.trim();
+    // Match English or Arabic risk level strings
+    const isHigh = ["high", "very high", "مرتفع", "مرتفع جدًا", "مرتفع جداً"].includes(normalized);
+    const isMedium = ["medium", "متوسط"].includes(normalized);
+    const isLow = ["low", "منخفض"].includes(normalized);
 
-      case "medium":
-        return {
-          text: "text-amber-600 dark:text-amber-300",
-          bg: "bg-amber-50 dark:bg-amber-500/10",
-          border: "border-amber-100 dark:border-amber-500/30",
-          badge:
-            "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30",
-        };
-
-      case "low":
-        return {
-          text: "text-emerald-600 dark:text-emerald-300",
-          bg: "bg-emerald-50 dark:bg-emerald-500/10",
-          border: "border-emerald-100 dark:border-emerald-500/30",
-          badge:
-            "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30",
-        };
-
-      default:
-        return {
-          text: "text-primary",
-          bg: "bg-primary/10",
-          border: "border-primary/15",
-          badge: "bg-primary/10 text-primary border-primary/15",
-        };
+    if (isHigh) {
+      return {
+        text: "text-red-600 dark:text-red-300",
+        bg: "bg-red-50 dark:bg-red-500/10",
+        border: "border-red-100 dark:border-red-500/30",
+        badge:
+          "bg-red-50 text-red-600 border-red-100 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30",
+      };
     }
+
+    if (isMedium) {
+      return {
+        text: "text-amber-600 dark:text-amber-300",
+        bg: "bg-amber-50 dark:bg-amber-500/10",
+        border: "border-amber-100 dark:border-amber-500/30",
+        badge:
+          "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30",
+      };
+    }
+
+    if (isLow) {
+      return {
+        text: "text-emerald-600 dark:text-emerald-300",
+        bg: "bg-emerald-50 dark:bg-emerald-500/10",
+        border: "border-emerald-100 dark:border-emerald-500/30",
+        badge:
+          "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30",
+      };
+    }
+
+    return {
+      text: "text-primary",
+      bg: "bg-primary/10",
+      border: "border-primary/15",
+      badge: "bg-primary/10 text-primary border-primary/15",
+    };
   };
 
   const handleReviewPrediction = (id: number) => {
@@ -309,48 +306,142 @@ export default function DoctorDashboard() {
   };
 
   const clinicalIndicators = selectedReport
-    ? [
-        {
-          label: t("dashboard.glucose"),
-          value: selectedReport.glucose,
-          unit: "mg/dL",
-        },
-        {
-          label: t("dashboard.bloodPressure"),
-          value: selectedReport.blood_pressure,
-          unit: "mmHg",
-        },
-        {
-          label: t("dashboard.bmi"),
-          value: selectedReport.bmi,
-          unit: "kg/m²",
-        },
-        {
-          label: t("dashboard.insulin"),
-          value: selectedReport.insulin,
-          unit: "mu U/ml",
-        },
-        {
-          label: isArabic ? "سماكة الجلد" : "Skin",
-          value: selectedReport.skin_thickness,
-          unit: "mm",
-        },
-        {
-          label: t("dashboard.age"),
-          value: selectedReport.age,
-          unit: "Years",
-        },
-        {
-          label: t("dashboard.diabetesPedigree"),
-          value: selectedReport.diabetes_pedigree_function,
-          unit: "Score",
-        },
-        {
-          label: t("dashboard.pregnancies"),
-          value: selectedReport.pregnancies,
-          unit: "Count",
-        },
-      ]
+    ? selectedReport.disease_type === "cardiovascular"
+      ? [
+          {
+            label: isArabic ? "الكوليسترول" : "Cholesterol",
+            value: selectedReport.extra_fields?.cholesterol || "N/A",
+            unit: "mg/dL",
+          },
+          {
+            label: isArabic ? "الضغط الانقباضي" : "Systolic BP",
+            value: selectedReport.extra_fields?.systolic_bp || "N/A",
+            unit: "mmHg",
+          },
+          {
+            label: isArabic ? "الضغط الانبساطي" : "Diastolic BP",
+            value: selectedReport.extra_fields?.diastolic_bp || "N/A",
+            unit: "mmHg",
+          },
+          {
+            label: isArabic ? "الوزن" : "Weight",
+            value: selectedReport.extra_fields?.weight || "N/A",
+            unit: "kg",
+          },
+          {
+            label: isArabic ? "الطول" : "Height",
+            value: selectedReport.extra_fields?.height || "N/A",
+            unit: "cm",
+          },
+          {
+            label: isArabic ? "السن" : "Age",
+            value: selectedReport.age,
+            unit: isArabic ? "سنة" : "Years",
+          },
+          {
+            label: isArabic ? "التدخين" : "Smoking",
+            value: selectedReport.extra_fields?.smoke !== undefined
+              ? (selectedReport.extra_fields?.smoke ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
+              : (selectedReport.extra_fields?.smoking !== undefined
+                ? (selectedReport.extra_fields?.smoking ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
+                : "N/A"),
+            unit: "",
+          },
+          {
+            label: isArabic ? "النشاط البدني" : "Physical Activity",
+            value: selectedReport.extra_fields?.physical_activity !== undefined
+              ? (selectedReport.extra_fields?.physical_activity ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
+              : (selectedReport.extra_fields?.active !== undefined
+                ? (selectedReport.extra_fields?.active ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
+                : "N/A"),
+            unit: "",
+          },
+        ]
+      : [
+          {
+            label: t("dashboard.glucose"),
+            value: selectedReport.glucose,
+            unit: "mg/dL",
+          },
+          {
+            label: t("dashboard.bloodPressure"),
+            value: selectedReport.blood_pressure,
+            unit: "mmHg",
+          },
+          {
+            label: t("dashboard.bmi"),
+            value: selectedReport.bmi,
+            unit: "kg/m²",
+          },
+          {
+            label: t("dashboard.insulin"),
+            value: selectedReport.insulin,
+            unit: "mu U/ml",
+          },
+          {
+            label: isArabic ? "سماكة الجلد" : "Skin",
+            value: selectedReport.skin_thickness,
+            unit: "mm",
+          },
+          {
+            label: t("dashboard.age"),
+            value: selectedReport.age,
+            unit: "Years",
+          },
+          {
+            label: t("dashboard.diabetesPedigree"),
+            value: selectedReport.diabetes_pedigree_function,
+            unit: "Score",
+          },
+          {
+            label: t("dashboard.pregnancies"),
+            value: selectedReport.pregnancies,
+            unit: "Count",
+          },
+          // Shared fields from extra_fields if available on Diabetes prediction
+          ...(selectedReport.extra_fields
+            ? [
+                {
+                  label: isArabic ? "الكوليسترول" : "Cholesterol",
+                  value: selectedReport.extra_fields.cholesterol || "N/A",
+                  unit: "mg/dL",
+                },
+                {
+                  label: isArabic ? "الضغط الانقباضي" : "Systolic BP",
+                  value: selectedReport.extra_fields.systolic_bp || "N/A",
+                  unit: "mmHg",
+                },
+                {
+                  label: isArabic ? "الوزن" : "Weight",
+                  value: selectedReport.extra_fields.weight || "N/A",
+                  unit: "kg",
+                },
+                {
+                  label: isArabic ? "الطول" : "Height",
+                  value: selectedReport.extra_fields.height || "N/A",
+                  unit: "cm",
+                },
+                {
+                  label: isArabic ? "التدخين" : "Smoking",
+                  value: selectedReport.extra_fields.smoke !== undefined
+                    ? (selectedReport.extra_fields.smoke ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
+                    : (selectedReport.extra_fields.smoking !== undefined
+                      ? (selectedReport.extra_fields.smoking ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
+                      : "N/A"),
+                  unit: "",
+                },
+                {
+                  label: isArabic ? "النشاط البدني" : "Physical Activity",
+                  value: selectedReport.extra_fields.physical_activity !== undefined
+                    ? (selectedReport.extra_fields.physical_activity ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
+                    : (selectedReport.extra_fields.active !== undefined
+                      ? (selectedReport.extra_fields.active ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
+                      : "N/A"),
+                  unit: "",
+                },
+              ]
+            : []),
+        ]
     : [];
 
   const reviewActions = [

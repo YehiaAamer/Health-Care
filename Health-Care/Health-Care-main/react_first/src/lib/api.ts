@@ -4,6 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export const API_ENDPOINTS = {
   PREDICT: `${API_BASE_URL}/api/predict/`,
+  PREDICT_V2: `${API_BASE_URL}/api/predict/v2/`,
   GET_PREDICTIONS: `${API_BASE_URL}/api/predictions/`,
   HISTORY: `${API_BASE_URL}/api/history/`,
   PROFILE: `${API_BASE_URL}/api/profile/`,
@@ -25,7 +26,6 @@ export const API_ENDPOINTS = {
 const TOKEN_STORAGE_KEY = "auth_tokens";
 
 const PUBLIC_ENDPOINTS = [
-  "/api/chatbot/",
   "/api/feature-importance/",
   "/api/ollama/health/",
 ];
@@ -222,7 +222,9 @@ export async function apiCall<T>(
       const tokens = getStoredTokens();
       let headers = buildHeaders(fetchOptions, tokens?.access);
 
-      let response = await fetch(endpoint, {
+      const url = endpoint.startsWith("/") ? `${API_BASE_URL}${endpoint}` : endpoint;
+
+      let response = await fetch(url, {
         ...fetchOptions,
         headers,
         signal: controller.signal,
@@ -236,7 +238,7 @@ export async function apiCall<T>(
         const publicHeaders = new Headers(headers);
         publicHeaders.delete("Authorization");
 
-        response = await fetch(endpoint, {
+        response = await fetch(url, {
           ...fetchOptions,
           headers: publicHeaders,
           signal: controller.signal,
@@ -255,7 +257,7 @@ export async function apiCall<T>(
         if (newAccessToken) {
           headers = buildHeaders(fetchOptions, newAccessToken);
 
-          response = await fetch(endpoint, {
+          response = await fetch(url, {
             ...fetchOptions,
             headers,
             signal: controller.signal,

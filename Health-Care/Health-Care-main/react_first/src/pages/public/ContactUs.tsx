@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
+import { apiCall } from "@/lib/api";
 import Header from "@/components/shared/Header";
 import Footer from "@/components/shared/Footer";
 import { useTranslation } from "react-i18next";
@@ -93,37 +94,12 @@ const ContactUs = () => {
     try {
       setIsLoading(true);
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/contact/`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(formData),
-        },
-      );
+      const data = await apiCall<{ message: string }>("/api/contact/", {
+        method: "POST",
+        body: JSON.stringify(formData),
+      });
 
-      let data: any = null;
-      try {
-        data = await response.json();
-      } catch {
-        data = null;
-      }
-
-      if (!response.ok) {
-        const apiMessage =
-          data?.message ||
-          data?.detail ||
-          data?.error ||
-          (Array.isArray(data) ? data[0] : undefined);
-
-        throw new Error(
-          getFriendlyErrorMessage(apiMessage, t("contactPage.failedMessage")),
-        );
-      }
-
-      toast.success(data?.message || t("contactPage.successMessage"));
+      toast.success(data.message || t("contactPage.successMessage"));
       setFormData({
         name: "",
         email: "",

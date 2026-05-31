@@ -34,7 +34,10 @@ interface Prediction {
   risk_level: string;
   message: string;
   created_at: string;
+  disease_type?: string;
+  session_id?: string;
 }
+
 
 export default function History() {
   const { user, isAuthenticated } = useAuth();
@@ -53,8 +56,11 @@ export default function History() {
         }>(API_ENDPOINTS.HISTORY, {
           method: "GET",
         });
-        setPredictions(data.predictions || []);
-        if (data.predictions && data.predictions.length === 0) {
+        const filtered = (data.predictions || []).filter(
+          (p) => !p.disease_type || p.disease_type === "diabetes"
+        );
+        setPredictions(filtered);
+        if (filtered.length === 0) {
           toast.info("لا توجد تحليلات في السجل");
         }
       } catch (err) {

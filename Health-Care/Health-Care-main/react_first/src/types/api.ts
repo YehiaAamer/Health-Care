@@ -41,6 +41,21 @@ export interface Prediction {
   review_status: ReviewStatus;
   created_at: string;
   patient_name?: string; // Opt-in from serializer
+  disease_type?: string;
+  extra_fields?: {
+    gender?: string;
+    weight?: number | string;
+    height?: number | string;
+    systolic_bp?: number | string;
+    diastolic_bp?: number | string;
+    cholesterol?: number | string;
+    smoke?: boolean;
+    smoking?: boolean;
+    alcohol?: boolean;
+    physical_activity?: boolean;
+    active?: boolean;
+    physicalActivity?: boolean;
+  };
 }
 
 export interface PredictionReview {

@@ -6,7 +6,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from ..models import Prediction, ChatbotSession, ChatbotMessage
 from ..services.xgboost_service import predict_diabetes_xgboost, get_feature_importance
 # Medgamma imports for Chatbot only
-from ..services.medgamma_service import chatbot_chat, MedgammaError
+from ..services.medgamma_service import chatbot_chat, MedgammaError, is_medical_query
+from ..services.cardiovascular_service import predict_cardiovascular
+import uuid
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -104,6 +106,146 @@ def predict_diabetes(request):
         return Response({
             "error": f"حدث خطأ غير متوقع: {str(e)}"
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# ═══════════════════════════════════════════════════════════════
+# Prediction Endpoint v2 (Multi-Disease)
+# ═══════════════════════════════════════════════════════════════
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def predict_v2(request):
+    """
+    التنبؤ بالسكري وأمراض القلب
+    POST /api/predict/v2/
+    """
+    try:
+        data = request.data
+        
+        # Shared & Cardio fields
+        weight = float(data.get('weight', 70))
+        height = float(data.get('height', 170))
+        gender = str(data.get('gender', 'male'))
+        systolic_bp = float(data.get('systolicBloodPressure', data.get('systolic_bp', 120)))
+        diastolic_bp = float(data.get('diastolicBloodPressure', data.get('diastolic_bp', 80)))
+        cholesterol = float(data.get('cholesterol', 180))
+        age = int(float(data.get('age', 35)))
+        
+        # Diabetes fields
+        pregnancies = float(data.get('pregnancies', 0))
+        glucose = float(data.get('glucose', 85))
+        skin_thickness = float(data.get('skinThickness', data.get('skin_thickness', 20)))
+        insulin = float(data.get('insulin', 0))
+        diabetes_pedigree = float(data.get('diabetesPedigreeFunction', data.get('diabetes_pedigree_function', 0.5)))
+        
+        # Calculate BMI server-side
+        height_m = height / 100.0
+        bmi = float(weight / (height_m * height_m)) if height_m > 0 else 25.0
+        
+        # Diabetes logic
+        features_diabetes = {
+            "pregnancies": pregnancies,
+            "glucose": glucose,
+            "blood_pressure": diastolic_bp,
+            "skin_thickness": skin_thickness,
+            "insulin": insulin,
+            "bmi": bmi,
+            "diabetes_pedigree_function": diabetes_pedigree,
+            "age": age
+        }
+        
+        try:
+            diabetes_prob, diabetes_risk = predict_diabetes_xgboost(features_diabetes)
+        except Exception as e:
+            return Response({"error": f"XGBoost failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        diabetes_message = _generate_auto_message(diabetes_prob, diabetes_risk, features_diabetes)
+
+        # Cardio logic
+        features_cardio = {
+            "age": age,
+            "gender": gender,
+            "height": height,
+            "weight": weight,
+            "systolic_bp": systolic_bp,
+            "diastolic_bp": diastolic_bp,
+            "cholesterol": cholesterol,
+            "glucose": glucose
+        }
+        
+        cardio_result = predict_cardiovascular(features_cardio)
+        
+        # Save to database
+        session_uuid = uuid.uuid4()
+        extra_fields = {
+            "gender": gender,
+            "weight": weight,
+            "height": height,
+            "systolic_bp": systolic_bp,
+            "diastolic_bp": diastolic_bp,
+            "cholesterol": cholesterol,
+            "smoke": bool(data.get("smoke", False)),
+            "alcohol": bool(data.get("alcohol", False)),
+            "physical_activity": bool(data.get("physicalActivity", data.get("physical_activity", False))),
+        }
+        
+        # Save Diabetes
+        pred_diabetes = Prediction.objects.create(
+            patient_user=request.user,
+            disease_type=Prediction.DISEASE_DIABETES,
+            session_id=session_uuid,
+            extra_fields=extra_fields,
+            pregnancies=pregnancies,
+            glucose=glucose,
+            blood_pressure=diastolic_bp,
+            skin_thickness=skin_thickness,
+            insulin=insulin,
+            bmi=bmi,
+            diabetes_pedigree_function=diabetes_pedigree,
+            age=age,
+            probability=diabetes_prob,
+            risk_level=diabetes_risk,
+            message=diabetes_message
+        )
+        
+        # Save Cardiovascular
+        pred_cardio = Prediction.objects.create(
+            patient_user=request.user,
+            disease_type=Prediction.DISEASE_CARDIOVASCULAR,
+            session_id=session_uuid,
+            extra_fields=extra_fields,
+            pregnancies=pregnancies,
+            glucose=glucose,
+            blood_pressure=diastolic_bp,
+            skin_thickness=skin_thickness,
+            insulin=insulin,
+            bmi=bmi,
+            diabetes_pedigree_function=diabetes_pedigree,
+            age=age,
+            probability=cardio_result["percentage"],
+            risk_level=cardio_result["arabic_risk_level"],
+            message=cardio_result["message"]
+        )
+
+        return Response({
+            "session_id": str(session_uuid),
+            "diabetes": {
+                "prediction_id": pred_diabetes.id,
+                "probability": diabetes_prob,
+                "risk_level": diabetes_risk,
+                "message": diabetes_message
+            },
+            "cardiovascular": {
+                "prediction_id": pred_cardio.id,
+                "probability": cardio_result["percentage"],
+                "risk_level": cardio_result["arabic_risk_level"],
+                "message": cardio_result["message"]
+            }
+        })
+        
+    except ValueError as e:
+        return Response({"error": f"Invalid data: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def _generate_auto_message(probability, risk_level, features):
@@ -290,60 +432,41 @@ def chatbot_predict(request):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # جلب التحليل السابق
-        if prediction_id:
-            try:
-                prediction = Prediction.objects.get(
-                    id=prediction_id,
-                    patient_user=request.user,
-                )
-                features = {
-                    'glucose': prediction.glucose,
-                    'blood_pressure': prediction.blood_pressure,
-                    'bmi': prediction.bmi,
-                    'age': prediction.age,
-                }
-                probability = prediction.probability
-                risk_level = prediction.risk_level
-            except Prediction.DoesNotExist:
-                return Response({
-                    "error": "التحليل غير موجود"
-                }, status=status.HTTP_404_NOT_FOUND)
-        else:
-            # لو مفيش prediction_id، نجيب آخر تحليل للمستخدم
-            if request.user.is_authenticated:
-                last_prediction = Prediction.objects.filter(patient_user=request.user).first()
-                if last_prediction:
-                    prediction = last_prediction
-                    prediction_id = last_prediction.id
-                    features = {
-                        'glucose': last_prediction.glucose,
-                        'blood_pressure': last_prediction.blood_pressure,
-                        'bmi': last_prediction.bmi,
-                        'age': last_prediction.age,
-                    }
-                    probability = last_prediction.probability
-                    risk_level = last_prediction.risk_level
-                else:
-                    # مفيش تحليلات خالص
-                    features = {
-                        'glucose': 85,
-                        'blood_pressure': 70,
-                        'bmi': 25,
-                        'age': 35,
-                    }
-                    probability = 5.0
-                    risk_level = "منخفض"
+        target_prediction = None
+        diabetes_prediction = None
+        cardio_prediction = None
+
+        if is_medical_query(user_message):
+            if prediction_id:
+                try:
+                    target_prediction = Prediction.objects.get(
+                        id=prediction_id,
+                        patient_user=request.user,
+                    )
+                except Prediction.DoesNotExist:
+                    return Response({
+                        "error": "التحليل غير موجود"
+                    }, status=status.HTTP_404_NOT_FOUND)
             else:
-                # مش مسجل دخول
-                features = {
-                    'glucose': 85,
-                    'blood_pressure': 70,
-                    'bmi': 25,
-                    'age': 35,
-                }
-                probability = 5.0
-                risk_level = "منخفض"
-        
+                # لو مفيش prediction_id، نجيب آخر تحليل للمستخدم
+                if request.user.is_authenticated:
+                    target_prediction = Prediction.objects.filter(
+                        patient_user=request.user
+                    ).order_by('-created_at').first()
+
+            if target_prediction:
+                prediction_id = target_prediction.id
+                if target_prediction.session_id:
+                    session_predictions = Prediction.objects.filter(session_id=target_prediction.session_id)
+                    diabetes_prediction = session_predictions.filter(disease_type=Prediction.DISEASE_DIABETES).first()
+                    cardio_prediction = session_predictions.filter(disease_type=Prediction.DISEASE_CARDIOVASCULAR).first()
+                
+                # Safe Fallback to target_prediction if it has no session_id or one type is missing
+                if not diabetes_prediction and target_prediction.disease_type == Prediction.DISEASE_DIABETES:
+                    diabetes_prediction = target_prediction
+                if not cardio_prediction and target_prediction.disease_type == Prediction.DISEASE_CARDIOVASCULAR:
+                    cardio_prediction = target_prediction
+
         # جلب تاريخ المحادثة إذا موجود
         conversation_history = []
         session = None
@@ -355,7 +478,7 @@ def chatbot_predict(request):
                 )
             except ChatbotSession.DoesNotExist:
                 return Response({
-                    "error": "Ø§Ù„Ù…Ø­Ø§Ø¯Ø«Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©"
+                    "error": "المحادثة غير موجودة"
                 }, status=status.HTTP_404_NOT_FOUND)
 
             messages = ChatbotMessage.objects.filter(
@@ -375,9 +498,8 @@ def chatbot_predict(request):
             print(f"[CHATBOT] Calling MedGemma (prediction_id={prediction_id}, conversation_id={conversation_id})")
             
             bot_response = chatbot_chat(
-                features=features,
-                probability=probability,
-                risk_level=risk_level,
+                diabetes_prediction=diabetes_prediction,
+                cardio_prediction=cardio_prediction,
                 question=user_message,
                 conversation_history=conversation_history if conversation_history else None
             )
@@ -396,7 +518,7 @@ def chatbot_predict(request):
             # إنشاء محادثة جديدة
             session = ChatbotSession.objects.create(
                 patient_user=request.user,
-                prediction=prediction if prediction_id else None,
+                prediction=target_prediction if prediction_id else None,
             )
             conversation_id = session.id
         
@@ -474,6 +596,9 @@ def get_past_predictions(request):
                 "probability": pred.probability,
                 "risk_level": pred.risk_level,
                 "message": pred.message,
+                "disease_type": pred.disease_type,
+                "session_id": str(pred.session_id) if pred.session_id else None,
+                "extra_fields": pred.extra_fields,
                 "created_at": pred.created_at.isoformat()
             })
 
@@ -517,6 +642,9 @@ def get_all_predictions(request):
                 "probability": pred.probability,
                 "risk_level": pred.risk_level,
                 "message": pred.message,
+                "disease_type": pred.disease_type,
+                "session_id": str(pred.session_id) if pred.session_id else None,
+                "extra_fields": pred.extra_fields,
                 "created_at": pred.created_at.isoformat()
             })
 

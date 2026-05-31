@@ -61,16 +61,48 @@ class UserProfile(models.Model):
         return f"Profile: {self.user.username}"
 
 
+class DoctorProfile(models.Model):
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="doctorprofile",
+    )
+    specialties = models.JSONField(default=list, blank=True, null=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "doctor_profile"
+
+    def get_specialties(self):
+        """Return specialties with backward compatibility"""
+        if self.specialties:
+            return self.specialties
+        # Default for existing doctors
+        return ["diabetes"]
+
+    def get_allowed_disease_types(self):
+        """Return allowed disease types based on doctor's specialties"""
+        return self.get_specialties()
+
+    def __str__(self):
+        return f"DoctorProfile: {self.user.username}"
+
+
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
         UserProfile.objects.create(user=instance)
+        # Create DoctorProfile automatically
+        DoctorProfile.objects.create(user=instance)
 
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
     if hasattr(instance, "profile"):
         instance.profile.save()
+    if hasattr(instance, "doctorprofile"):
+        instance.doctorprofile.save()
 
 
 class DoctorPatientAssignment(models.Model):
@@ -166,6 +198,13 @@ class Prediction(models.Model):
         (REVIEW_NEEDS_FOLLOWUP, "Needs follow-up"),
     ]
 
+    DISEASE_DIABETES = "diabetes"
+    DISEASE_CARDIOVASCULAR = "cardiovascular"
+    DISEASE_CHOICES = [
+        (DISEASE_DIABETES, "Diabetes"),
+        (DISEASE_CARDIOVASCULAR, "Cardiovascular"),
+    ]
+
     patient_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -194,6 +233,13 @@ class Prediction(models.Model):
         choices=REVIEW_STATUS_CHOICES,
         default=REVIEW_PENDING,
     )
+    disease_type = models.CharField(
+        max_length=30,
+        choices=DISEASE_CHOICES,
+        default=DISEASE_DIABETES,
+    )
+    extra_fields = models.JSONField(default=dict, blank=True)
+    session_id = models.UUIDField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

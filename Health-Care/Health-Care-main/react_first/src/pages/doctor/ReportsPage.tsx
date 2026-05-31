@@ -183,17 +183,17 @@ export default function ReportsPage() {
   };
 
   const getRiskColor = (level: string) => {
-    switch (level?.toLowerCase()) {
-      case "high":
-      case "very high":
-        return "red";
-      case "medium":
-        return "orange";
-      case "low":
-        return "green";
-      default:
-        return "blue";
+    const normalized = level?.toLowerCase()?.trim();
+    if (["high", "very high", "مرتفع", "مرتفع جدًا", "مرتفع جداً"].includes(normalized)) {
+      return "red";
     }
+    if (["medium", "متوسط"].includes(normalized)) {
+      return "orange";
+    }
+    if (["low", "منخفض"].includes(normalized)) {
+      return "green";
+    }
+    return "blue";
   };
 
   const getRiskClasses = (level: string) => {
@@ -317,48 +317,142 @@ export default function ReportsPage() {
   ];
 
   const clinicalIndicators = selectedReport
-    ? [
-        {
-          label: t("dashboard.glucose"),
-          value: selectedReport.glucose,
-          unit: "mg/dL",
-        },
-        {
-          label: t("dashboard.bloodPressure"),
-          value: selectedReport.blood_pressure,
-          unit: "mmHg",
-        },
-        {
-          label: t("dashboard.bmi"),
-          value: selectedReport.bmi,
-          unit: "kg/m²",
-        },
-        {
-          label: t("dashboard.insulin"),
-          value: selectedReport.insulin,
-          unit: "mu U/ml",
-        },
-        {
-          label: isArabic ? "سماكة الجلد" : "Skin",
-          value: selectedReport.skin_thickness,
-          unit: "mm",
-        },
-        {
-          label: t("dashboard.age"),
-          value: selectedReport.age,
-          unit: "Years",
-        },
-        {
-          label: t("dashboard.diabetesPedigree"),
-          value: selectedReport.diabetes_pedigree_function,
-          unit: "Score",
-        },
-        {
-          label: t("dashboard.pregnancies"),
-          value: selectedReport.pregnancies,
-          unit: "Count",
-        },
-      ]
+    ? selectedReport.disease_type === "cardiovascular"
+      ? [
+          {
+            label: isArabic ? "الكوليسترول" : "Cholesterol",
+            value: selectedReport.extra_fields?.cholesterol || "N/A",
+            unit: "mg/dL",
+          },
+          {
+            label: isArabic ? "الضغط الانقباضي" : "Systolic BP",
+            value: selectedReport.extra_fields?.systolic_bp || "N/A",
+            unit: "mmHg",
+          },
+          {
+            label: isArabic ? "الضغط الانبساطي" : "Diastolic BP",
+            value: selectedReport.extra_fields?.diastolic_bp || "N/A",
+            unit: "mmHg",
+          },
+          {
+            label: isArabic ? "الوزن" : "Weight",
+            value: selectedReport.extra_fields?.weight || "N/A",
+            unit: "kg",
+          },
+          {
+            label: isArabic ? "الطول" : "Height",
+            value: selectedReport.extra_fields?.height || "N/A",
+            unit: "cm",
+          },
+          {
+            label: isArabic ? "السن" : "Age",
+            value: selectedReport.age,
+            unit: isArabic ? "سنة" : "Years",
+          },
+          {
+            label: isArabic ? "التدخين" : "Smoking",
+            value: selectedReport.extra_fields?.smoke !== undefined
+              ? (selectedReport.extra_fields?.smoke ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
+              : (selectedReport.extra_fields?.smoking !== undefined
+                ? (selectedReport.extra_fields?.smoking ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
+                : "N/A"),
+            unit: "",
+          },
+          {
+            label: isArabic ? "النشاط البدني" : "Physical Activity",
+            value: selectedReport.extra_fields?.physical_activity !== undefined
+              ? (selectedReport.extra_fields?.physical_activity ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
+              : (selectedReport.extra_fields?.active !== undefined
+                ? (selectedReport.extra_fields?.active ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
+                : "N/A"),
+            unit: "",
+          },
+        ]
+      : [
+          {
+            label: t("dashboard.glucose"),
+            value: selectedReport.glucose,
+            unit: "mg/dL",
+          },
+          {
+            label: t("dashboard.bloodPressure"),
+            value: selectedReport.blood_pressure,
+            unit: "mmHg",
+          },
+          {
+            label: t("dashboard.bmi"),
+            value: selectedReport.bmi,
+            unit: "kg/m²",
+          },
+          {
+            label: t("dashboard.insulin"),
+            value: selectedReport.insulin,
+            unit: "mu U/ml",
+          },
+          {
+            label: isArabic ? "سماكة الجلد" : "Skin",
+            value: selectedReport.skin_thickness,
+            unit: "mm",
+          },
+          {
+            label: t("dashboard.age"),
+            value: selectedReport.age,
+            unit: "Years",
+          },
+          {
+            label: t("dashboard.diabetesPedigree"),
+            value: selectedReport.diabetes_pedigree_function,
+            unit: "Score",
+          },
+          {
+            label: t("dashboard.pregnancies"),
+            value: selectedReport.pregnancies,
+            unit: "Count",
+          },
+          // Shared fields from extra_fields if available on Diabetes prediction
+          ...(selectedReport.extra_fields
+            ? [
+                {
+                  label: isArabic ? "الكوليسترول" : "Cholesterol",
+                  value: selectedReport.extra_fields.cholesterol || "N/A",
+                  unit: "mg/dL",
+                },
+                {
+                  label: isArabic ? "الضغط الانقباضي" : "Systolic BP",
+                  value: selectedReport.extra_fields.systolic_bp || "N/A",
+                  unit: "mmHg",
+                },
+                {
+                  label: isArabic ? "الوزن" : "Weight",
+                  value: selectedReport.extra_fields.weight || "N/A",
+                  unit: "kg",
+                },
+                {
+                  label: isArabic ? "الطول" : "Height",
+                  value: selectedReport.extra_fields.height || "N/A",
+                  unit: "cm",
+                },
+                {
+                  label: isArabic ? "التدخين" : "Smoking",
+                  value: selectedReport.extra_fields.smoke !== undefined
+                    ? (selectedReport.extra_fields.smoke ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
+                    : (selectedReport.extra_fields.smoking !== undefined
+                      ? (selectedReport.extra_fields.smoking ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
+                      : "N/A"),
+                  unit: "",
+                },
+                {
+                  label: isArabic ? "النشاط البدني" : "Physical Activity",
+                  value: selectedReport.extra_fields.physical_activity !== undefined
+                    ? (selectedReport.extra_fields.physical_activity ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
+                    : (selectedReport.extra_fields.active !== undefined
+                      ? (selectedReport.extra_fields.active ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
+                      : "N/A"),
+                  unit: "",
+                },
+              ]
+            : []),
+        ]
     : [];
 
   const reviewActions = [
