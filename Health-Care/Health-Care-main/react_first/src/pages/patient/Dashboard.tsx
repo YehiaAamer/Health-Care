@@ -1,3 +1,4 @@
+// src/pages/patient/Dashboard.tsx
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -91,6 +92,26 @@ type RiskDistributionItem = {
   color: string;
 };
 
+type RiskIndicatorItem = {
+  key: string;
+  label: string;
+  value: number;
+  severity: number;
+};
+
+type RangeSummary = {
+  average: number;
+  diabetesAverage: number;
+  cardioAverage: number;
+  reports: number;
+  highestPercentage: number;
+  highestLevel: RiskLevel | "unknown";
+  highestDiabetesPercentage: number;
+  highestDiabetesLevel: RiskLevel | "unknown";
+  highestCardioPercentage: number;
+  highestCardioLevel: RiskLevel | "unknown";
+};
+
 const CARDIO_COEFFICIENTS = {
   intercept: -11.2,
   age: 0.055,
@@ -151,7 +172,10 @@ const normalizePercentageValue = (value?: number) => {
 };
 
 const normalizeAnyRiskLevel = (riskLevel?: string): RiskLevel | "unknown" => {
-  const risk = (riskLevel || "").trim().toLowerCase();
+  const risk = String(riskLevel || "")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
 
   if (
     risk.includes("very_high") ||
@@ -300,25 +324,36 @@ const getCardioPrediction = (
   t: TranslateFn,
   allPredictions?: Prediction[]
 ): CardiovascularPrediction => {
-  // Try to find sibling cardiovascular record via session_id
   if (prediction.session_id && allPredictions) {
     const siblingCardio = allPredictions.find(
-      (p) => p.session_id === prediction.session_id && p.disease_type === "cardiovascular"
+      (p) =>
+        p.session_id === prediction.session_id &&
+        p.disease_type === "cardiovascular"
     );
+
     if (siblingCardio) {
-      const backendPercentage = normalizePercentageValue(siblingCardio.probability);
-      const backendRiskLevel = normalizeCardioRiskLevel(siblingCardio.risk_level);
+      const backendPercentage =
+        normalizePercentageValue(siblingCardio.cardiovascular_percentage) ??
+        normalizePercentageValue(siblingCardio.cardiovascular_probability) ??
+        normalizePercentageValue(siblingCardio.probability);
+
+      const backendRiskLevel = normalizeCardioRiskLevel(
+        siblingCardio.cardiovascular_risk_level || siblingCardio.risk_level
+      );
+
       if (backendPercentage !== null) {
         const finalRiskLevel =
           backendRiskLevel ?? getRiskLevelFromPercentage(backendPercentage);
+
         return {
           probability: Number((backendPercentage / 100).toFixed(4)),
           percentage: backendPercentage,
           risk_level: finalRiskLevel,
           message:
+            siblingCardio.cardiovascular_message ||
             siblingCardio.message ||
             getCardioRiskMessage(finalRiskLevel, t),
-          z_score: 0,
+          z_score: Number(siblingCardio.cardiovascular_z_score ?? 0),
           isFallback: false,
         };
       }
@@ -385,6 +420,32 @@ const getCardioPrediction = (
   });
 };
 
+const getSeverityScore = (
+  value: number,
+  thresholds: {
+    normal: number;
+    medium: number;
+    high: number;
+    veryHigh: number;
+  }
+) => {
+  if (value >= thresholds.veryHigh) return 4;
+  if (value >= thresholds.high) return 3;
+  if (value >= thresholds.medium) return 2;
+  if (value >= thresholds.normal) return 1;
+  return 0;
+};
+
+const normalizeIndicatorsBySeverity = (indicators: RiskIndicatorItem[]) => {
+  return indicators
+    .filter((item) => item.severity > 0 && !Number.isNaN(item.value))
+    .sort((a, b) => {
+      if (b.severity !== a.severity) return b.severity - a.severity;
+      return b.value - a.value;
+    })
+    .slice(0, 3);
+};
+
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const { t, i18n } = useTranslation();
@@ -414,6 +475,7 @@ const Dashboard = () => {
     const fetchPredictions = async () => {
       try {
         setIsLoading(true);
+        setError(null);
 
         const data = await apiCall<{
           count: number;
@@ -422,7 +484,9 @@ const Dashboard = () => {
           method: "GET",
         });
 
-        const filtered = (data.predictions || [])
+        const allPredictions = data.predictions || [];
+
+        const filtered = allPredictions
           .filter((p) => !p.disease_type || p.disease_type === "diabetes")
           .sort(
             (a, b) =>
@@ -430,7 +494,7 @@ const Dashboard = () => {
               new Date(a.created_at).getTime()
           );
 
-        setPredictions(filtered);
+        setPredictions(allPredictions.length ? allPredictions : filtered);
       } catch (err) {
         console.error("Error fetching predictions:", err);
         setError(t("dashboard.fetchError"));
@@ -499,10 +563,7 @@ const Dashboard = () => {
     }
   };
 
-  const formatNumber = (
-    value: number,
-    options?: Intl.NumberFormatOptions
-  ) => {
+  const formatNumber = (value: number, options?: Intl.NumberFormatOptions) => {
     return value.toLocaleString(isArabic ? "ar-EG" : "en-US", options);
   };
 
@@ -535,10 +596,22 @@ const Dashboard = () => {
     return normalizePercentageValue(prediction.probability) ?? 0;
   };
 
+  // مهم:
+  // هنا الريسك بتاع السكر بقى بيتحسب من النسبة الراجعة من الباك فقط،
+  // ومبقاش بياخد risk_level من الباك عشان مايحصلش تعارض زي 30.95% وتظهر Low.
   const getEffectiveDiabetesRiskLevel = (prediction: Prediction): RiskLevel => {
     const percentage = getDiabetesPercentage(prediction);
     return getRiskLevelFromPercentage(percentage);
   };
+
+  const diabetesPredictions = useMemo(() => {
+    return predictions
+      .filter((p) => !p.disease_type || p.disease_type === "diabetes")
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+  }, [predictions]);
 
   const getAverageValue = (values: number[]) => {
     if (!values.length) return null;
@@ -553,22 +626,42 @@ const Dashboard = () => {
       return {
         percentage: 0,
         level: "unknown" as RiskLevel | "unknown",
+        diabetesPercentage: 0,
+        diabetesLevel: "unknown" as RiskLevel | "unknown",
+        cardioPercentage: 0,
+        cardioLevel: "unknown" as RiskLevel | "unknown",
       };
     }
 
     let highestPercentage = 0;
     let highestLevel: RiskLevel | "unknown" = "unknown";
 
+    let highestDiabetesPercentage = 0;
+    let highestDiabetesLevel: RiskLevel | "unknown" = "unknown";
+
+    let highestCardioPercentage = 0;
+    let highestCardioLevel: RiskLevel | "unknown" = "unknown";
+
     sourcePredictions.forEach((prediction) => {
       const diabetesPercentage = getDiabetesPercentage(prediction);
       const diabetesLevel = getEffectiveDiabetesRiskLevel(prediction);
+
+      if (diabetesPercentage > highestDiabetesPercentage) {
+        highestDiabetesPercentage = diabetesPercentage;
+        highestDiabetesLevel = diabetesLevel;
+      }
 
       if (diabetesPercentage > highestPercentage) {
         highestPercentage = diabetesPercentage;
         highestLevel = diabetesLevel;
       }
 
-      const cardio = getCardioPrediction(prediction, t);
+      const cardio = getCardioPrediction(prediction, t, predictions);
+
+      if (cardio.percentage > highestCardioPercentage) {
+        highestCardioPercentage = cardio.percentage;
+        highestCardioLevel = cardio.risk_level;
+      }
 
       if (cardio.percentage > highestPercentage) {
         highestPercentage = cardio.percentage;
@@ -579,6 +672,10 @@ const Dashboard = () => {
     return {
       percentage: Number(highestPercentage.toFixed(2)),
       level: highestLevel,
+      diabetesPercentage: Number(highestDiabetesPercentage.toFixed(2)),
+      diabetesLevel: highestDiabetesLevel,
+      cardioPercentage: Number(highestCardioPercentage.toFixed(2)),
+      cardioLevel: highestCardioLevel,
     };
   };
 
@@ -603,12 +700,12 @@ const Dashboard = () => {
       .replace(/\s+/g, " ");
   };
 
-  const latestPrediction = predictions[0];
+  const latestPrediction = diabetesPredictions[0];
 
   const latestCardioPrediction = useMemo(() => {
     if (!latestPrediction) return null;
-    return getCardioPrediction(latestPrediction, t);
-  }, [latestPrediction, t]);
+    return getCardioPrediction(latestPrediction, t, predictions);
+  }, [latestPrediction, t, predictions]);
 
   const latestDiabetesRiskLevel = useMemo(() => {
     if (!latestPrediction) return null;
@@ -626,24 +723,24 @@ const Dashboard = () => {
   }, [latestCardioPrediction]);
 
   const averageRisk = useMemo(() => {
-    if (!predictions.length) return 0;
+    if (!diabetesPredictions.length) return 0;
 
-    const total = predictions.reduce((sum, pred) => {
+    const total = diabetesPredictions.reduce((sum, pred) => {
       return sum + getDiabetesPercentage(pred);
     }, 0);
 
-    return total / predictions.length;
-  }, [predictions]);
+    return total / diabetesPredictions.length;
+  }, [diabetesPredictions]);
 
   const averageCardioRisk = useMemo(() => {
-    if (!predictions.length) return 0;
+    if (!diabetesPredictions.length) return 0;
 
-    const total = predictions.reduce((sum, pred) => {
-      return sum + getCardioPrediction(pred, t).percentage;
+    const total = diabetesPredictions.reduce((sum, pred) => {
+      return sum + getCardioPrediction(pred, t, predictions).percentage;
     }, 0);
 
-    return total / predictions.length;
-  }, [predictions, t]);
+    return total / diabetesPredictions.length;
+  }, [diabetesPredictions, predictions, t]);
 
   const rangePredictions = useMemo(() => {
     if (!selectedRange) return [];
@@ -655,7 +752,7 @@ const Dashboard = () => {
       startDate.setHours(0, 0, 0, 0);
       startDate.setDate(now.getDate() - 27);
 
-      return [...predictions]
+      return [...diabetesPredictions]
         .filter(
           (pred) => new Date(pred.created_at).getTime() >= startDate.getTime()
         )
@@ -665,10 +762,10 @@ const Dashboard = () => {
         );
     }
 
-    const startDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
     const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    return [...predictions]
+    return [...diabetesPredictions]
       .filter((pred) => {
         const date = new Date(pred.created_at).getTime();
 
@@ -678,7 +775,7 @@ const Dashboard = () => {
         (a, b) =>
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
-  }, [predictions, selectedRange]);
+  }, [diabetesPredictions, selectedRange]);
 
   const inputsChartData = useMemo(() => {
     if (!latestPrediction) return [];
@@ -810,7 +907,7 @@ const Dashboard = () => {
   }, [latestPrediction, isArabic, t]);
 
   const riskDistributionData = useMemo<RiskDistributionItem[]>(() => {
-    const sourcePredictions = selectedRange ? rangePredictions : predictions;
+    const sourcePredictions = selectedRange ? rangePredictions : diabetesPredictions;
 
     const counts: Record<RiskLevel, number> = {
       low: 0,
@@ -821,7 +918,7 @@ const Dashboard = () => {
 
     sourcePredictions.forEach((pred) => {
       const diabetesRisk = getEffectiveDiabetesRiskLevel(pred);
-      const cardioRisk = getCardioPrediction(pred, t).risk_level;
+      const cardioRisk = getCardioPrediction(pred, t, predictions).risk_level;
 
       counts[diabetesRisk] += 1;
       counts[cardioRisk] += 1;
@@ -870,32 +967,51 @@ const Dashboard = () => {
         color: RISK_COLORS.very_high,
       },
     ];
-  }, [predictions, rangePredictions, selectedRange, t]);
+  }, [diabetesPredictions, rangePredictions, selectedRange, predictions, t]);
 
-  const rangeSummary = useMemo(() => {
+  const rangeSummary = useMemo<RangeSummary | null>(() => {
     if (!selectedRange) return null;
 
-    const totalRiskValues = rangePredictions.flatMap((prediction) => {
-      const cardio = getCardioPrediction(prediction, t);
+    const diabetesValues = rangePredictions.map(getDiabetesPercentage);
+    const cardioValues = rangePredictions.map(
+      (prediction) => getCardioPrediction(prediction, t, predictions).percentage
+    );
 
-      return [getDiabetesPercentage(prediction), cardio.percentage];
-    });
+    const allRiskValues = [...diabetesValues, ...cardioValues];
 
     const average =
-      totalRiskValues.length > 0
-        ? totalRiskValues.reduce((sum, value) => sum + value, 0) /
-          totalRiskValues.length
+      allRiskValues.length > 0
+        ? allRiskValues.reduce((sum, value) => sum + value, 0) /
+          allRiskValues.length
+        : 0;
+
+    const diabetesAverage =
+      diabetesValues.length > 0
+        ? diabetesValues.reduce((sum, value) => sum + value, 0) /
+          diabetesValues.length
+        : 0;
+
+    const cardioAverage =
+      cardioValues.length > 0
+        ? cardioValues.reduce((sum, value) => sum + value, 0) /
+          cardioValues.length
         : 0;
 
     const highestRisk = getHighestRiskFromPredictions(rangePredictions);
 
     return {
       average: Number(average.toFixed(2)),
+      diabetesAverage: Number(diabetesAverage.toFixed(2)),
+      cardioAverage: Number(cardioAverage.toFixed(2)),
       reports: rangePredictions.length,
       highestPercentage: highestRisk.percentage,
       highestLevel: highestRisk.level,
+      highestDiabetesPercentage: highestRisk.diabetesPercentage,
+      highestDiabetesLevel: highestRisk.diabetesLevel,
+      highestCardioPercentage: highestRisk.cardioPercentage,
+      highestCardioLevel: highestRisk.cardioLevel,
     };
-  }, [rangePredictions, selectedRange, t]);
+  }, [rangePredictions, selectedRange, predictions, t]);
 
   const rangeTrendChartData = useMemo(() => {
     if (!selectedRange) return [];
@@ -911,7 +1027,7 @@ const Dashboard = () => {
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 7);
 
-        const weekPredictions = predictions.filter((prediction) => {
+        const weekPredictions = diabetesPredictions.filter((prediction) => {
           const predictionTime = new Date(prediction.created_at).getTime();
 
           return (
@@ -923,7 +1039,7 @@ const Dashboard = () => {
         const diabetesValues = weekPredictions.map(getDiabetesPercentage);
 
         const cardioValues = weekPredictions.map(
-          (prediction) => getCardioPrediction(prediction, t).percentage
+          (prediction) => getCardioPrediction(prediction, t, predictions).percentage
         );
 
         const diabetesAverage = getAverageValue(diabetesValues);
@@ -934,7 +1050,9 @@ const Dashboard = () => {
 
         return {
           key: `week-${index + 1}`,
-          label: `${isArabic ? "الأسبوع" : "Week"} ${formatNumber(index + 1)}`,
+          label: t("dashboard.extra.weekNumber", {
+            number: formatNumber(index + 1),
+          }),
           diabetesRisk: diabetesAverage,
           cardioRisk: cardioAverage,
           averageRisk: weeklyAverage,
@@ -950,14 +1068,14 @@ const Dashboard = () => {
       });
     }
 
-    const monthSlots = Array.from({ length: 6 }, (_, index) => {
-      return new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
+    const monthSlots = Array.from({ length: 12 }, (_, index) => {
+      return new Date(now.getFullYear(), now.getMonth() - 11 + index, 1);
     });
 
     return monthSlots.map((monthDate) => {
       const monthKey = getMonthKey(monthDate);
 
-      const monthPredictions = predictions.filter((prediction) => {
+      const monthPredictions = diabetesPredictions.filter((prediction) => {
         const predictionDate = new Date(prediction.created_at);
 
         return getMonthKey(predictionDate) === monthKey;
@@ -966,7 +1084,7 @@ const Dashboard = () => {
       const diabetesValues = monthPredictions.map(getDiabetesPercentage);
 
       const cardioValues = monthPredictions.map(
-        (prediction) => getCardioPrediction(prediction, t).percentage
+        (prediction) => getCardioPrediction(prediction, t, predictions).percentage
       );
 
       const diabetesAverage = getAverageValue(diabetesValues);
@@ -991,12 +1109,10 @@ const Dashboard = () => {
         reports: monthPredictions.length,
       };
     });
-  }, [predictions, selectedRange, isArabic, t]);
-
-  const searchedPredictions = useMemo(() => {
+  }, [diabetesPredictions, selectedRange, isArabic, predictions, t]);  const searchedPredictions = useMemo(() => {
     const query = normalizeSearchText(searchTerm);
 
-    const sortedPredictions = [...predictions].sort(
+    const sortedPredictions = [...diabetesPredictions].sort(
       (a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
@@ -1005,7 +1121,7 @@ const Dashboard = () => {
 
     return sortedPredictions
       .filter((pred) => {
-        const cardio = getCardioPrediction(pred, t);
+        const cardio = getCardioPrediction(pred, t, predictions);
         const diabetesRiskLevel = getEffectiveDiabetesRiskLevel(pred);
 
         const localizedDate = new Date(pred.created_at).toLocaleDateString(
@@ -1020,9 +1136,10 @@ const Dashboard = () => {
             pred.blood_pressure,
             pred.skin_thickness,
             pred.insulin,
-            pred.bmi,
             pred.diabetes_pedigree_function,
             pred.age,
+            pred.weight,
+            pred.height,
             getDiabetesPercentage(pred),
             diabetesRiskLevel,
             getLocalizedRiskLabel(diabetesRiskLevel),
@@ -1038,7 +1155,7 @@ const Dashboard = () => {
         return searchableContent.includes(query);
       })
       .slice(0, 3);
-  }, [predictions, searchTerm, isArabic, t]);
+  }, [diabetesPredictions, searchTerm, isArabic, predictions, t]);
 
   const desktopContentOffsetClass = isArabic
     ? isDesktopSidebarCollapsed
@@ -1056,9 +1173,230 @@ const Dashboard = () => {
   const diabetesLabel = t("dashboard.extra.diabetes");
   const cardioLabel = t("dashboard.extra.cardiovascular");
 
+  const buildRiskIndicators = (pred: Prediction) => {
+    const height = pred.height ?? 170;
+
+    const calculatedWeightFromBmi = Number(
+      (Number(pred.bmi ?? 0) * Math.pow(height / 100, 2)).toFixed(1)
+    );
+
+    const weight =
+      pred.weight ??
+      (calculatedWeightFromBmi > 0 ? calculatedWeightFromBmi : 70);
+
+    const systolicBloodPressure =
+      pred.systolic_blood_pressure ??
+      Math.min((pred.blood_pressure ?? 80) + 40, 260);
+
+    const diastolicBloodPressure =
+      pred.diastolic_blood_pressure ?? pred.blood_pressure ?? 80;
+
+    const cholesterol = pred.cholesterol ?? 180;
+
+    const diabetesIndicators = normalizeIndicatorsBySeverity([
+      ...(shouldShowPregnanciesInput(pred)
+        ? [
+            {
+              key: "pregnancies",
+              label: t("dashboard.extra.inputs.pregnancies"),
+              value: Number(pred.pregnancies ?? 0),
+              severity: getSeverityScore(Number(pred.pregnancies ?? 0), {
+                normal: 1,
+                medium: 3,
+                high: 5,
+                veryHigh: 8,
+              }),
+            },
+          ]
+        : []),
+
+      {
+        key: "glucose",
+        label: t("dashboard.extra.inputs.glucose"),
+        value: Number(pred.glucose ?? 0),
+        severity: getSeverityScore(Number(pred.glucose ?? 0), {
+          normal: 100,
+          medium: 126,
+          high: 180,
+          veryHigh: 250,
+        }),
+      },
+
+      {
+        key: "diabetes_bp",
+        label: t("dashboard.extra.inputs.diabetesBloodPressure"),
+        value: Number(pred.blood_pressure ?? 0),
+        severity: getSeverityScore(Number(pred.blood_pressure ?? 0), {
+          normal: 80,
+          medium: 90,
+          high: 100,
+          veryHigh: 120,
+        }),
+      },
+
+      {
+        key: "skin_thickness",
+        label: t("dashboard.extra.inputs.skinThickness"),
+        value: Number(pred.skin_thickness ?? 0),
+        severity: getSeverityScore(Number(pred.skin_thickness ?? 0), {
+          normal: 25,
+          medium: 35,
+          high: 45,
+          veryHigh: 55,
+        }),
+      },
+
+      {
+        key: "insulin",
+        label: t("dashboard.extra.inputs.insulin"),
+        value: Number(pred.insulin ?? 0),
+        severity: getSeverityScore(Number(pred.insulin ?? 0), {
+          normal: 25,
+          medium: 100,
+          high: 200,
+          veryHigh: 400,
+        }),
+      },
+
+      {
+        key: "weight_diabetes",
+        label: t("dashboard.extra.inputs.weight"),
+        value: Number(weight),
+        severity: getSeverityScore(Number(weight), {
+          normal: 80,
+          medium: 100,
+          high: 120,
+          veryHigh: 150,
+        }),
+      },
+
+      {
+        key: "height_diabetes",
+        label: t("dashboard.extra.inputs.height"),
+        value: Number(height),
+        severity: 1,
+      },
+
+      {
+        key: "pedigree",
+        label: t("dashboard.extra.inputs.pedigree"),
+        value: Number(pred.diabetes_pedigree_function ?? 0),
+        severity: getSeverityScore(
+          Number(pred.diabetes_pedigree_function ?? 0),
+          {
+            normal: 0.5,
+            medium: 0.8,
+            high: 1.2,
+            veryHigh: 1.8,
+          }
+        ),
+      },
+
+      {
+        key: "age_diabetes",
+        label: t("dashboard.extra.inputs.age"),
+        value: Number(pred.age ?? 0),
+        severity: getSeverityScore(Number(pred.age ?? 0), {
+          normal: 45,
+          medium: 55,
+          high: 65,
+          veryHigh: 75,
+        }),
+      },
+    ]);
+
+    const cardioIndicators = normalizeIndicatorsBySeverity([
+      {
+        key: "systolic_bp",
+        label: t("dashboard.extra.inputs.systolic"),
+        value: Number(systolicBloodPressure),
+        severity: getSeverityScore(Number(systolicBloodPressure), {
+          normal: 120,
+          medium: 130,
+          high: 140,
+          veryHigh: 180,
+        }),
+      },
+
+      {
+        key: "diastolic_bp",
+        label: t("dashboard.extra.inputs.diastolic"),
+        value: Number(diastolicBloodPressure),
+        severity: getSeverityScore(Number(diastolicBloodPressure), {
+          normal: 80,
+          medium: 90,
+          high: 100,
+          veryHigh: 120,
+        }),
+      },
+
+      {
+        key: "cholesterol",
+        label: t("dashboard.extra.inputs.cholesterol"),
+        value: Number(cholesterol),
+        severity: getSeverityScore(Number(cholesterol), {
+          normal: 200,
+          medium: 240,
+          high: 280,
+          veryHigh: 320,
+        }),
+      },
+
+      {
+        key: "weight",
+        label: t("dashboard.extra.inputs.weight"),
+        value: Number(weight),
+        severity: getSeverityScore(Number(weight), {
+          normal: 80,
+          medium: 100,
+          high: 120,
+          veryHigh: 150,
+        }),
+      },
+
+      {
+        key: "glucose_cardio",
+        label: t("dashboard.extra.inputs.glucose"),
+        value: Number(pred.glucose ?? 0),
+        severity: getSeverityScore(Number(pred.glucose ?? 0), {
+          normal: 100,
+          medium: 126,
+          high: 180,
+          veryHigh: 250,
+        }),
+      },
+
+      {
+        key: "age_cardio",
+        label: t("dashboard.extra.inputs.age"),
+        value: Number(pred.age ?? 0),
+        severity: getSeverityScore(Number(pred.age ?? 0), {
+          normal: 45,
+          medium: 55,
+          high: 65,
+          veryHigh: 75,
+        }),
+      },
+    ]);
+
+    return {
+      height,
+      weight,
+      systolicBloodPressure,
+      diastolicBloodPressure,
+      cholesterol,
+      diabetesIndicators,
+      cardioIndicators,
+    };
+  };
+
   const latestScoresBlock = (
-    <div className="flex flex-wrap items-center justify-start gap-x-4 gap-y-2 text-left">
-      <div className="flex flex-wrap items-center justify-start gap-1.5">
+    <div
+      className={`flex w-full flex-col gap-2 text-right sm:w-auto xl:flex-row xl:flex-wrap xl:items-center xl:justify-start xl:gap-x-4 xl:gap-y-2 ${
+        isArabic ? "items-end" : "items-end xl:text-left"
+      }`}
+    >
+      <div className="flex w-full flex-wrap items-center justify-end gap-1.5 xl:w-auto xl:justify-start">
         <span className="text-[11px] font-semibold text-muted-foreground">
           {t("dashboard.extra.latestDiabetesScore")}
         </span>
@@ -1083,7 +1421,7 @@ const Dashboard = () => {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-start gap-1.5">
+      <div className="flex w-full flex-wrap items-center justify-end gap-1.5 xl:w-auto xl:justify-start">
         <span className="text-[11px] font-semibold text-muted-foreground">
           {t("dashboard.extra.latestCardioScore")}
         </span>
@@ -1206,54 +1544,88 @@ const Dashboard = () => {
     );
   };
 
-  const buildReportState = (pred: Prediction) => {
-    const cardio = getCardioPrediction(pred, t);
-    const diabetesPercentage = getDiabetesPercentage(pred);
-    const diabetesRiskLevel = getEffectiveDiabetesRiskLevel(pred);
+const buildReportState = (pred: Prediction) => {
+  const cardio = getCardioPrediction(pred, t, predictions);
+  const diabetesPercentage = getDiabetesPercentage(pred);
+  const diabetesRiskLevel = getEffectiveDiabetesRiskLevel(pred);
 
-    const height = pred.height ?? 170;
+  const normalizedGender = normalizeGenderValue(pred.gender);
 
-    const calculatedWeightFromBmi = Number(
-      (Number(pred.bmi ?? 0) * Math.pow(height / 100, 2)).toFixed(1)
-    );
+  const reportGender =
+    normalizedGender === "male" || normalizedGender === "female"
+      ? normalizedGender
+      : Number(pred.pregnancies ?? 0) > 0
+      ? "female"
+      : "male";
 
-    const weight =
-      pred.weight ?? (calculatedWeightFromBmi > 0 ? calculatedWeightFromBmi : 70);
+  const height = pred.height ?? 170;
 
-    return {
-      formData: {
-        gender: pred.gender,
-        pregnancies: pred.pregnancies,
-        glucose: pred.glucose,
-        bloodPressure: pred.blood_pressure,
-        systolicBloodPressure: pred.systolic_blood_pressure,
-        diastolicBloodPressure:
-          pred.diastolic_blood_pressure ?? pred.blood_pressure,
-        skinThickness: pred.skin_thickness,
-        insulin: pred.insulin,
-        weight,
-        height,
-        cholesterol: pred.cholesterol,
-        bmi: pred.bmi,
-        diabetesPedigreeFunction: pred.diabetes_pedigree_function,
-        age: pred.age,
-      },
+  const calculatedWeightFromBmi = Number(
+    (Number(pred.bmi ?? 0) * Math.pow(height / 100, 2)).toFixed(1)
+  );
+
+  const weight =
+    pred.weight ?? (calculatedWeightFromBmi > 0 ? calculatedWeightFromBmi : 70);
+
+  const diastolicBloodPressure =
+    pred.diastolic_blood_pressure ?? pred.blood_pressure ?? 80;
+
+  const systolicBloodPressure =
+    pred.systolic_blood_pressure ??
+    Math.min(diastolicBloodPressure + 40, 260);
+
+  const cholesterol = pred.cholesterol ?? 180;
+
+  const pregnancies =
+    reportGender === "female" ? Number(pred.pregnancies ?? 0) : 0;
+
+  return {
+    formData: {
+      gender: reportGender,
+
+      ...(reportGender === "female"
+        ? {
+            pregnancies,
+          }
+        : {}),
+
+      glucose: pred.glucose,
+      systolicBloodPressure,
+      diastolicBloodPressure,
+      skinThickness: pred.skin_thickness,
+      insulin: pred.insulin,
+      weight,
+      height,
+      cholesterol,
+      diabetesPedigreeFunction: pred.diabetes_pedigree_function,
+      age: pred.age,
+    },
+
+    probability: diabetesPercentage,
+    percentage: diabetesPercentage,
+    riskLevel: diabetesRiskLevel,
+    message: pred.message,
+    predictionId: pred.id,
+    sessionId: pred.session_id,
+
+    diabetesPrediction: {
       probability: diabetesPercentage,
-      riskLevel: getLocalizedRiskLabel(diabetesRiskLevel),
+      percentage: diabetesPercentage,
+      risk_level: diabetesRiskLevel,
       message: pred.message,
-      predictionId: pred.id,
+      prediction_id: pred.id,
+    },
 
-      diabetesPrediction: {
-        probability: diabetesPercentage,
-        risk_level: diabetesRiskLevel,
-        message: pred.message,
-        prediction_id: pred.id,
-      },
-
-      cardiovascularPrediction: cardio,
-    };
+    cardiovascularPrediction: {
+      ...cardio,
+      probability:
+        cardio.percentage <= 1
+          ? cardio.percentage
+          : Number((cardio.percentage / 100).toFixed(4)),
+      percentage: cardio.percentage,
+    },
   };
-
+};
   const visibleRiskDistributionData = riskDistributionData.filter(
     (item) => item.value > 0
   );
@@ -1265,15 +1637,12 @@ const Dashboard = () => {
     >
       <Header variant="dashboard" />
 
-      <main
-        className="w-full max-w-none flex-1 overflow-x-hidden px-3 pb-4 pt-16 sm:px-4 lg:px-5 xl:pt-0"
-        style={{ paddingTop: undefined }}
-      >
+      <main className="w-full max-w-none flex-1 overflow-x-hidden px-3 pb-4 pt-16 sm:px-4 lg:px-5 xl:pt-0">
         <div className="relative w-full max-w-none">
           <PatientSidebar
             user={user}
             isArabic={isArabic}
-            predictionsLength={predictions.length}
+            predictionsLength={diabetesPredictions.length}
             isSidebarOpen={isSidebarOpen}
             setIsSidebarOpen={setIsSidebarOpen}
             isDesktopSidebarCollapsed={isDesktopSidebarCollapsed}
@@ -1382,117 +1751,137 @@ const Dashboard = () => {
             <section
               className={`grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 ${smoothSectionClass}`}
             >
-              <Card className="group rounded-[18px] border border-border bg-card p-4 text-card-foreground shadow-sm transition-colors duration-200 hover:border-primary/25 hover:bg-primary/5">
+              <Card className="group relative overflow-hidden rounded-[18px] border border-border bg-card p-4 text-card-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/35 hover:bg-primary/5 hover:shadow-lg">
+                <div className="absolute inset-x-0 top-0 h-1 bg-primary/70" />
+
                 <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                   <Activity className="h-5 w-5 text-primary" />
                 </div>
 
-                <p className="mb-3 text-sm text-muted-foreground">
+                <p className="mb-3 text-sm font-semibold text-primary">
                   {t("dashboard.extra.averageRisk")}
                 </p>
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium text-muted-foreground">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium text-muted-foreground">
                       {diabetesLabel}
-                    </span>
+                    </p>
 
-                    <span className="text-xl font-bold text-foreground">
-                      {predictions.length
+                    <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                      {diabetesPredictions.length
                         ? `${formatNumber(averageRisk, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}%`
                         : "--"}
-                    </span>
+                    </p>
                   </div>
 
-                  <div className="h-px bg-border" />
+                  <div className="h-12 w-px shrink-0 bg-border" />
 
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium text-muted-foreground">
+                  <div
+                    className={`min-w-0 flex-1 ${
+                      isArabic ? "text-left" : "text-right"
+                    }`}
+                  >
+                    <p className="truncate text-xs font-medium text-muted-foreground">
                       {cardioLabel}
-                    </span>
+                    </p>
 
-                    <span className="text-xl font-bold text-foreground">
-                      {predictions.length
+                    <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                      {diabetesPredictions.length
                         ? `${formatNumber(averageCardioRisk, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}%`
                         : "--"}
-                    </span>
+                    </p>
                   </div>
                 </div>
               </Card>
 
-              <Card className="group rounded-[18px] border border-border bg-card p-4 text-card-foreground shadow-sm transition-colors duration-200 hover:border-primary/25 hover:bg-primary/5">
+              <Card className="group relative overflow-hidden rounded-[18px] border border-border bg-card p-4 text-card-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/35 hover:bg-primary/5 hover:shadow-lg">
+                <div className="absolute inset-x-0 top-0 h-1 bg-primary/70" />
+
                 <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                   <ShieldCheck className="h-5 w-5 text-primary" />
                 </div>
 
-                <p className="mb-3 text-sm text-muted-foreground">
+                <p className="mb-3 text-sm font-semibold text-primary">
                   {t("dashboard.extra.latestStatus")}
                 </p>
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium text-muted-foreground">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium text-muted-foreground">
                       {diabetesLabel}
-                    </span>
+                    </p>
 
-                    <span className={`text-xl font-bold ${latestRiskTextColor}`}>
+                    <p
+                      className={`mt-1 truncate text-2xl font-bold tracking-tight ${latestRiskTextColor}`}
+                    >
                       {latestDiabetesRiskLevel
                         ? getLocalizedRiskLabel(latestDiabetesRiskLevel)
                         : "--"}
-                    </span>
+                    </p>
                   </div>
 
-                  <div className="h-px bg-border" />
+                  <div className="h-12 w-px shrink-0 bg-border" />
 
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium text-muted-foreground">
+                  <div
+                    className={`min-w-0 flex-1 ${
+                      isArabic ? "text-left" : "text-right"
+                    }`}
+                  >
+                    <p className="truncate text-xs font-medium text-muted-foreground">
                       {cardioLabel}
-                    </span>
+                    </p>
 
-                    <span
-                      className={`text-xl font-bold ${latestCardioRiskTextColor}`}
+                    <p
+                      className={`mt-1 truncate text-2xl font-bold tracking-tight ${latestCardioRiskTextColor}`}
                     >
                       {latestCardioPrediction
                         ? getLocalizedRiskLabel(
                             latestCardioPrediction.risk_level
                           )
                         : "--"}
-                    </span>
+                    </p>
                   </div>
                 </div>
               </Card>
 
-              <Card className="group rounded-[18px] border border-border bg-card p-4 text-card-foreground shadow-sm transition-colors duration-200 hover:border-primary/25 hover:bg-primary/5">
+              <Card className="group relative overflow-hidden rounded-[18px] border border-border bg-card p-4 text-card-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/35 hover:bg-primary/5 hover:shadow-lg">
+                <div className="absolute inset-x-0 top-0 h-1 bg-primary/70" />
+
                 <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                   <FileText className="h-5 w-5 text-primary" />
                 </div>
 
-                <p className="mb-1.5 text-sm text-muted-foreground">
+                <p className="mb-1.5 text-sm font-semibold text-primary">
                   {t("dashboard.savedReports")}
                 </p>
 
                 <h3 className="text-2xl font-bold text-foreground">
-                  {formatNumber(predictions.length)}
+                  {formatNumber(diabetesPredictions.length)}
                 </h3>
               </Card>
 
-              <Card className="group rounded-[18px] border border-border bg-card p-4 text-card-foreground shadow-sm transition-colors duration-200 hover:border-primary/25 hover:bg-primary/5">
+              <Card className="group relative overflow-hidden rounded-[18px] border border-border bg-card p-4 text-card-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/35 hover:bg-primary/5 hover:shadow-lg">
+                <div className="absolute inset-x-0 top-0 h-1 bg-primary/70" />
+
                 <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
                   <Clock3 className="h-5 w-5 text-primary" />
                 </div>
 
-                <p className="mb-1.5 text-sm text-muted-foreground">
+                <p className="mb-1.5 text-sm font-semibold text-primary">
                   {t("dashboard.lastCheckup")}
                 </p>
 
                 <h3 className="text-xl font-bold text-foreground">
-                  {latestPrediction ? formatDate(latestPrediction.created_at) : "--"}
+                  {latestPrediction
+                    ? formatDate(latestPrediction.created_at)
+                    : "--"}
                 </h3>
               </Card>
             </section>
@@ -1509,7 +1898,7 @@ const Dashboard = () => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    {predictions.length > 3 && !selectedRange && (
+                    {diabetesPredictions.length > 3 && !selectedRange && (
                       <Link to="/past-reports">
                         <Button variant="outline" size="sm">
                           {t("dashboard.allReports")}
@@ -1588,24 +1977,57 @@ const Dashboard = () => {
                                 </div>
                               </div>
 
-                              <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                              <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
                                 <div className="rounded-2xl border border-border bg-primary/5 p-3 transition-all duration-300 hover:border-primary/25 hover:bg-primary/10 hover:shadow-sm">
-                                  <p className="text-xs font-medium text-muted-foreground">
+                                  <p className="mb-3 text-xs font-semibold text-primary">
                                     {selectedRange === "weekly"
                                       ? t("dashboard.extra.weeklyAverage")
                                       : t("dashboard.extra.monthlyAverage")}
                                   </p>
 
-                                  <h5 className="mt-1 text-2xl font-bold text-foreground">
-                                    {`${formatNumber(rangeSummary.average, {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })}%`}
-                                  </h5>
+                                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+                                    <div className="min-w-0">
+                                      <p className="truncate text-xs font-medium text-muted-foreground">
+                                        {diabetesLabel}
+                                      </p>
+
+                                      <h5 className="mt-1 whitespace-nowrap text-xl font-bold text-foreground sm:text-2xl">
+                                        {`${formatNumber(
+                                          rangeSummary.diabetesAverage,
+                                          {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                          }
+                                        )}%`}
+                                      </h5>
+                                    </div>
+
+                                    <div className="hidden h-12 w-px shrink-0 bg-border sm:block" />
+
+                                    <div
+                                      className={`min-w-0 ${
+                                        isArabic ? "sm:text-left" : "sm:text-right"
+                                      }`}
+                                    >
+                                      <p className="truncate text-xs font-medium text-muted-foreground">
+                                        {cardioLabel}
+                                      </p>
+
+                                      <h5 className="mt-1 whitespace-nowrap text-xl font-bold text-foreground sm:text-2xl">
+                                        {`${formatNumber(
+                                          rangeSummary.cardioAverage,
+                                          {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                          }
+                                        )}%`}
+                                      </h5>
+                                    </div>
+                                  </div>
                                 </div>
 
                                 <div className="rounded-2xl border border-border bg-primary/5 p-3 transition-all duration-300 hover:border-primary/25 hover:bg-primary/10 hover:shadow-sm">
-                                  <p className="text-xs font-medium text-muted-foreground">
+                                  <p className="text-xs font-semibold text-primary">
                                     {selectedRange === "weekly"
                                       ? t("dashboard.extra.reportsThisWeek")
                                       : t("dashboard.extra.reportsDisplayedMonths")}
@@ -1617,32 +2039,74 @@ const Dashboard = () => {
                                 </div>
 
                                 <div className="rounded-2xl border border-border bg-primary/5 p-3 transition-all duration-300 hover:border-primary/25 hover:bg-primary/10 hover:shadow-sm">
-                                  <p className="text-xs font-medium text-muted-foreground">
+                                  <p className="mb-3 text-xs font-semibold text-primary">
                                     {selectedRange === "weekly"
                                       ? t("dashboard.extra.highestWeeklyRisk")
                                       : t("dashboard.extra.highestDisplayedRisk")}
                                   </p>
 
-                                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                                    <h5 className="text-2xl font-bold text-foreground">
-                                      {`${formatNumber(
-                                        rangeSummary.highestPercentage,
-                                        {
-                                          minimumFractionDigits: 2,
-                                          maximumFractionDigits: 2,
-                                        }
-                                      )}%`}
-                                    </h5>
+                                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-start">
+                                    <div className="min-w-0">
+                                      <p className="truncate text-xs font-medium text-muted-foreground">
+                                        {diabetesLabel}
+                                      </p>
 
-                                    <span
-                                      className={`text-sm font-bold ${getRiskTextClass(
-                                        rangeSummary.highestLevel
-                                      )}`}
+                                      <div className="mt-1">
+                                        <h5 className="whitespace-nowrap text-xl font-bold text-foreground sm:text-2xl">
+                                          {`${formatNumber(
+                                            rangeSummary.highestDiabetesPercentage,
+                                            {
+                                              minimumFractionDigits: 2,
+                                              maximumFractionDigits: 2,
+                                            }
+                                          )}%`}
+                                        </h5>
+
+                                        <span
+                                          className={`text-xs font-bold ${getRiskTextClass(
+                                            rangeSummary.highestDiabetesLevel
+                                          )}`}
+                                        >
+                                          {getLocalizedRiskLabel(
+                                            rangeSummary.highestDiabetesLevel
+                                          )}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="hidden h-14 w-px shrink-0 bg-border sm:block" />
+
+                                    <div
+                                      className={`min-w-0 ${
+                                        isArabic ? "sm:text-left" : "sm:text-right"
+                                      }`}
                                     >
-                                      {getLocalizedRiskLabel(
-                                        rangeSummary.highestLevel
-                                      )}
-                                    </span>
+                                      <p className="truncate text-xs font-medium text-muted-foreground">
+                                        {cardioLabel}
+                                      </p>
+
+                                      <div className="mt-1">
+                                        <h5 className="whitespace-nowrap text-xl font-bold text-foreground sm:text-2xl">
+                                          {`${formatNumber(
+                                            rangeSummary.highestCardioPercentage,
+                                            {
+                                              minimumFractionDigits: 2,
+                                              maximumFractionDigits: 2,
+                                            }
+                                          )}%`}
+                                        </h5>
+
+                                        <span
+                                          className={`text-xs font-bold ${getRiskTextClass(
+                                            rangeSummary.highestCardioLevel
+                                          )}`}
+                                        >
+                                          {getLocalizedRiskLabel(
+                                            rangeSummary.highestCardioLevel
+                                          )}
+                                        </span>
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -1771,7 +2235,9 @@ const Dashboard = () => {
                                           ? cardioLabel
                                           : name === "diabetesRisk"
                                           ? diabetesLabel
-                                          : t("dashboard.extra.analysisAverage"),
+                                          : t(
+                                              "dashboard.extra.analysisAverage"
+                                            ),
                                       ]}
                                       labelFormatter={(label) => {
                                         const point = rangeTrendChartData.find(
@@ -1865,24 +2331,25 @@ const Dashboard = () => {
                             </>
                           ) : (
                             <>
-                              <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                <div>
-                                  <h4 className="font-semibold text-foreground">
+                              <div className="mb-3 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                                <div className="min-w-0">
+                                  <h4 className="whitespace-nowrap font-semibold text-foreground">
                                     {t("dashboard.extra.analysisInputs")}
                                   </h4>
 
-                                  <p className="text-xs text-muted-foreground">
+                                  <p className="max-w-full text-xs leading-relaxed text-muted-foreground xl:whitespace-nowrap">
                                     {t("dashboard.extra.analysisInputsDesc")}
                                   </p>
                                 </div>
 
-                                <div className="flex max-w-full flex-col items-start gap-2 sm:items-end">
-                                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                <div className="flex w-full max-w-full flex-col items-end gap-2 text-right xl:w-auto xl:items-end">
+                                  <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-muted-foreground xl:justify-start">
                                     <span className="inline-flex items-center gap-2">
                                       <span
                                         className="h-2.5 w-2.5 rounded-full"
                                         style={{
-                                          backgroundColor: DIABETES_CHART_COLOR,
+                                          backgroundColor:
+                                            DIABETES_CHART_COLOR,
                                         }}
                                       />
                                       {diabetesLabel}
@@ -2010,7 +2477,10 @@ const Dashboard = () => {
                                       itemStyle={{
                                         color: "hsl(var(--foreground))",
                                       }}
-                                      formatter={(value: number, name: string) => [
+                                      formatter={(
+                                        value: number,
+                                        name: string
+                                      ) => [
                                         formatNumber(Number(value), {
                                           minimumFractionDigits: 0,
                                           maximumFractionDigits: 3,
@@ -2244,7 +2714,17 @@ const Dashboard = () => {
                       </div>
                     ))}
                   </div>
-                ) : predictions.length === 0 ? (
+                ) : error ? (
+                  <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-8 text-center">
+                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10">
+                      <AlertTriangle className="h-6 w-6 text-red-500" />
+                    </div>
+                    <h4 className="mb-2 font-semibold text-foreground">
+                      {t("dashboard.unableToLoadAnalyses")}
+                    </h4>
+                    <p className="text-sm text-red-500">{error}</p>
+                  </div>
+                ) : diabetesPredictions.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-8 text-center">
                     <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
                       <Beaker className="h-7 w-7 text-primary" />
@@ -2269,16 +2749,6 @@ const Dashboard = () => {
                     </h4>
                     <p className="text-muted-foreground">{searchTerm}</p>
                   </div>
-                ) : error ? (
-                  <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-8 text-center">
-                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10">
-                      <AlertTriangle className="h-6 w-6 text-red-500" />
-                    </div>
-                    <h4 className="mb-2 font-semibold text-foreground">
-                      {t("dashboard.unableToLoadAnalyses")}
-                    </h4>
-                    <p className="text-sm text-red-500">{error}</p>
-                  </div>
                 ) : (
                   <>
                     <div className="hidden w-full overflow-hidden lg:block">
@@ -2299,43 +2769,13 @@ const Dashboard = () => {
                         </div>
 
                         {displayedPredictions.map((pred) => {
-                          const cardio = getCardioPrediction(pred, t);
-                          const diabetesPercentage = getDiabetesPercentage(pred);
+                          const cardio = getCardioPrediction(pred, t, predictions);
+                          const diabetesPercentage =
+                            getDiabetesPercentage(pred);
                           const diabetesRiskLevel =
                             getEffectiveDiabetesRiskLevel(pred);
-
-                          const height = pred.height ?? 170;
-
-                          const calculatedWeightFromBmi = Number(
-                            (
-                              Number(pred.bmi ?? 0) *
-                              Math.pow(height / 100, 2)
-                            ).toFixed(1)
-                          );
-
-                          const weight =
-                            pred.weight ??
-                            (calculatedWeightFromBmi > 0
-                              ? calculatedWeightFromBmi
-                              : 70);
-
-                          const topIndicators = [
-                            {
-                              key: "glucose",
-                              label: t("dashboard.glucose"),
-                              value: pred.glucose,
-                            },
-                            {
-                              key: "weight",
-                              label: t("dashboard.extra.inputs.weight"),
-                              value: weight,
-                            },
-                            {
-                              key: "height",
-                              label: t("dashboard.extra.inputs.height"),
-                              value: height,
-                            },
-                          ];
+                          const { diabetesIndicators, cardioIndicators } =
+                            buildRiskIndicators(pred);
 
                           return (
                             <div
@@ -2349,13 +2789,17 @@ const Dashboard = () => {
                                   </div>
 
                                   <div className="grid grid-cols-[minmax(0,auto)_max-content] items-center gap-x-2 gap-y-2">
-                                    <p className="truncate font-semibold text-foreground">
-                                      {t("dashboard.extra.diabetesRisk")}:{" "}
-                                      {formatNumber(diabetesPercentage, {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      })}
-                                      %
+                                    <p className="truncate font-semibold">
+                                      <span className="text-primary">
+                                        {t("dashboard.extra.diabetesRisk")}:
+                                      </span>{" "}
+                                      <span className="font-normal text-muted-foreground">
+                                        {formatNumber(diabetesPercentage, {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        })}
+                                        %
+                                      </span>
                                     </p>
 
                                     <Badge
@@ -2366,13 +2810,17 @@ const Dashboard = () => {
                                       {getLocalizedRiskLabel(diabetesRiskLevel)}
                                     </Badge>
 
-                                    <p className="truncate font-semibold text-foreground">
-                                      {t("dashboard.extra.cardioRisk")}:{" "}
-                                      {formatNumber(cardio.percentage, {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      })}
-                                      %
+                                    <p className="truncate font-semibold">
+                                      <span className="text-primary">
+                                        {t("dashboard.extra.cardioRisk")}:
+                                      </span>{" "}
+                                      <span className="font-normal text-muted-foreground">
+                                        {formatNumber(cardio.percentage, {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        })}
+                                        %
+                                      </span>
                                     </p>
 
                                     <Badge
@@ -2387,20 +2835,78 @@ const Dashboard = () => {
                               </div>
 
                               <div className="min-w-0">
-                                <div className="flex flex-col gap-1 text-sm">
-                                  {topIndicators.map((indicator) => (
-                                    <div
-                                      key={indicator.key}
-                                      className="flex min-w-0 items-center gap-2"
-                                    >
-                                      <span className="whitespace-nowrap font-medium text-foreground">
-                                        {indicator.label}:
-                                      </span>
-                                      <span className="whitespace-nowrap text-muted-foreground">
-                                        {formatNumber(indicator.value)}
-                                      </span>
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                  <div className="min-w-0 border-e border-border pe-3">
+                                    <p className="mb-1.5 text-xs font-semibold text-primary">
+                                      {diabetesLabel}
+                                    </p>
+
+                                    <div className="flex flex-col gap-1">
+                                      {diabetesIndicators.length > 0 ? (
+                                        diabetesIndicators.map((indicator) => (
+                                          <div
+                                            key={indicator.key}
+                                            className="flex min-w-0 items-center gap-2"
+                                          >
+                                            <span className="truncate font-medium text-foreground">
+                                              {indicator.label}:
+                                            </span>
+
+                                            <span className="whitespace-nowrap text-muted-foreground">
+                                              {formatNumber(
+                                                Number(indicator.value),
+                                                {
+                                                  maximumFractionDigits: 2,
+                                                }
+                                              )}
+                                            </span>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">
+                                          {t(
+                                            "dashboard.extra.noHighIndicators"
+                                          )}
+                                        </span>
+                                      )}
                                     </div>
-                                  ))}
+                                  </div>
+
+                                  <div className="min-w-0">
+                                    <p className="mb-1.5 text-xs font-semibold text-primary">
+                                      {cardioLabel}
+                                    </p>
+
+                                    <div className="flex flex-col gap-1">
+                                      {cardioIndicators.length > 0 ? (
+                                        cardioIndicators.map((indicator) => (
+                                          <div
+                                            key={indicator.key}
+                                            className="flex min-w-0 items-center gap-2"
+                                          >
+                                            <span className="truncate font-medium text-foreground">
+                                              {indicator.label}:
+                                            </span>
+
+                                            <span className="whitespace-nowrap text-muted-foreground">
+                                              {formatNumber(
+                                                Number(indicator.value),
+                                                {
+                                                  maximumFractionDigits: 2,
+                                                }
+                                              )}
+                                            </span>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">
+                                          {t(
+                                            "dashboard.extra.noHighIndicators"
+                                          )}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
 
@@ -2414,7 +2920,10 @@ const Dashboard = () => {
                               </div>
 
                               <div className="flex items-center justify-center gap-2">
-                                <Link to="/report" state={buildReportState(pred)}>
+                                <Link
+                                  to="/report"
+                                  state={buildReportState(pred)}
+                                >
                                   <Button
                                     type="button"
                                     className="h-10 whitespace-nowrap rounded-full bg-primary px-6 font-semibold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md"
@@ -2431,25 +2940,12 @@ const Dashboard = () => {
 
                     <div className="grid gap-3 lg:hidden">
                       {displayedPredictions.map((pred) => {
-                        const cardio = getCardioPrediction(pred, t);
+                        const cardio = getCardioPrediction(pred, t, predictions);
                         const diabetesPercentage = getDiabetesPercentage(pred);
                         const diabetesRiskLevel =
                           getEffectiveDiabetesRiskLevel(pred);
-
-                        const height = pred.height ?? 170;
-
-                        const calculatedWeightFromBmi = Number(
-                          (
-                            Number(pred.bmi ?? 0) *
-                            Math.pow(height / 100, 2)
-                          ).toFixed(1)
-                        );
-
-                        const weight =
-                          pred.weight ??
-                          (calculatedWeightFromBmi > 0
-                            ? calculatedWeightFromBmi
-                            : 70);
+                        const { diabetesIndicators, cardioIndicators } =
+                          buildRiskIndicators(pred);
 
                         return (
                           <div
@@ -2463,13 +2959,17 @@ const Dashboard = () => {
 
                               <div className="min-w-0 flex-1">
                                 <div className="grid grid-cols-[minmax(0,auto)_max-content] items-center gap-x-2 gap-y-2">
-                                  <p className="font-semibold leading-snug text-foreground">
-                                    {t("dashboard.extra.diabetesRisk")}:{" "}
-                                    {formatNumber(diabetesPercentage, {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })}
-                                    %
+                                  <p className="font-semibold leading-snug">
+                                    <span className="text-primary">
+                                      {t("dashboard.extra.diabetesRisk")}:
+                                    </span>{" "}
+                                    <span className="font-normal text-muted-foreground">
+                                      {formatNumber(diabetesPercentage, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                      %
+                                    </span>
                                   </p>
 
                                   <Badge
@@ -2480,13 +2980,17 @@ const Dashboard = () => {
                                     {getLocalizedRiskLabel(diabetesRiskLevel)}
                                   </Badge>
 
-                                  <p className="font-semibold leading-snug text-foreground">
-                                    {t("dashboard.extra.cardioRiskShort")}:{" "}
-                                    {formatNumber(cardio.percentage, {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })}
-                                    %
+                                  <p className="font-semibold leading-snug">
+                                    <span className="text-primary">
+                                      {t("dashboard.extra.cardioRiskShort")}:
+                                    </span>{" "}
+                                    <span className="font-normal text-muted-foreground">
+                                      {formatNumber(cardio.percentage, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                      %
+                                    </span>
                                   </p>
 
                                   <Badge
@@ -2499,36 +3003,81 @@ const Dashboard = () => {
                                 </div>
 
                                 <div className="mt-3 rounded-xl bg-muted/30 p-3">
-                                  <p className="mb-1 text-xs text-muted-foreground">
+                                  <p className="mb-2 text-xs font-semibold text-muted-foreground">
                                     {t("dashboard.riskIndicators")}
                                   </p>
 
-                                  <div className="flex flex-col gap-1 text-sm">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium text-foreground">
-                                        {t("dashboard.glucose")}:
-                                      </span>
-                                      <span className="text-muted-foreground">
-                                        {formatNumber(pred.glucose)}
-                                      </span>
+                                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <div className="rounded-xl border border-border bg-background/60 p-3">
+                                      <p className="mb-2 text-xs font-semibold text-primary">
+                                        {diabetesLabel}
+                                      </p>
+
+                                      <div className="flex flex-col gap-1.5 text-sm">
+                                        {diabetesIndicators.length > 0 ? (
+                                          diabetesIndicators.map((indicator) => (
+                                            <div
+                                              key={indicator.key}
+                                              className="flex min-w-0 items-center justify-between gap-2"
+                                            >
+                                              <span className="truncate font-medium text-foreground">
+                                                {indicator.label}
+                                              </span>
+
+                                              <span className="whitespace-nowrap text-muted-foreground">
+                                                {formatNumber(
+                                                  Number(indicator.value),
+                                                  {
+                                                    maximumFractionDigits: 2,
+                                                  }
+                                                )}
+                                              </span>
+                                            </div>
+                                          ))
+                                        ) : (
+                                          <span className="text-xs text-muted-foreground">
+                                            {t(
+                                              "dashboard.extra.noHighIndicators"
+                                            )}
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium text-foreground">
-                                        {t("dashboard.extra.inputs.weight")}:
-                                      </span>
-                                      <span className="text-muted-foreground">
-                                        {formatNumber(weight)}
-                                      </span>
-                                    </div>
+                                    <div className="rounded-xl border border-border bg-background/60 p-3">
+                                      <p className="mb-2 text-xs font-semibold text-primary">
+                                        {cardioLabel}
+                                      </p>
 
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium text-foreground">
-                                        {t("dashboard.extra.inputs.height")}:
-                                      </span>
-                                      <span className="text-muted-foreground">
-                                        {formatNumber(height)}
-                                      </span>
+                                      <div className="flex flex-col gap-1.5 text-sm">
+                                        {cardioIndicators.length > 0 ? (
+                                          cardioIndicators.map((indicator) => (
+                                            <div
+                                              key={indicator.key}
+                                              className="flex min-w-0 items-center justify-between gap-2"
+                                            >
+                                              <span className="truncate font-medium text-foreground">
+                                                {indicator.label}
+                                              </span>
+
+                                              <span className="whitespace-nowrap text-muted-foreground">
+                                                {formatNumber(
+                                                  Number(indicator.value),
+                                                  {
+                                                    maximumFractionDigits: 2,
+                                                  }
+                                                )}
+                                              </span>
+                                            </div>
+                                          ))
+                                        ) : (
+                                          <span className="text-xs text-muted-foreground">
+                                            {t(
+                                              "dashboard.extra.noHighIndicators"
+                                            )}
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -2537,19 +3086,28 @@ const Dashboard = () => {
                                   <p className="mb-1 text-xs text-muted-foreground">
                                     {t("dashboard.date")}
                                   </p>
+
                                   <p className="text-sm text-muted-foreground">
                                     {formatDate(pred.created_at)}
                                   </p>
+
                                   <p className="mt-1 text-xs text-muted-foreground">
                                     {formatTime(pred.created_at)}
                                   </p>
                                 </div>
 
-                                <div className="mt-3">
-                                  <Link to="/report" state={buildReportState(pred)}>
+                                <div
+                                  className={`mt-4 flex ${
+                                    isArabic ? "justify-start" : "justify-end"
+                                  }`}
+                                >
+                                  <Link
+                                    to="/report"
+                                    state={buildReportState(pred)}
+                                  >
                                     <Button
                                       type="button"
-                                      className="h-10 w-full rounded-full bg-primary font-semibold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md"
+                                      className="h-10 min-w-[132px] rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md sm:min-w-[150px]"
                                     >
                                       {t("dashboard.viewReport")}
                                     </Button>

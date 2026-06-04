@@ -274,7 +274,7 @@ dashboard: {
   savedReports: "Saved Reports",
   lastCheckup: "Last Checkup",
 
-  analysisOverview: "Overview of your diabetes and Cardiovascular analyses",
+  analysisOverview: "Overview of your diabetes and cardiovascular analyses",
   allReports: "All Reports",
   weekly: "Weekly",
   monthly: "Monthly",
@@ -342,36 +342,49 @@ dashboard: {
   chartShortAge: "Age",
 
   extra: {
-      averageRisk: "Average Risk",
-  latestStatus: "Latest Status",
+    averageRisk: "Average Risk",
+    latestStatus: "Latest Status",
+
     diabetes: "Diabetes",
     cardiovascular: "Cardiovascular",
     cardioShort: "Cardio",
-weeklyAverage: "Weekly average",
-monthlyAverage: "Average of displayed analyses",
-highestWeeklyRisk: "Highest weekly risk",
-reportsThisWeek: "Reports this week",
-reportsDisplayedMonths: "Displayed analyses",
-highestDisplayedRisk: "Highest displayed risk",
+
     diabetesRisk: "Diabetes Risk",
     cardioRisk: "Cardiovascular Risk",
     cardioRiskShort: "Cardio Risk",
 
     latestDiabetesScore: "Latest Diabetes Score",
     latestCardioScore: "Latest Cardiovascular Score",
+
+    weekNumber: "Week {{number}}",
+    noHighIndicators: "No high indicators",
+
     weeklyRiskTrend: "Weekly Risk Trend",
     monthlyRiskTrend: "Monthly Risk Trend",
+
     weeklyRiskTrendDesc:
-      "Shows the last 7 days with each day's average score under it",
-    monthlyRiskTrendDesc: "Shows the current month and upcoming months",
+      "Average diabetes and cardiovascular risk over the last 4 weeks",
+    monthlyRiskTrendDesc:
+      "Average diabetes and cardiovascular risk over the last 12 months",
+
+    weeklyAverage: "Average Risk - Last 4 Weeks",
+    monthlyAverage: "Average Risk - Last 12 Months",
+
+    reportsThisWeek: "Reports in Last 4 Weeks",
+    reportsDisplayedMonths: "Reports in Last 12 Months",
+
+    highestWeeklyRisk: "Highest Risk - Last 4 Weeks",
+    highestDisplayedRisk: "Highest Risk - Last 12 Months",
 
     analysisInputs: "Analysis Inputs",
-    analysisInputsDesc: "Values used for diabetes and cardiovascular analysis",
+    analysisInputsDesc:
+      "Comparison of diabetes and cardiovascular inputs in the latest analysis",
 
     riskDistribution: "Risk Distribution",
-    riskDistributionDesc: "Includes diabetes and cardiovascular",
+    riskDistributionDesc:
+      "Distribution of diabetes and cardiovascular results by risk level",
 
-    analysisAverage: "Average",
+    analysisAverage: "Analysis Average",
     reports: "Reports",
 
     riskLevels: {
@@ -382,17 +395,19 @@ highestDisplayedRisk: "Highest displayed risk",
     },
 
     inputs: {
-      pregnancies: "Preg.",
+      pregnancies: "Pregnancies",
       glucose: "Glucose",
-      systolic: "Sys. BP",
-      diastolic: "Dia. BP",
-      skinThickness: "Skin",
+      systolic: "Systolic BP",
+      diastolic: "Diastolic BP",
+      diabetesBloodPressure: "Diabetes BP",
+      skinThickness: "Skin Thickness",
       insulin: "Insulin",
       pedigree: "Pedigree",
       age: "Age",
       weight: "Weight",
       height: "Height",
-      cholesterol: "Chol.",
+      cholesterol: "Cholesterol",
+      bmi: "BMI",
     },
 
     aria: {

@@ -221,181 +221,191 @@ const ar = {
     }
 
   },
-  dashboard: {
-    title: "لوحة التحكم",
-    welcome: "أهلاً بعودتك",
-    hello: "يا",
-    subtitle: "صحتك، بقوة الذكاء الاصطناعي.",
-    mainMenu: "القائمة الرئيسية",
-    search: "بحث",
-    clearSearch: "مسح البحث",
-    newTest: "عمل فحص جديد",
-    newCheckup: "فحص جديد",
-    recentAnalyses: "التحاليل الحديثة",
-    previousReports: "التقارير السابقة",
-    bookConsultation: "احجز استشارة",
-    settings: "الإعدادات",
+dashboard: {
+  title: "لوحة التحكم",
+  welcome: "أهلاً بعودتك",
+  hello: "يا",
+  subtitle: "صحتك، بقوة الذكاء الاصطناعي.",
 
-    riskIndicators: "مؤشرات الخطورة",
-    riskLow: "منخفض",
-    riskMedium: "متوسط",
-    riskHigh: "مرتفع",
-    loading: "جاري تحميل البيانات...",
-    fetchError: "لم نتمكن من جلب التحاليل السابقة",
-    dataError: "خطأ في جلب البيانات",
-    unableToLoadAnalyses: "تعذر تحميل التحليلات",
-    noPreviousAnalyses: "لا توجد تحاليل سابقة",
-    firstTestNow: "عمل تحليل أول الآن",
-    noReportsYet: "لا توجد تقارير سابقة بعد",
-    reportCount: "تقرير",
+  mainMenu: "القائمة الرئيسية",
+  search: "بحث",
+  clearSearch: "مسح البحث",
+  newTest: "عمل فحص جديد",
+  newCheckup: "فحص جديد",
+  recentAnalyses: "التحاليل الحديثة",
+  previousReports: "التقارير السابقة",
+  bookConsultation: "احجز استشارة",
+  settings: "الإعدادات",
 
+  riskIndicators: "مؤشرات الخطورة",
+  riskLow: "منخفض",
+  riskMedium: "متوسط",
+  riskHigh: "مرتفع",
+  loading: "جاري تحميل البيانات...",
+  fetchError: "لم نتمكن من جلب التحاليل السابقة",
+  dataError: "خطأ في جلب البيانات",
+  unableToLoadAnalyses: "تعذر تحميل التحليلات",
+
+  noPreviousAnalyses: "لا توجد تحاليل سابقة",
+  firstTestNow: "عمل تحليل أول الآن",
+  noReportsYet: "لا توجد تقارير سابقة بعد",
+  reportCount: "تقرير",
+
+  averageRisk: "متوسط نسبة الخطورة",
+  latestStatus: "آخر حالة",
+  savedReports: "التقارير المحفوظة",
+  lastCheckup: "آخر تحليل",
+
+  analysisOverview: "نظرة عامة على تحاليل السكري والقلب والأوعية الدموية لديك",
+  allReports: "كل التقارير",
+  weekly: "أسبوعي",
+  monthly: "شهري",
+  latestAnalysisScore: "نتيجة آخر تحليل",
+  noData: "لا توجد بيانات",
+  progress: "التقدم",
+  outOf: "من",
+
+  pregnancies: "عدد مرات الحمل",
+  glucose: "الجلوكوز",
+  bloodPressure: "ضغط الدم",
+  skinThickness: "سماكة الجلد",
+  insulin: "الإنسولين",
+  bmi: "مؤشر كتلة الجسم",
+  age: "العمر",
+  diabetesPedigree: "العامل الوراثي",
+
+  infectionProbability: "احتمالية الإصابة",
+  viewReport: "عرض التقرير",
+  date: "التاريخ",
+  action: "الإجراءات",
+
+  healthTipText:
+    "حافظ على رطوبة جسدك، مارس الرياضة بانتظام، واحصل على قسط كافٍ من النوم لصحة أفضل.",
+
+  lastDoctorContact: "آخر تواصل مع الطبيب",
+  lastDoctorContactDesc: "آخر موعد استشارة تم تسجيله",
+  doctorCardTitle: "الطبيب المعالج",
+  doctorCardText:
+    "سيظهر آخر طبيب تم التواصل معه هنا عند توفر بيانات الاستشارة.",
+  openConsultations: "افتح الاستشارات",
+
+  logout: "تسجيل الخروج",
+  help: "المساعدة",
+  logoutError: "فشل تسجيل الخروج",
+
+  last7Days: "آخر 7 أيام",
+  last30Days: "آخر 30 يوم",
+
+  riskTooltip: "نسبة الخطورة",
+  valueLabel: "القيمة",
+
+  weeklyAverage: "متوسط الأسبوع",
+  monthlyAverage: "متوسط الشهر",
+
+  reportsThisWeek: "تقارير هذا الأسبوع",
+  reportsThisMonth: "تقارير هذا الشهر",
+
+  highestWeeklyRisk: "أعلى خطورة هذا الأسبوع",
+  highestMonthlyRisk: "أعلى خطورة هذا الشهر",
+
+  noWeeklyReportsTitle: "لا توجد تقارير أسبوعية",
+  noMonthlyReportsTitle: "لا توجد تقارير شهرية",
+
+  noWeeklyReportsDesc: "لا توجد تحليلات محفوظة خلال آخر 7 أيام.",
+  noMonthlyReportsDesc: "لا توجد تحليلات محفوظة خلال آخر 30 يوم.",
+
+  chartShortPregnancies: "الحمل",
+  chartShortGlucose: "الجلوكوز",
+  chartShortBloodPressure: "الضغط",
+  chartShortSkinThickness: "الجلد",
+  chartShortInsulin: "الإنسولين",
+  chartShortBmi: "BMI",
+  chartShortDiabetesPedigree: "الوراثة",
+  chartShortAge: "العمر",
+
+  extra: {
     averageRisk: "متوسط نسبة الخطورة",
     latestStatus: "آخر حالة",
-    savedReports: "التقارير المحفوظة",
-    lastCheckup: "آخر تحليل",
 
-    analysisOverview: "نظرة عامة على تحاليل السكري و القلب و الأوعية الدموية لديك",
-    allReports: "كل التقارير",
-    weekly: "أسبوعي",
-    monthly: "شهري",
-    latestAnalysisScore: "نتيجة آخر تحليل",
-    noData: "لا توجد بيانات",
-    progress: "التقدم",
-    outOf: "من",
+    diabetes: "السكري",
+    cardiovascular: "القلب والأوعية الدموية",
+    cardioShort: "القلب",
 
-    pregnancies: "عدد مرات الحمل",
-    glucose: "الجلوكوز",
-    bloodPressure: "ضغط الدم",
-    skinThickness: "سماكة الجلد",
-    insulin: "الإنسولين",
-    bmi: "مؤشر كتلة الجسم",
-    age: "العمر",
-    diabetesPedigree: "العامل الوراثي",
+    diabetesRisk: "خطر السكري",
+    cardioRisk: "خطر القلب والأوعية الدموية",
+    cardioRiskShort: "خطر القلب",
 
-    infectionProbability: "احتمالية الإصابة",
-    viewReport: "عرض التقرير",
-    date: "التاريخ",
-    action: "الإجراءات",
+    latestDiabetesScore: "آخر نتيجة للسكري",
+    latestCardioScore: "آخر نتيجة للقلب والأوعية الدموية",
 
-    healthTipText:
-      "حافظ على رطوبة جسدك، مارس الرياضة بانتظام، واحصل على قسط كافٍ من النوم لصحة أفضل.",
+    weekNumber: "الأسبوع {{number}}",
+    noHighIndicators: "لا توجد مؤشرات مرتفعة",
 
-    lastDoctorContact: "آخر تواصل مع الطبيب",
-    lastDoctorContactDesc: "آخر موعد استشارة تم تسجيله",
-    doctorCardTitle: "الطبيب المعالج",
-    doctorCardText:
-      "سيظهر آخر طبيب تم التواصل معه هنا عند توفر بيانات الاستشارة.",
-    openConsultations: "افتح الاستشارات",
+    weeklyRiskTrend: "اتجاه الخطورة الأسبوعي",
+    monthlyRiskTrend: "اتجاه الخطورة الشهري",
+    weeklyRiskTrendDesc:
+      "متوسط مخاطر السكري والقلب والأوعية الدموية خلال آخر 4 أسابيع",
+    monthlyRiskTrendDesc:
+      "متوسط مخاطر السكري والقلب والأوعية الدموية خلال آخر 6 أشهر",
 
-    logout: "تسجيل الخروج",
-    help: "المساعدة",
-    logoutError: "فشل تسجيل الخروج",
+    weeklyAverage: "المتوسط الأسبوعي",
+    monthlyAverage: "المتوسط الشهري",
+    reportsThisWeek: "تقارير الفترة",
+    reportsDisplayedMonths: "تقارير الأشهر المعروضة",
+    highestWeeklyRisk: "أعلى خطورة أسبوعية",
+    highestDisplayedRisk: "أعلى خطورة معروضة",
 
-    last7Days: "آخر 7 أيام",
-    last30Days: "آخر 30 يوم",
+    analysisInputs: "مدخلات التحليل",
+    analysisInputsDesc:
+      "مقارنة مدخلات السكري والقلب والأوعية الدموية في آخر تحليل",
 
-    riskTooltip: "نسبة الخطورة",
-    valueLabel: "القيمة",
+    riskDistribution: "توزيع مستويات الخطورة",
+    riskDistributionDesc:
+      "توزيع نتائج السكري والقلب والأوعية الدموية حسب مستوى الخطورة",
 
-    weeklyAverage: "متوسط الأسبوع",
-    monthlyAverage: "متوسط الشهر",
+    analysisAverage: "متوسط التحليل",
+    reports: "التقارير",
 
-    reportsThisWeek: "تقارير هذا الأسبوع",
-    reportsThisMonth: "تقارير هذا الشهر",
-
-    highestWeeklyRisk: "أعلى خطورة هذا الأسبوع",
-    highestMonthlyRisk: "أعلى خطورة هذا الشهر",
-
-    noWeeklyReportsTitle: "لا توجد تقارير أسبوعية",
-    noMonthlyReportsTitle: "لا توجد تقارير شهرية",
-
-    noWeeklyReportsDesc: "لا توجد تحليلات محفوظة خلال آخر 7 أيام.",
-    noMonthlyReportsDesc: "لا توجد تحليلات محفوظة خلال آخر 30 يوم.",
-
-    chartShortPregnancies: "الحمل",
-    chartShortGlucose: "الجلوكوز",
-    chartShortBloodPressure: "الضغط",
-    chartShortSkinThickness: "الجلد",
-    chartShortInsulin: "الإنسولين",
-    chartShortBmi: "BMI",
-    chartShortDiabetesPedigree: "الوراثة",
-    chartShortAge: "العمر",
-
-    extra: {
-      averageRisk: "متوسط نسبة الخطورة",
-      latestStatus: "آخر حالة",
-      diabetes: "السكري",
-      cardiovascular: "القلب والأوعية الدموية",
-      cardioShort: "القلب",
-      weeklyAverage: "المتوسط الأسبوعي",
-      monthlyAverage: "متوسط التحاليل المعروضة",
-      highestWeeklyRisk: "أعلى خطورة أسبوعية",
-      reportsThisWeek: "تقارير هذا الأسبوع",
-      reportsDisplayedMonths: "التحاليل المعروضة",
-      highestDisplayedRisk: "أعلى خطورة معروضة",
-      diabetesRisk: "خطر السكري",
-      cardioRisk: "خطر القلب والأوعية الدموية",
-      cardioRiskShort: "خطر القلب",
-
-      latestDiabetesScore: "آخر نتيجة للسكري",
-      latestCardioScore: "آخر نتيجة تقديرية للقلب والأوعية الدموية",
-
-      weeklyRiskTrend: "تحليل المخاطر الأسبوعي",
-      monthlyRiskTrend: "تحليل المخاطر الشهري",
-      weeklyRiskTrendDesc: "يعرض آخر 7 أيام وتحت كل يوم متوسط نسبة التحليل",
-      monthlyRiskTrendDesc: "يعرض الشهر الحالي والشهور القادمة",
-
-      reportsDisplayedMonths: "التقارير خلال الشهور المعروضة",
-      highestDisplayedRisk: "أعلى خطورة في الشهور المعروضة",
-
-      analysisInputs: "مدخلات التحليل",
-      analysisInputsDesc:
-        "القيم المستخدمة في تحليل السكري والقلب والأوعية الدموية",
-
-      riskDistribution: "حالات الخطورة",
-      riskDistributionDesc: "تشمل السكري والقلب والأوعية الدموية",
-
-      analysisAverage: "متوسط التحليل",
-      reports: "التقارير",
-
-      riskLevels: {
-        low: "منخفض",
-        medium: "متوسط",
-        high: "عالي",
-        veryHigh: "عالي جدًا",
-      },
-
-      inputs: {
-        pregnancies: "الحمل",
-        glucose: "الجلوكوز",
-        systolic: "انقباضي",
-        diastolic: "انبساطي",
-        skinThickness: "سُمك الجلد",
-        insulin: "الأنسولين",
-        pedigree: "الوراثة",
-        age: "العمر",
-        weight: "الوزن",
-        height: "الطول",
-        cholesterol: "كوليسترول",
-      },
-
-      aria: {
-        toggleLanguage: "تغيير اللغة",
-        notifications: "الإشعارات",
-      },
+    riskLevels: {
+      low: "منخفض",
+      medium: "متوسط",
+      high: "عالي",
+      veryHigh: "عالي جدًا",
     },
 
-    cardioMessages: {
-      very_high:
-        "يشير الحساب التقديري إلى وجود خطورة عالية جدًا للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.",
-      high:
-        "يشير الحساب التقديري إلى وجود خطورة عالية للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.",
-      medium:
-        "يشير الحساب التقديري إلى وجود خطورة متوسطة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.",
-      low:
-        "يشير الحساب التقديري إلى وجود خطورة منخفضة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.",
+    inputs: {
+      pregnancies: "مرات الحمل",
+      glucose: "الجلوكوز",
+      systolic: "الضغط الانقباضي",
+      diastolic: "الضغط الانبساطي",
+      diabetesBloodPressure: "ضغط السكري",
+      skinThickness: "سُمك الجلد",
+      insulin: "الأنسولين",
+      pedigree: "عامل الوراثة",
+      age: "العمر",
+      weight: "الوزن",
+      height: "الطول",
+      cholesterol: "الكوليسترول",
+      bmi: "مؤشر كتلة الجسم",
+    },
+
+    aria: {
+      toggleLanguage: "تغيير اللغة",
+      notifications: "الإشعارات",
     },
   },
+
+  cardioMessages: {
+    very_high:
+      "يشير الحساب التقديري إلى وجود خطورة عالية جدًا للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.",
+    high:
+      "يشير الحساب التقديري إلى وجود خطورة عالية للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.",
+    medium:
+      "يشير الحساب التقديري إلى وجود خطورة متوسطة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.",
+    low:
+      "يشير الحساب التقديري إلى وجود خطورة منخفضة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.",
+  },
+},
   report: {
     title: "تقرير التحليل المبدئي",
 

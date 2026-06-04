@@ -67,6 +67,7 @@ export default function PatientSidebar({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>("light");
   const [isMounted, setIsMounted] = useState(false);
+  const [profilePictureVersion, setProfilePictureVersion] = useState(0);
 
   const isDark = theme === "dark";
 
@@ -84,6 +85,21 @@ export default function PatientSidebar({
 
   useEffect(() => {
     setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const handleProfilePictureUpdated = () => {
+      setProfilePictureVersion((prev) => prev + 1);
+    };
+
+    window.addEventListener("profilePictureUpdated", handleProfilePictureUpdated);
+
+    return () => {
+      window.removeEventListener(
+        "profilePictureUpdated",
+        handleProfilePictureUpdated
+      );
+    };
   }, []);
 
   useEffect(() => {
@@ -175,6 +191,12 @@ export default function PatientSidebar({
     user?.username ||
     user?.email ||
     t("dashboard.patient", "Patient");
+
+  const profilePictureUrl = user?.profile_picture
+    ? `${user.profile_picture}${
+        user.profile_picture.includes("?") ? "&" : "?"
+      }v=${profilePictureVersion}`
+    : "";
 
   const navItems = [
     {
@@ -306,7 +328,7 @@ export default function PatientSidebar({
                   "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    : "text-muted-foreground hover:bg-primary/10 hover:text-primary",
                   isCompact && !forceOpen && "justify-center px-0"
                 )
               }
@@ -337,7 +359,7 @@ export default function PatientSidebar({
             <button
               type="button"
               onClick={handleGoHome}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
             >
               <Home className="h-4 w-4 shrink-0" />
               {(!isCompact || forceOpen) && (
@@ -348,7 +370,7 @@ export default function PatientSidebar({
             <button
               type="button"
               onClick={handleGoToProfile}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
             >
               <User className="h-4 w-4 shrink-0" />
               {(!isCompact || forceOpen) && (
@@ -359,7 +381,7 @@ export default function PatientSidebar({
             <button
               type="button"
               onClick={handleToggleTheme}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-primary"
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
             >
               {isDark ? (
                 <Sun className="h-4 w-4 shrink-0" />
@@ -379,7 +401,7 @@ export default function PatientSidebar({
             <button
               type="button"
               onClick={handlePatientLogout}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-destructive"
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
             >
               <LogOut className="h-4 w-4 shrink-0" />
               {(!isCompact || forceOpen) && (
@@ -393,25 +415,35 @@ export default function PatientSidebar({
           type="button"
           onClick={() => setAccountMenuOpen((prev) => !prev)}
           className={cn(
-            "group flex w-full items-center gap-3 rounded-xl transition-colors hover:bg-primary/10",
+            "group flex w-full items-center gap-3 rounded-xl transition-colors hover:bg-primary/10 hover:text-primary",
             isCompact && !forceOpen ? "justify-center px-0 py-2" : "p-2"
           )}
         >
-          <User
+          <div
             className={cn(
-              "h-5 w-5 shrink-0 text-primary",
+              "flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-primary/20 bg-primary/10",
               isCompact && !forceOpen && "mx-auto"
             )}
-          />
+          >
+            {profilePictureUrl ? (
+              <img
+                src={profilePictureUrl}
+                alt={patientName}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <User className="h-5 w-5 text-primary" />
+            )}
+          </div>
 
           {(!isCompact || forceOpen) && (
             <div className="min-w-0 flex-1 text-start">
-              <p className="truncate text-sm font-medium text-foreground">
+              <p className="truncate text-sm font-medium text-foreground group-hover:text-primary">
                 {patientName}
               </p>
 
               {user?.email && (
-                <p className="mt-1 truncate text-xs text-muted-foreground">
+                <p className="mt-1 truncate text-xs text-muted-foreground group-hover:text-primary/80">
                   {user.email}
                 </p>
               )}
