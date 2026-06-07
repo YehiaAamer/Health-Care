@@ -583,6 +583,10 @@ export default function PatientsPage() {
 
   const riskFilterOptions = [
     {
+      value: "all",
+      label: isArabic ? "كل الخطورات" : "All Risks",
+    },
+    {
       value: "veryhigh",
       label: isArabic ? "عالية جدًا" : "Very High",
     },
@@ -674,60 +678,12 @@ export default function PatientsPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                <div className="w-full overflow-x-auto pb-1 xl:w-auto xl:pb-0">
-                  <div className="flex h-12 w-fit items-center gap-1 rounded-full border border-primary/20 bg-background p-1 shadow-sm">
-                    <button
-                      type="button"
-                      onClick={() => setStatusFilter("all")}
-                      className={cn(
-                        "h-10 rounded-full px-5 text-sm font-semibold transition-none",
-                        statusFilter === "all"
-                          ? "bg-primary text-primary-foreground"
-                          : "text-primary hover:bg-primary/10"
-                      )}
-                    >
-                      {t("doctorDashboard.appointments.filterAll")}
-                    </button>
-
-                    <Select
-                      value={statusFilter === "all" ? undefined : statusFilter}
-                      onValueChange={setStatusFilter}
-                      dir={isArabic ? "rtl" : "ltr"}
-                    >
-                      <SelectTrigger
-                        className={cn(
-                          "h-10 w-fit min-w-[110px] rounded-full border-0 px-5 text-sm font-semibold shadow-none transition-none focus:ring-0 focus:ring-offset-0",
-                          statusFilter !== "all"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-transparent text-primary hover:bg-primary/10"
-                        )}
-                      >
-                        <SelectValue
-                          placeholder={isArabic ? "الخطورة" : "Risk"}
-                        />
-                      </SelectTrigger>
-
-                      <SelectContent className="rounded-2xl border-border bg-popover p-1 text-popover-foreground shadow-xl">
-                        {riskFilterOptions.map((option) => (
-                          <SelectItem
-                            key={option.value}
-                            value={option.value}
-                            className="cursor-pointer rounded-xl text-sm font-semibold focus:bg-primary/10 focus:text-primary"
-                          >
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center xl:w-auto">
-                  <div className="relative w-full sm:min-w-[320px] xl:w-96">
+              <div className="flex w-full flex-col items-center justify-center gap-3 lg:flex-row">
+                <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-full border border-border bg-background shadow-sm transition-all focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/10 md:h-12 md:flex-row md:items-center">
+                  <div className="group relative min-h-12 flex-1">
                     <Search
                       className={cn(
-                        "absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground",
+                        "absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary",
                         isArabic ? "right-4" : "left-4"
                       )}
                     />
@@ -739,10 +695,8 @@ export default function PatientsPage() {
                           : "Search by name or email..."
                       }
                       className={cn(
-                        "h-12 rounded-full border border-border bg-background text-sm font-semibold text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-4 focus-visible:ring-primary/10",
-                        isArabic
-                          ? "pr-11 pl-9 text-right"
-                          : "pl-11 pr-9 text-left"
+                        "h-12 rounded-none border-0 bg-transparent text-sm font-semibold text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0",
+                        isArabic ? "pr-10 pl-10 text-right" : "pl-10 pr-10"
                       )}
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
@@ -754,7 +708,7 @@ export default function PatientsPage() {
                         onClick={() => setSearch("")}
                         className={cn(
                           "absolute top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary",
-                          isArabic ? "left-3" : "right-3"
+                          isArabic ? "left-4" : "right-4"
                         )}
                       >
                         <X className="h-4 w-4" />
@@ -762,16 +716,42 @@ export default function PatientsPage() {
                     )}
                   </div>
 
-                  <Button
-                    onClick={() => setOpenCreate(true)}
-                    className="h-12 w-full rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:w-auto"
+                  <div className="h-px w-full bg-border md:h-7 md:w-px" />
+
+                  <Select
+                    value={statusFilter}
+                    onValueChange={setStatusFilter}
+                    dir={isArabic ? "rtl" : "ltr"}
                   >
-                    <Plus
-                      className={cn("h-4 w-4", isArabic ? "ml-2" : "mr-2")}
-                    />
-                    {isArabic ? "مريض جديد" : "New Patient"}
-                  </Button>
+                    <SelectTrigger className="h-12 w-full rounded-none border-0 bg-transparent px-4 text-sm font-bold text-primary shadow-none transition-none hover:bg-primary/5 hover:text-primary focus:ring-0 focus:ring-offset-0 md:w-[210px]">
+                      <SelectValue
+                        placeholder={isArabic ? "الخطورة" : "Risk"}
+                      />
+                    </SelectTrigger>
+
+                    <SelectContent className="rounded-2xl border-border bg-popover p-1 text-popover-foreground shadow-xl">
+                      {riskFilterOptions.map((option) => (
+                        <SelectItem
+                          key={option.value}
+                          value={option.value}
+                          className="cursor-pointer rounded-xl text-sm font-semibold focus:bg-primary/10 focus:text-primary"
+                        >
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+
+                <Button
+                  onClick={() => setOpenCreate(true)}
+                  className="h-12 w-full rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:w-auto"
+                >
+                  <Plus
+                    className={cn("h-4 w-4", isArabic ? "ml-2" : "mr-2")}
+                  />
+                  {isArabic ? "مريض جديد" : "New Patient"}
+                </Button>
               </div>
             </div>
           </div>
@@ -923,7 +903,7 @@ export default function PatientsPage() {
       <Dialog open={openCreate} onOpenChange={setOpenCreate}>
         <DialogContent
           dir={isArabic ? "rtl" : "ltr"}
-          className="max-h-[90vh] w-[92vw] overflow-y-auto rounded-3xl border border-border bg-card text-card-foreground sm:max-w-xl"
+          className="max-h-[90vh] w-[92vw] overflow-y-auto rounded-3xl border border-border bg-card text-card-foreground sm:max-w-xl [&>button]:hidden"
         >
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-foreground">
@@ -1033,7 +1013,7 @@ export default function PatientsPage() {
       <Dialog open={openDetails} onOpenChange={setOpenDetails}>
         <DialogContent
           dir={isArabic ? "rtl" : "ltr"}
-          className="max-h-[90vh] w-[92vw] overflow-y-auto rounded-3xl border border-border bg-card text-card-foreground sm:max-w-2xl"
+          className="max-h-[90vh] w-[92vw] overflow-y-auto rounded-3xl border border-border bg-card text-card-foreground sm:max-w-2xl [&>button]:hidden"
         >
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-foreground">

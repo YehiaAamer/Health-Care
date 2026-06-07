@@ -16,7 +16,17 @@ export const API_ENDPOINTS = {
   DOCTOR_RISK_DISTRIBUTION: `${API_BASE_URL}/api/doctor/risk-distribution/`,
   DOCTOR_PATIENTS: `${API_BASE_URL}/api/doctor/patients/`,
   DOCTOR_APPOINTMENTS_TODAY: `${API_BASE_URL}/api/doctor/appointments/today/`,
-  DOCTOR_MESSAGES: `${API_BASE_URL}/api/doctor/messages/recent/`,
+
+  // Messages
+  // Base endpoint for thread messages and send:
+  // GET  /api/doctor/messages/<thread_id>/messages/
+  // POST /api/doctor/messages/<thread_id>/send/
+  DOCTOR_MESSAGES: `${API_BASE_URL}/api/doctor/messages/`,
+
+  // Recent threads endpoint:
+  // GET /api/doctor/messages/recent/
+  DOCTOR_MESSAGES_RECENT: `${API_BASE_URL}/api/doctor/messages/recent/`,
+
   DOCTOR_REPORTS: `${API_BASE_URL}/api/doctor/predictions/`,
   DOCTOR_ACTIVITY: `${API_BASE_URL}/api/doctor/activity/`,
   DOCTOR_PROFILE: `${API_BASE_URL}/api/doctor/profile/`,
@@ -155,7 +165,10 @@ async function retryWithBackoff<T>(
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
-      if (error instanceof APIError && [400, 401, 403, 404].includes(error.statusCode || 0)) {
+      if (
+        error instanceof APIError &&
+        [400, 401, 403, 404].includes(error.statusCode || 0)
+      ) {
         throw error;
       }
 
@@ -222,7 +235,9 @@ export async function apiCall<T>(
       const tokens = getStoredTokens();
       let headers = buildHeaders(fetchOptions, tokens?.access);
 
-      const url = endpoint.startsWith("/") ? `${API_BASE_URL}${endpoint}` : endpoint;
+      const url = endpoint.startsWith("/")
+        ? `${API_BASE_URL}${endpoint}`
+        : endpoint;
 
       let response = await fetch(url, {
         ...fetchOptions,

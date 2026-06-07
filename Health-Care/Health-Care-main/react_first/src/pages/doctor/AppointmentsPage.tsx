@@ -26,7 +26,6 @@ import {
   Video,
   X,
   Eye,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Activity,
@@ -48,6 +47,7 @@ interface Appointment {
   meeting_url?: string;
   call_url?: string;
   video_link?: string;
+  appointment_date?: string;
 }
 
 type PatientDetails = User & {
@@ -65,8 +65,6 @@ export default function AppointmentsPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [weekAnchorDate, setWeekAnchorDate] = useState<Date>(new Date());
-  const [showCalendar, setShowCalendar] = useState(false);
   const [selectedTime, setSelectedTime] = useState("");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -115,6 +113,7 @@ export default function AppointmentsPage() {
       time: "10:00 AM - 10:30 AM",
       reason: isArabic ? "متابعة السكري" : "Diabetes Follow-up",
       status: "In Progress",
+      appointment_date: new Date().toISOString(),
     },
     {
       id: 2,
@@ -124,6 +123,7 @@ export default function AppointmentsPage() {
       time: "11:00 AM - 11:30 AM",
       reason: isArabic ? "مراجعة ضغط الدم" : "Blood Pressure Review",
       status: "Upcoming",
+      appointment_date: new Date().toISOString(),
     },
     {
       id: 3,
@@ -133,6 +133,7 @@ export default function AppointmentsPage() {
       time: "12:00 PM - 12:30 PM",
       reason: isArabic ? "استشارة غذائية" : "Nutritional Consultation",
       status: "Upcoming",
+      appointment_date: new Date().toISOString(),
     },
     {
       id: 4,
@@ -142,6 +143,7 @@ export default function AppointmentsPage() {
       time: "02:00 PM - 02:30 PM",
       reason: isArabic ? "فحص سنوي" : "Annual Checkup",
       status: "Completed",
+      appointment_date: new Date().toISOString(),
     },
     {
       id: 5,
@@ -151,6 +153,7 @@ export default function AppointmentsPage() {
       time: "03:00 PM - 03:30 PM",
       reason: isArabic ? "مراجعة نتائج التحاليل" : "Lab Results Review",
       status: "Upcoming",
+      appointment_date: new Date().toISOString(),
     },
   ];
 
@@ -199,6 +202,15 @@ export default function AppointmentsPage() {
 
     return cleanValue;
   };
+
+  const formattedSelectedDate = date
+    ? date.toLocaleDateString(isArabic ? "ar-EG" : "en-US", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : "";
 
   const getPatientNumericId = (appt: Appointment) => {
     if (appt.patient_user) return Number(appt.patient_user);
@@ -275,53 +287,6 @@ export default function AppointmentsPage() {
     }
   };
 
-  const weekDates = useMemo(() => {
-    return Array.from({ length: 7 }, (_, index) => {
-      const current = new Date(weekAnchorDate);
-      current.setDate(weekAnchorDate.getDate() + index);
-
-      return {
-        fullDate: current,
-        dayName: current.toLocaleDateString(isArabic ? "ar-EG" : "en-US", {
-          weekday: "short",
-        }),
-        dayNumber: current.getDate(),
-      };
-    });
-  }, [weekAnchorDate, isArabic]);
-
-  const isSameDay = (a?: Date, b?: Date) => {
-    if (!a || !b) return false;
-
-    return (
-      a.getDate() === b.getDate() &&
-      a.getMonth() === b.getMonth() &&
-      a.getFullYear() === b.getFullYear()
-    );
-  };
-
-  const formattedSelectedDate = date
-    ? date.toLocaleDateString(isArabic ? "ar-EG" : "en-US", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    : "";
-
-  const moveWeek = (direction: "prev" | "next") => {
-    setWeekAnchorDate((prev) => {
-      const nextDate = new Date(prev);
-      nextDate.setDate(prev.getDate() + (direction === "next" ? 7 : -7));
-      return nextDate;
-    });
-  };
-
-  const handleSelectDate = (selectedDate?: Date) => {
-    if (!selectedDate) return;
-    setDate(selectedDate);
-  };
-
   const handleSelectTime = (time: string) => {
     setSelectedTime(formatAppointmentTime(time));
   };
@@ -356,6 +321,8 @@ export default function AppointmentsPage() {
           meeting_url: apt.meeting_url,
           call_url: apt.call_url,
           video_link: apt.video_link,
+          appointment_date:
+            apt.appointment_date || apt.date || apt.created_at || "",
         }));
 
         setAppointments(mapped);
@@ -448,8 +415,14 @@ export default function AppointmentsPage() {
     if (
       !newAppointment.patient_name.trim() ||
       !selectedTime.trim() ||
-      !newAppointment.reason.trim()
+      !newAppointment.reason.trim() ||
+      !date
     ) {
+      toast.info(
+        isArabic
+          ? "اكتب اسم المريض، سبب الزيارة، واختر التاريخ والوقت"
+          : "Enter patient name, visit reason, and select date and time"
+      );
       return;
     }
 
@@ -462,6 +435,7 @@ export default function AppointmentsPage() {
       time: formatAppointmentTime(selectedTime),
       reason: newAppointment.reason,
       status: "Upcoming",
+      appointment_date: date.toISOString(),
     };
 
     setAppointments((prev) => [createdAppointment, ...prev]);
@@ -471,6 +445,7 @@ export default function AppointmentsPage() {
       reason: "",
     });
     setSelectedTime("");
+    setDate(new Date());
     setShowNewAppointment(false);
     setFilter("all");
     setCurrentPage(1);
@@ -528,188 +503,17 @@ export default function AppointmentsPage() {
             </div>
 
             <Button
-              onClick={() => setShowNewAppointment(true)}
+              onClick={() => {
+                setDate(new Date());
+                setSelectedTime("");
+                setShowNewAppointment(true);
+              }}
               className="h-12 rounded-2xl bg-primary px-6 font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
             >
               {t("doctorDashboard.appointments.newAppointment")}
             </Button>
           </div>
         </div>
-
-        <Card className="w-full rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-sm transition-all duration-300 hover:shadow-md">
-          <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <CalendarIcon className="h-5 w-5" />
-              </div>
-
-              <div>
-                <h3 className="text-base font-bold text-foreground">
-                  {isArabic ? "اختيار التاريخ" : "Select Date"}
-                </h3>
-
-                <p className="text-sm font-medium text-muted-foreground">
-                  {formattedSelectedDate}
-                </p>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setShowCalendar((prev) => !prev)}
-              className="h-9 w-fit rounded-xl px-3 text-sm font-semibold text-muted-foreground hover:bg-primary/10 hover:text-primary"
-            >
-              {isArabic ? "عرض التقويم كامل" : "Full calendar"}
-              <ChevronDown
-                className={`h-4 w-4 transition-transform ${
-                  showCalendar ? "rotate-180" : ""
-                } ${isArabic ? "mr-1" : "ml-1"}`}
-              />
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => moveWeek("prev")}
-              className="h-[76px] w-11 shrink-0 rounded-2xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
-            >
-              {isArabic ? (
-                <ChevronRight className="h-5 w-5" />
-              ) : (
-                <ChevronLeft className="h-5 w-5" />
-              )}
-            </Button>
-
-            <div className="grid flex-1 grid-cols-7 gap-3">
-              {weekDates.map((item) => {
-                const selected = isSameDay(date, item.fullDate);
-
-                return (
-                  <button
-                    key={item.fullDate.toISOString()}
-                    type="button"
-                    onClick={() => handleSelectDate(item.fullDate)}
-                    className={`rounded-2xl border px-2 py-4 text-center transition-all ${
-                      selected
-                        ? "border-primary bg-primary/10 text-primary shadow-sm"
-                        : "border-border bg-background hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
-                    }`}
-                  >
-                    <p
-                      className={`text-xs font-semibold ${
-                        selected ? "text-primary" : "text-muted-foreground"
-                      }`}
-                    >
-                      {item.dayName}
-                    </p>
-
-                    <p className="mt-2 text-xl font-bold">{item.dayNumber}</p>
-                  </button>
-                );
-              })}
-            </div>
-
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => moveWeek("next")}
-              className="h-[76px] w-11 shrink-0 rounded-2xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
-            >
-              {isArabic ? (
-                <ChevronLeft className="h-5 w-5" />
-              ) : (
-                <ChevronRight className="h-5 w-5" />
-              )}
-            </Button>
-          </div>
-
-          {showCalendar && (
-            <div className="mt-5 w-full rounded-3xl border border-border bg-background p-4 shadow-sm">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={(selectedDate) => {
-                  if (!selectedDate) return;
-                  setDate(selectedDate);
-                  setWeekAnchorDate(selectedDate);
-                }}
-                className="w-full"
-                classNames={{
-                  months: "w-full",
-                  month: "w-full space-y-4",
-                  table: "w-full border-collapse space-y-1",
-                  head_row: "grid grid-cols-7",
-                  row: "grid grid-cols-7 w-full mt-2",
-                  cell: "relative flex h-12 items-center justify-center p-0 text-center text-sm",
-                  day: "h-10 w-full rounded-xl p-0 font-semibold hover:bg-primary/10 hover:text-primary",
-                  day_selected:
-                    "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-                  day_today: "bg-primary/10 text-primary",
-                  day_outside: "text-muted-foreground opacity-50",
-                  day_disabled: "text-muted-foreground opacity-50",
-                  nav: "flex items-center gap-2",
-                  nav_button:
-                    "h-9 w-9 rounded-xl border border-border bg-background text-muted-foreground hover:bg-primary/10 hover:text-primary",
-                  caption:
-                    "relative flex items-center justify-center pt-1 text-sm font-bold text-foreground",
-                  caption_label: "text-sm font-bold",
-                  head_cell:
-                    "flex h-9 items-center justify-center text-xs font-bold text-muted-foreground",
-                }}
-              />
-
-              <div className="mt-5 rounded-3xl bg-primary/[0.03] p-4 dark:bg-primary/10">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <Clock className="h-5 w-5" />
-                    </div>
-
-                    <div>
-                      <h4 className="text-sm font-bold text-foreground">
-                        {isArabic ? "اختيار الوقت" : "Select Time"}
-                      </h4>
-
-                      <p className="text-xs font-medium text-muted-foreground">
-                        {selectedTime
-                          ? isArabic
-                            ? `الوقت المختار: ${formatAppointmentTime(
-                                selectedTime
-                              )}`
-                            : `Selected time: ${formatAppointmentTime(
-                                selectedTime
-                              )}`
-                          : isArabic
-                          ? "اختار الوقت"
-                          : "Select time"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
-                  {timeSlots.map((time) => (
-                    <button
-                      key={time}
-                      type="button"
-                      onClick={() => handleSelectTime(time)}
-                      className={`rounded-2xl border px-3 py-3 text-xs font-bold transition-all ${
-                        selectedTime === formatAppointmentTime(time)
-                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                          : "border-border bg-background text-foreground hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
-                      }`}
-                    >
-                      {formatAppointmentTime(time)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </Card>
 
         <div className="flex justify-center">
           <Tabs
@@ -1076,8 +880,8 @@ export default function AppointmentsPage() {
       </div>
 
       {showNewAppointment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <Card className="w-full max-w-xl rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
+          <Card className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-2xl">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-xl font-bold text-foreground">
@@ -1086,8 +890,8 @@ export default function AppointmentsPage() {
 
                 <p className="mt-1 text-sm font-medium text-muted-foreground">
                   {isArabic
-                    ? "أدخل بيانات الحجز وسيظهر مباشرة في القائمة."
-                    : "Enter appointment details and it will appear in the schedule."}
+                    ? "أدخل بيانات الحجز واختر التاريخ والوقت."
+                    : "Enter appointment details and select date and time."}
                 </p>
               </div>
 
@@ -1100,62 +904,162 @@ export default function AppointmentsPage() {
               </button>
             </div>
 
-            <div className="mb-4 rounded-2xl bg-primary/10 p-4">
-              <p className="text-xs font-bold uppercase tracking-widest text-primary/70">
-                {isArabic ? "التاريخ والوقت المختار" : "Selected Date & Time"}
-              </p>
+            <div className="grid gap-5 lg:grid-cols-[1fr_1.15fr]">
+              <div className="space-y-4">
+                <div className="rounded-2xl bg-primary/10 p-4">
+                  <p className="text-xs font-bold uppercase tracking-widest text-primary/70">
+                    {isArabic ? "التاريخ والوقت المختار" : "Selected Date & Time"}
+                  </p>
 
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm font-bold text-foreground">
-                <span>{formattedSelectedDate || "--"}</span>
-                <span className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground">
-                  {selectedTime
-                    ? formatAppointmentTime(selectedTime)
-                    : isArabic
-                    ? "لم يتم اختيار وقت"
-                    : "No time selected"}
-                </span>
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-sm font-bold text-foreground">
+                    <span>{formattedSelectedDate || "--"}</span>
+
+                    <span className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground">
+                      {selectedTime
+                        ? formatAppointmentTime(selectedTime)
+                        : isArabic
+                        ? "لم يتم اختيار وقت"
+                        : "No time selected"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid gap-4">
+                  <Input
+                    placeholder={isArabic ? "اسم المريض" : "Patient name"}
+                    className="h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground"
+                    value={newAppointment.patient_name}
+                    onChange={(e) =>
+                      setNewAppointment((prev) => ({
+                        ...prev,
+                        patient_name: e.target.value,
+                      }))
+                    }
+                  />
+
+                  <Input
+                    placeholder={isArabic ? "رقم المريض" : "Patient ID"}
+                    className="h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground"
+                    value={newAppointment.patient_id}
+                    onChange={(e) =>
+                      setNewAppointment((prev) => ({
+                        ...prev,
+                        patient_id: e.target.value,
+                      }))
+                    }
+                  />
+
+                  <Input
+                    placeholder={isArabic ? "سبب الزيارة" : "Visit reason"}
+                    className="h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground"
+                    value={newAppointment.reason}
+                    onChange={(e) =>
+                      setNewAppointment((prev) => ({
+                        ...prev,
+                        reason: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-border bg-background p-4 shadow-sm">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <CalendarIcon className="h-5 w-5" />
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground">
+                      {isArabic ? "اختيار التاريخ" : "Select Date"}
+                    </h4>
+
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {formattedSelectedDate}
+                    </p>
+                  </div>
+                </div>
+
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(selectedDate) => {
+                    if (!selectedDate) return;
+                    setDate(selectedDate);
+                  }}
+                  className="w-full"
+                  classNames={{
+                    months: "w-full",
+                    month: "w-full space-y-4",
+                    table: "w-full border-collapse space-y-1",
+                    head_row: "grid grid-cols-7",
+                    row: "grid grid-cols-7 w-full mt-2",
+                    cell: "relative flex h-11 items-center justify-center p-0 text-center text-sm",
+                    day: "h-9 w-full rounded-xl p-0 font-semibold hover:bg-primary/10 hover:text-primary",
+                    day_selected:
+                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+                    day_today: "bg-primary/10 text-primary",
+                    day_outside: "text-muted-foreground opacity-50",
+                    day_disabled: "text-muted-foreground opacity-50",
+                    nav: "flex items-center gap-2",
+                    nav_button:
+                      "h-9 w-9 rounded-xl border border-border bg-background text-muted-foreground hover:bg-primary/10 hover:text-primary",
+                    caption:
+                      "relative flex items-center justify-center pt-1 text-sm font-bold text-foreground",
+                    caption_label: "text-sm font-bold",
+                    head_cell:
+                      "flex h-9 items-center justify-center text-xs font-bold text-muted-foreground",
+                  }}
+                />
+
+                <div className="mt-5 rounded-3xl bg-primary/[0.03] p-4 dark:bg-primary/10">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <Clock className="h-5 w-5" />
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">
+                        {isArabic ? "اختيار الوقت" : "Select Time"}
+                      </h4>
+
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {selectedTime
+                          ? isArabic
+                            ? `الوقت المختار: ${formatAppointmentTime(
+                                selectedTime
+                              )}`
+                            : `Selected time: ${formatAppointmentTime(
+                                selectedTime
+                              )}`
+                          : isArabic
+                          ? "اختار الوقت المناسب للحجز"
+                          : "Select the appointment time"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {timeSlots.map((time) => (
+                      <button
+                        key={time}
+                        type="button"
+                        onClick={() => handleSelectTime(time)}
+                        className={`rounded-2xl border px-3 py-3 text-xs font-bold transition-all ${
+                          selectedTime === formatAppointmentTime(time)
+                            ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                            : "border-border bg-background text-foreground hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
+                        }`}
+                      >
+                        {formatAppointmentTime(time)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                placeholder={isArabic ? "اسم المريض" : "Patient name"}
-                className="h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground"
-                value={newAppointment.patient_name}
-                onChange={(e) =>
-                  setNewAppointment((prev) => ({
-                    ...prev,
-                    patient_name: e.target.value,
-                  }))
-                }
-              />
-
-              <Input
-                placeholder={isArabic ? "رقم المريض" : "Patient ID"}
-                className="h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground"
-                value={newAppointment.patient_id}
-                onChange={(e) =>
-                  setNewAppointment((prev) => ({
-                    ...prev,
-                    patient_id: e.target.value,
-                  }))
-                }
-              />
-
-              <Input
-                placeholder={isArabic ? "سبب الزيارة" : "Visit reason"}
-                className="h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground md:col-span-2"
-                value={newAppointment.reason}
-                onChange={(e) =>
-                  setNewAppointment((prev) => ({
-                    ...prev,
-                    reason: e.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex justify-end gap-3 border-t border-border pt-5">
               <Button
                 variant="outline"
                 onClick={() => setShowNewAppointment(false)}
@@ -1166,7 +1070,12 @@ export default function AppointmentsPage() {
 
               <Button
                 onClick={handleCreateAppointment}
-                disabled={!selectedTime}
+                disabled={
+                  !newAppointment.patient_name.trim() ||
+                  !newAppointment.reason.trim() ||
+                  !selectedTime ||
+                  !date
+                }
                 className="h-11 rounded-full bg-primary px-5 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
                 {isArabic ? "إنشاء الحجز" : "Create Appointment"}

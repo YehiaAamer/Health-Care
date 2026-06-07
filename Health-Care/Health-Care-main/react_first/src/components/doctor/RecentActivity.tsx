@@ -75,9 +75,6 @@ export default function RecentActivity({
       .slice(0, MAX_DASHBOARD_ACTIVITIES);
   }, [safeActivities]);
 
-  const cardClassName =
-    "flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-md";
-
   const getActivityIcon = (type: string) => {
     switch (type) {
       case "prediction":
@@ -87,10 +84,12 @@ export default function RecentActivity({
             strokeWidth={2.4}
           />
         );
+
       case "review":
         return (
           <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" strokeWidth={2.4} />
         );
+
       case "appointment":
         return (
           <Calendar
@@ -98,6 +97,7 @@ export default function RecentActivity({
             strokeWidth={2.4}
           />
         );
+
       case "message":
         return (
           <MessageSquare
@@ -105,6 +105,7 @@ export default function RecentActivity({
             strokeWidth={2.4}
           />
         );
+
       default:
         return (
           <Bell className="h-3 w-3 sm:h-3.5 sm:w-3.5" strokeWidth={2.4} />
@@ -116,12 +117,16 @@ export default function RecentActivity({
     switch (type) {
       case "prediction":
         return "bg-primary/10 text-primary border-primary/15";
+
       case "review":
         return "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30";
+
       case "appointment":
         return "bg-sky-50 text-sky-600 border-sky-100 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30";
+
       case "message":
         return "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30";
+
       default:
         return "bg-muted text-muted-foreground border-border";
     }
@@ -138,6 +143,18 @@ export default function RecentActivity({
     } catch {
       return "";
     }
+  };
+
+  const openActivityReportFilter = (activity: ActivityItem) => {
+    if (!activity.related_id) return;
+
+    navigate(`/doctor-dashboard/reports?filterReportId=${activity.related_id}`, {
+      state: {
+        filterReportId: activity.related_id,
+        fromRecentActivity: true,
+        openDrawer: false,
+      },
+    });
   };
 
   const CardTitleBlock = () => (
@@ -167,6 +184,9 @@ export default function RecentActivity({
       )}
     </CardHeader>
   );
+
+  const cardClassName =
+    "flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-md";
 
   if (isLoading) {
     return (
@@ -223,11 +243,37 @@ export default function RecentActivity({
             {visibleActivities.map((activity, index) => {
               const title = cleanActivityText(activity.title);
               const description = cleanActivityText(activity.description);
+              const canOpenReportFilter = Boolean(activity.related_id);
 
               return (
                 <div
                   key={`${activity.type}-${activity.created_at}-${index}`}
-                  className="group relative flex min-h-[40px] items-start gap-2.5 sm:min-h-[46px] sm:gap-3"
+                  role={canOpenReportFilter ? "button" : undefined}
+                  tabIndex={canOpenReportFilter ? 0 : undefined}
+                  onClick={() => openActivityReportFilter(activity)}
+                  onKeyDown={(event) => {
+                    if (
+                      canOpenReportFilter &&
+                      (event.key === "Enter" || event.key === " ")
+                    ) {
+                      event.preventDefault();
+                      openActivityReportFilter(activity);
+                    }
+                  }}
+                  className={cn(
+                    "group relative flex min-h-[40px] items-start gap-2.5 rounded-2xl px-1 py-1 sm:min-h-[46px] sm:gap-3",
+                    "transition-colors duration-200",
+                    canOpenReportFilter
+                      ? "cursor-pointer hover:bg-muted/30"
+                      : "cursor-default"
+                  )}
+                  title={
+                    canOpenReportFilter
+                      ? isRTL
+                        ? "عرض التحليل في التقارير"
+                        : "View report filter"
+                      : undefined
+                  }
                 >
                   <div
                     className={cn(

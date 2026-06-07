@@ -131,7 +131,7 @@ const RISK_COLORS: Record<RiskLevel, string> = {
   very_high: "#ef4444",
 };
 
-const DIABETES_CHART_COLOR = "hsl(var(--primary))";
+const DIABETES_CHART_COLOR = "#EC4899";
 const CARDIO_CHART_COLOR = "#64748b";
 
 const sigmoid = (z: number) => {

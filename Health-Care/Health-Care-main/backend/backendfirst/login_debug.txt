@@ -1,0 +1,8 @@
+Attempt: Email='yehiaaamer6@gmail.com', Password='Test1234!'
+DB check: User exists in DB (ID: 2, Active: True)
+Result: AUTHENTICATION_SUCCESS
+
+Attempt: Email='yehiaaamer6@gmail.com', Password='Test1234!'
+DB check: User exists in DB (ID: 2, Active: True)
+Result: AUTHENTICATION_SUCCESS
+

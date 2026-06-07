@@ -6,14 +6,21 @@ export const patientsApi = {
    * Get list of patients assigned to the doctor
    */
   getPatients: async (): Promise<User[]> => {
-    const response = await apiCall<{ patients: User[] }>(API_ENDPOINTS.DOCTOR_PATIENTS);
+    const response = await apiCall<{ patients: User[] }>(
+      API_ENDPOINTS.DOCTOR_PATIENTS
+    );
+
     return response?.patients || [];
   },
 
   /**
    * Get full medical history/profile of a patient
    */
-  getPatientProfile: async (id: number): Promise<User & { predictions: Prediction[] }> => {
-    return apiCall(`${API_ENDPOINTS.DOCTOR_PATIENTS}${id}/`);
-  }
+  getPatientProfile: async (
+    id: number
+  ): Promise<User & { predictions: Prediction[] }> => {
+    return apiCall<User & { predictions: Prediction[] }>(
+      `${API_ENDPOINTS.DOCTOR_PATIENTS}${id}/profile/`
+    );
+  },
 };

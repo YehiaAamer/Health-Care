@@ -1,19 +1,68 @@
 import math
+from pathlib import Path
+import joblib
+import numpy as np
 
-CARDIO_COEFFICIENTS = {
-    "intercept": -11.2,
-    "age": 0.055,
-    "gender": 0.42,
-    "height": -0.012,
-    "weight": 0.035,
-    "ap_hi": 0.052,
-    "ap_lo": 0.028,
-    "cholesterol": 0.48,
-    "gluc": 0.32,
-}
+BASE_DIR = Path(__file__).resolve().parent.parent
+MODEL_PATH = BASE_DIR / "resources" / "cardio_model.pkl"
+SCALER_PATH = BASE_DIR / "resources" / "cardio_scaler.pkl"
 
-def sigmoid(z: float) -> float:
-    return 1 / (1 + math.exp(-z))
+_model = None
+_scaler = None
+
+
+def load_cardio_model():
+    global _model, _scaler
+
+    if _model is None:
+        if not MODEL_PATH.exists():
+            raise FileNotFoundError(f"Cardio model file not found: {MODEL_PATH}")
+        _model = joblib.load(MODEL_PATH)
+
+    if _scaler is None:
+        if not SCALER_PATH.exists():
+            raise FileNotFoundError(f"Cardio scaler file not found: {SCALER_PATH}")
+        _scaler = joblib.load(SCALER_PATH)
+
+    return _model, _scaler
+
+
+def normalize_gender(gender: str) -> int:
+    value = str(gender or "male").strip().lower()
+
+    # Cardio dataset usually uses:
+    # 1 = female
+    # 2 = male
+    if value in ["male", "m", "ذكر", "man"]:
+        return 2
+
+    if value in ["female", "f", "أنثى", "انثى", "woman"]:
+        return 1
+
+    return 2
+
+
+def normalize_cholesterol(cholesterol: float) -> int:
+    # Frontend sends mg/dL, but trained dataset expects category 1/2/3
+    cholesterol = float(cholesterol or 0)
+
+    if cholesterol >= 240:
+        return 3
+    if cholesterol >= 200:
+        return 2
+    return 1
+
+
+def normalize_glucose(glucose: float) -> int:
+    # Frontend sends mg/dL, but trained dataset expects category 1/2/3
+    glucose = float(glucose or 0)
+
+    if glucose >= 126:
+        return 3
+    if glucose >= 100:
+        return 2
+    return 1
+
 
 def get_cardio_risk_level(percentage: float) -> str:
     if percentage >= 80:
@@ -24,6 +73,7 @@ def get_cardio_risk_level(percentage: float) -> str:
         return "medium"
     return "low"
 
+
 def get_cardio_risk_message(risk_level: str, is_arabic: bool = True) -> str:
     if is_arabic:
         if risk_level == "very_high":
@@ -32,82 +82,62 @@ def get_cardio_risk_message(risk_level: str, is_arabic: bool = True) -> str:
             return "يشير النموذج إلى وجود خطورة عالية للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة."
         if risk_level == "medium":
             return "يشير النموذج إلى وجود خطورة متوسطة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة."
-        if risk_level == "low":
-            return "يشير النموذج إلى وجود خطورة منخفضة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة."
-        return "تم إنشاء توقع خطورة القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة."
-    else:
-        if risk_level == "very_high":
-            return "The model indicates a very high cardiovascular risk based on the provided clinical indicators."
-        if risk_level == "high":
-            return "The model indicates a high cardiovascular risk based on the provided clinical indicators."
-        if risk_level == "medium":
-            return "The model indicates a moderate cardiovascular risk based on the provided clinical indicators."
-        if risk_level == "low":
-            return "The model indicates a low cardiovascular risk based on the provided clinical indicators."
-        return "The model generated a cardiovascular risk prediction based on the provided clinical indicators."
+        return "يشير النموذج إلى وجود خطورة منخفضة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المدخلة."
 
-def normalize_cholesterol(cholesterol: float) -> int:
-    if cholesterol >= 240:
-        return 3
-    if cholesterol >= 200:
-        return 2
-    return 1
+    if risk_level == "very_high":
+        return "The model indicates a very high cardiovascular risk based on the provided clinical indicators."
+    if risk_level == "high":
+        return "The model indicates a high cardiovascular risk based on the provided clinical indicators."
+    if risk_level == "medium":
+        return "The model indicates a moderate cardiovascular risk based on the provided clinical indicators."
+    return "The model indicates a low cardiovascular risk based on the provided clinical indicators."
 
-def normalize_glucose(glucose: float) -> int:
-    if glucose >= 126:
-        return 3
-    if glucose >= 100:
-        return 2
-    return 1
 
 def predict_cardiovascular(data: dict) -> dict:
-    age = float(data.get("age", 0))
-    gender_str = str(data.get("gender", "male")).lower()
-    gender_value = 1 if gender_str == "male" else 0
-    height = float(data.get("height", 0))
-    weight = float(data.get("weight", 0))
-    systolic_bp = float(data.get("systolic_bp", 0))
-    diastolic_bp = float(data.get("diastolic_bp", 0))
-    cholesterol = float(data.get("cholesterol", 0))
-    glucose = float(data.get("glucose", 0))
-    
-    # is_arabic is currently not passed from frontend explicitly, but usually response messages are arabic in backend
-    is_arabic = data.get("is_arabic", True)
+    model, scaler = load_cardio_model()
 
-    cholesterol_value = normalize_cholesterol(cholesterol)
-    glucose_value = normalize_glucose(glucose)
+    age = float(data.get("age", 35))
+    gender = normalize_gender(data.get("gender", "male"))
+    height = float(data.get("height", 170))
+    weight = float(data.get("weight", 70))
+    systolic_bp = float(data.get("systolic_bp", data.get("systolicBloodPressure", 120)))
+    diastolic_bp = float(data.get("diastolic_bp", data.get("diastolicBloodPressure", 80)))
 
-    z = (
-        CARDIO_COEFFICIENTS["intercept"] +
-        CARDIO_COEFFICIENTS["age"] * age +
-        CARDIO_COEFFICIENTS["gender"] * gender_value +
-        CARDIO_COEFFICIENTS["height"] * height +
-        CARDIO_COEFFICIENTS["weight"] * weight +
-        CARDIO_COEFFICIENTS["ap_hi"] * systolic_bp +
-        CARDIO_COEFFICIENTS["ap_lo"] * diastolic_bp +
-        CARDIO_COEFFICIENTS["cholesterol"] * cholesterol_value +
-        CARDIO_COEFFICIENTS["gluc"] * glucose_value
-    )
+    cholesterol = normalize_cholesterol(float(data.get("cholesterol", 180)))
+    glucose = normalize_glucose(float(data.get("glucose", 85)))
 
-    probability = sigmoid(z)
+    is_arabic = bool(data.get("is_arabic", True))
+
+    input_data = np.array([[
+        age,
+        gender,
+        height,
+        weight,
+        systolic_bp,
+        diastolic_bp,
+        cholesterol,
+        glucose,
+    ]])
+
+    input_scaled = scaler.transform(input_data)
+
+    probability = float(model.predict_proba(input_scaled)[0][1])
     percentage = round(probability * 100, 2)
+
     risk_level = get_cardio_risk_level(percentage)
-    message = get_cardio_risk_message(risk_level, is_arabic)
-    
-    # Map back to Arabic risk levels as used in diabetes logic if necessary
-    # Or keep as is, but diabetes logic returns "مرتفع" etc. Let's align with what diabetes returns for consistency in DB.
+
     arabic_risk_mapping = {
         "very_high": "مرتفع جدًا",
         "high": "مرتفع",
         "medium": "متوسط",
-        "low": "منخفض"
+        "low": "منخفض",
     }
 
     return {
-        "probability": float(round(probability, 4)),
+        "probability": round(probability, 4),
         "percentage": percentage,
-        "risk_level": risk_level, # DB often stores English mapping or Arabic based on what diabetes did. Let's return both or map later. We'll stick to 'risk_level' and let the view adapt if needed.
+        "risk_level": risk_level,
         "arabic_risk_level": arabic_risk_mapping.get(risk_level, "منخفض"),
-        "message": message,
-        "z_score": float(round(z, 4))
+        "message": get_cardio_risk_message(risk_level, is_arabic),
+        "z_score": 0,
     }
