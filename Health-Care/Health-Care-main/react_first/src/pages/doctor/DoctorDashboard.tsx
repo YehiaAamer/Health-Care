@@ -10,6 +10,7 @@ import PendingPredictions from "@/components/doctor/PendingPredictions";
 import RiskDistributionChart from "@/components/doctor/RiskDistributionChart";
 import AppointmentsToday from "@/components/doctor/AppointmentsToday";
 import RecentActivity from "@/components/doctor/RecentActivity";
+import NotificationBell from "@/components/Shared/NotificationBell";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -543,23 +544,7 @@ export default function DoctorDashboard() {
               <Globe className="h-5 w-5" />
             </Button>
 
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="relative h-12 w-12 shrink-0 rounded-2xl border border-border bg-card text-primary shadow-sm transition-colors hover:bg-primary/10 hover:text-primary"
-            >
-              <Bell className="h-5 w-5" />
-
-              {stats?.unread_notifications > 0 && (
-                <span
-                  className={cn(
-                    "absolute top-3 h-2.5 w-2.5 rounded-full border-2 border-card bg-red-500",
-                    isArabic ? "left-3" : "right-3"
-                  )}
-                />
-              )}
-            </Button>
+            <NotificationBell isArabic={isArabic} />
           </div>
         </div>
 

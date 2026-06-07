@@ -1,19 +1,11 @@
-import math
+import os
+import joblib
+import numpy as np
+from pathlib import Path
 
-CARDIO_COEFFICIENTS = {
-    "intercept": -11.2,
-    "age": 0.055,
-    "gender": 0.42,
-    "height": -0.012,
-    "weight": 0.035,
-    "ap_hi": 0.052,
-    "ap_lo": 0.028,
-    "cholesterol": 0.48,
-    "gluc": 0.32,
-}
-
-def sigmoid(z: float) -> float:
-    return 1 / (1 + math.exp(-z))
+BASE_DIR = Path(__file__).resolve().parent.parent
+MODEL_PATH = BASE_DIR / 'resources' / 'cardio_model.pkl'
+SCALER_PATH = BASE_DIR / 'resources' / 'cardio_scaler.pkl'
 
 def get_cardio_risk_level(percentage: float) -> str:
     if percentage >= 80:
@@ -62,40 +54,48 @@ def normalize_glucose(glucose: float) -> int:
 
 def predict_cardiovascular(data: dict) -> dict:
     age = float(data.get("age", 0))
-    gender_str = str(data.get("gender", "male")).lower()
-    gender_value = 1 if gender_str == "male" else 0
+    gender_raw = data.get("gender", 1)
+    if isinstance(gender_raw, str):
+        gender_raw = 1 if gender_raw.lower() in ['male', '1'] else 2
+    gender = float(gender_raw)
+    
     height = float(data.get("height", 0))
     weight = float(data.get("weight", 0))
     systolic_bp = float(data.get("systolic_bp", 0))
     diastolic_bp = float(data.get("diastolic_bp", 0))
-    cholesterol = float(data.get("cholesterol", 0))
-    glucose = float(data.get("glucose", 0))
+    cholesterol_raw = float(data.get("cholesterol", 0))
+    glucose_raw = float(data.get("glucose", 0))
     
-    # is_arabic is currently not passed from frontend explicitly, but usually response messages are arabic in backend
+    cholesterol_value = float(normalize_cholesterol(cholesterol_raw))
+    glucose_value = float(normalize_glucose(glucose_raw))
+    
     is_arabic = data.get("is_arabic", True)
 
-    cholesterol_value = normalize_cholesterol(cholesterol)
-    glucose_value = normalize_glucose(glucose)
+    features = np.array([[age, gender, height, weight, systolic_bp, diastolic_bp, cholesterol_value, glucose_value]])
+    
+    # Load model and scaler to ensure no cache
+    fresh_model = joblib.load(MODEL_PATH)
+    fresh_scaler = joblib.load(SCALER_PATH)
+    
+    features_scaled = fresh_scaler.transform(features)
+    probability = fresh_model.predict_proba(features_scaled)[0, 1]
+    
+    print("--- DEPLOYMENT VERIFICATION LOG ---")
+    print(f"Loaded model path: {MODEL_PATH}")
+    print(f"Model File Timestamp: {os.path.getmtime(MODEL_PATH)}")
+    print(f"Loaded scaler path: {SCALER_PATH}")
+    print(f"Model type: {type(fresh_model)}")
+    print(f"Scaler class: {type(fresh_scaler)}")
+    print(f"Prediction probability source: LogisticRegression model via joblib")
+    print(f"Feature vector before scaling: {features}")
+    print(f"Feature vector after scaling: {features_scaled}")
+    print(f"Final probability: {probability}")
+    print("-----------------------------------")
 
-    z = (
-        CARDIO_COEFFICIENTS["intercept"] +
-        CARDIO_COEFFICIENTS["age"] * age +
-        CARDIO_COEFFICIENTS["gender"] * gender_value +
-        CARDIO_COEFFICIENTS["height"] * height +
-        CARDIO_COEFFICIENTS["weight"] * weight +
-        CARDIO_COEFFICIENTS["ap_hi"] * systolic_bp +
-        CARDIO_COEFFICIENTS["ap_lo"] * diastolic_bp +
-        CARDIO_COEFFICIENTS["cholesterol"] * cholesterol_value +
-        CARDIO_COEFFICIENTS["gluc"] * glucose_value
-    )
-
-    probability = sigmoid(z)
     percentage = round(probability * 100, 2)
     risk_level = get_cardio_risk_level(percentage)
     message = get_cardio_risk_message(risk_level, is_arabic)
     
-    # Map back to Arabic risk levels as used in diabetes logic if necessary
-    # Or keep as is, but diabetes logic returns "مرتفع" etc. Let's align with what diabetes returns for consistency in DB.
     arabic_risk_mapping = {
         "very_high": "مرتفع جدًا",
         "high": "مرتفع",
@@ -106,8 +106,8 @@ def predict_cardiovascular(data: dict) -> dict:
     return {
         "probability": float(round(probability, 4)),
         "percentage": percentage,
-        "risk_level": risk_level, # DB often stores English mapping or Arabic based on what diabetes did. Let's return both or map later. We'll stick to 'risk_level' and let the view adapt if needed.
+        "risk_level": risk_level,
         "arabic_risk_level": arabic_risk_mapping.get(risk_level, "منخفض"),
         "message": message,
-        "z_score": float(round(z, 4))
+        "z_score": 0.0
     }

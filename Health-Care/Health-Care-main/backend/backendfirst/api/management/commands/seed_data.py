@@ -8,6 +8,7 @@ from api.models import (
 )
 from django.utils import timezone
 from datetime import timedelta
+from api.services.notification_service import create_notification
 
 class Command(BaseCommand):
     help = 'Seed database with realistic healthcare data for a specific doctor'
@@ -158,7 +159,7 @@ class Command(BaseCommand):
         # Today's appointments
         for i in range(5):
             patient = random.choice(patients)
-            Appointment.objects.create(
+            appt = Appointment.objects.create(
                 doctor_user=doctor_user,
                 patient_user=patient,
                 appointment_date=timezone.now().date(),
@@ -167,17 +168,33 @@ class Command(BaseCommand):
                 status='scheduled',
                 notes="Patient check-up."
             )
+            create_notification(
+                user=patient,
+                type="appointment_confirmed",
+                title="تأكيد الموعد",
+                body="Your appointment has been confirmed.",
+                related_object_id=appt.id,
+                related_object_type="appointment"
+            )
 
         # Future appointments
         for i in range(10):
             patient = random.choice(patients)
-            Appointment.objects.create(
+            appt = Appointment.objects.create(
                 doctor_user=doctor_user,
                 patient_user=patient,
                 appointment_date=timezone.now().date() + timedelta(days=random.randint(1, 14)),
                 appointment_time=timezone.now().time(),
                 appointment_type=random.choice(['FOLLOW_UP', 'INITIAL_CONSULT']),
                 status='scheduled'
+            )
+            create_notification(
+                user=patient,
+                type="appointment_confirmed",
+                title="تأكيد الموعد",
+                body="Your appointment has been confirmed.",
+                related_object_id=appt.id,
+                related_object_type="appointment"
             )
 
         # 6. Create Messages

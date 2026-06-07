@@ -12,6 +12,8 @@ from .views.doctor_views import (
     doctor_profile,
     doctor_notifications,
     all_patient_predictions,
+    thread_messages,
+    send_message,
 )
 
 urlpatterns = [
@@ -36,6 +38,8 @@ urlpatterns = [
 
     # Messages
     path('messages/recent/', recent_messages, name='recent_messages'),
+    path('messages/recent/<int:thread_id>/messages/', thread_messages, name='thread_messages'),
+    path('messages/recent/<int:thread_id>/send/', send_message, name='send_message'),
 
     # Activity
     path('activity/', recent_activity, name='recent_activity'),

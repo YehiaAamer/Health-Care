@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { notificationsApi } from "@/api/notifications";
 import type { Notification } from "@/types/api";
+import { useAuth } from "@/hooks/useAuth";
 
 interface NotificationBellProps {
   isArabic?: boolean;
@@ -20,11 +21,11 @@ interface NotificationBellProps {
 }
 
 const getNotificationTitle = (notification: Notification) => {
-  return notification.title || notification.message || "Notification";
+  return notification.title || "Notification";
 };
 
 const getNotificationMessage = (notification: Notification) => {
-  return notification.message || notification.title || "";
+  return notification.body || "";
 };
 
 const getNotificationDate = (notification: Notification) => {
@@ -54,6 +55,7 @@ export default function NotificationBell({
   isArabic = false,
   className,
 }: NotificationBellProps) {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -76,7 +78,7 @@ export default function NotificationBell({
       setIsLoading(true);
       setError(null);
 
-      const data = await notificationsApi.getNotifications();
+      const data = await notificationsApi.getNotifications(user?.role);
 
       setNotifications(
         [...(data || [])].sort((a, b) => {

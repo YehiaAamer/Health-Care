@@ -3,11 +3,12 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
-from ..models import Prediction, ChatbotSession, ChatbotMessage
+from ..models import Prediction, ChatbotSession, ChatbotMessage, DoctorPatientAssignment
 from ..services.xgboost_service import predict_diabetes_xgboost, get_feature_importance
 # Medgamma imports for Chatbot only
 from ..services.medgamma_service import chatbot_chat, MedgammaError, is_medical_query
 from ..services.cardiovascular_service import predict_cardiovascular
+from ..services.notification_service import create_notification
 import uuid
 
 
@@ -67,11 +68,18 @@ def predict_diabetes(request):
         # ─────────────────────────────────────────────
         message = _generate_auto_message(probability, risk_level, features)
 
+        # Find active doctor assignment for the patient
+        assignment = DoctorPatientAssignment.objects.filter(
+            patient_user=request.user,
+            status="active"
+        ).first()
+
         # ─────────────────────────────────────────────
         # حفظ في قاعدة البيانات
         # ─────────────────────────────────────────────
         prediction = Prediction.objects.create(
             patient_user=request.user,
+            assignment=assignment,
             pregnancies=features.get('pregnancies', 0),
             glucose=features.get('glucose', 85),
             blood_pressure=features.get('blood_pressure', 70),
@@ -84,6 +92,32 @@ def predict_diabetes(request):
             risk_level=risk_level,
             message=message
         )
+
+        # Trigger doctor notifications if assignment exists
+        if assignment:
+            doctor = assignment.doctor_user
+            patient_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+            
+            # New prediction notification
+            create_notification(
+                user=doctor,
+                type="new_prediction",
+                title="تحليل جديد للمراجعة",
+                body=f"Patient {patient_name} submitted a new prediction and requires review.",
+                related_object_id=prediction.id,
+                related_object_type="prediction"
+            )
+            
+            # High risk alert notification if probability >= 50%
+            if probability >= 50.0:
+                create_notification(
+                    user=doctor,
+                    type="high_risk_alert",
+                    title="تنبيه: مريض ذو خطورة عالية",
+                    body=f"High diabetes risk detected for Patient {patient_name}.",
+                    related_object_id=prediction.id,
+                    related_object_type="prediction"
+                )
 
         # ─────────────────────────────────────────────
         # الاستجابة
@@ -174,6 +208,12 @@ def predict_v2(request):
         
         cardio_result = predict_cardiovascular(features_cardio)
         
+        # Find active doctor assignment for the patient
+        assignment = DoctorPatientAssignment.objects.filter(
+            patient_user=request.user,
+            status="active"
+        ).first()
+
         # Save to database
         session_uuid = uuid.uuid4()
         extra_fields = {
@@ -191,6 +231,7 @@ def predict_v2(request):
         # Save Diabetes
         pred_diabetes = Prediction.objects.create(
             patient_user=request.user,
+            assignment=assignment,
             disease_type=Prediction.DISEASE_DIABETES,
             session_id=session_uuid,
             extra_fields=extra_fields,
@@ -210,6 +251,7 @@ def predict_v2(request):
         # Save Cardiovascular
         pred_cardio = Prediction.objects.create(
             patient_user=request.user,
+            assignment=assignment,
             disease_type=Prediction.DISEASE_CARDIOVASCULAR,
             session_id=session_uuid,
             extra_fields=extra_fields,
@@ -225,6 +267,51 @@ def predict_v2(request):
             risk_level=cardio_result["arabic_risk_level"],
             message=cardio_result["message"]
         )
+
+        # Trigger doctor notifications if assignment exists
+        if assignment:
+            doctor = assignment.doctor_user
+            patient_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+            
+            # Diabetes notification
+            create_notification(
+                user=doctor,
+                type="new_prediction",
+                title="تحليل جديد للمراجعة",
+                body=f"Patient {patient_name} submitted a new prediction and requires review.",
+                related_object_id=pred_diabetes.id,
+                related_object_type="prediction"
+            )
+            
+            if diabetes_prob >= 50.0:
+                create_notification(
+                    user=doctor,
+                    type="high_risk_alert",
+                    title="تنبيه: مريض ذو خطورة عالية",
+                    body=f"High diabetes risk detected for Patient {patient_name}.",
+                    related_object_id=pred_diabetes.id,
+                    related_object_type="prediction"
+                )
+                
+            # Cardiovascular notification
+            create_notification(
+                user=doctor,
+                type="new_prediction",
+                title="تحليل جديد للمراجعة",
+                body=f"Patient {patient_name} submitted a new prediction and requires review.",
+                related_object_id=pred_cardio.id,
+                related_object_type="prediction"
+            )
+            
+            if cardio_result["percentage"] >= 50.0:
+                create_notification(
+                    user=doctor,
+                    type="high_risk_alert",
+                    title="تنبيه: مريض ذو خطورة عالية",
+                    body=f"High cardiovascular risk detected for Patient {patient_name}.",
+                    related_object_id=pred_cardio.id,
+                    related_object_type="prediction"
+                )
 
         return Response({
             "session_id": str(session_uuid),

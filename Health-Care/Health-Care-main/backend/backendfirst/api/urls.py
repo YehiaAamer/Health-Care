@@ -11,6 +11,7 @@ from .views.patient_views import (
     predict_v2,
 )
 from .views.auth_views import register, login, logout, get_current_user, update_profile, delete_profile_picture, password_reset_request, password_reset_confirm
+from .views.notification_views import patient_notifications, mark_notification_as_read
 from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
@@ -51,4 +52,10 @@ urlpatterns = [
     # Doctor Dashboard Endpoints
     # ────────────────────────────────────────────────
     path('doctor/', include('api.doctor_urls')),
+
+    # ────────────────────────────────────────────────
+    # Notification Endpoints
+    # ────────────────────────────────────────────────
+    path('patient/notifications/', patient_notifications, name='patient_notifications'),
+    path('notifications/<int:notification_id>/read/', mark_notification_as_read, name='mark_notification_as_read'),
 ]

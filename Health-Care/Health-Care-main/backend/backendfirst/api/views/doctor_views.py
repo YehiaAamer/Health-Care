@@ -14,6 +14,7 @@ from ..models import (
     Notification, Appointment, UserProfile, MedicationRecommendation,
 )
 from ..doctor_permissions import IsApprovedDoctor
+from ..services.notification_service import create_notification
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -263,8 +264,8 @@ def review_prediction(request, prediction_id):
     prediction.review_status = decision
     prediction.save(update_fields=["review_status"])
 
-    # Create notification for patient
-    Notification.objects.create(
+    # Create notification for patient using service
+    create_notification(
         user=prediction.patient_user,
         type="prediction_reviewed",
         title="تمت مراجعة تحليلك",
@@ -671,3 +672,99 @@ def doctor_notifications(request):
     } for n in notifications]
 
     return Response({"count": len(data), "notifications": data})
+
+
+# ═══════════════════════════════════════════════════════════════
+# Chat Views
+# ═══════════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def thread_messages(request, thread_id):
+    """
+    GET /api/doctor/messages/recent/<thread_id>/messages/
+    Returns list of messages for a thread.
+    """
+    try:
+        thread = DoctorPatientChatThread.objects.get(id=thread_id)
+    except DoctorPatientChatThread.DoesNotExist:
+        return Response({"error": "المحادثة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
+
+    # Verify authorization (request user must be either doctor or patient in the thread)
+    assignment = thread.assignment
+    if request.user != assignment.doctor_user and request.user != assignment.patient_user:
+        return Response({"error": "غير مصرح لك بمشاهدة هذه المحادثة"}, status=status.HTTP_403_FORBIDDEN)
+
+    messages = thread.messages.all().order_by("created_at")
+    data = [{
+        "id": m.id,
+        "content": m.content,
+        "sender": "patient" if m.sender_user == assignment.patient_user else "doctor",
+        "created_at": m.created_at.isoformat()
+    } for m in messages]
+
+    return Response({"messages": data})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def send_message(request, thread_id):
+    """
+    POST /api/doctor/messages/recent/<thread_id>/send/
+    Sends a new message in the chat thread and triggers a notification.
+    """
+    try:
+        thread = DoctorPatientChatThread.objects.get(id=thread_id)
+    except DoctorPatientChatThread.DoesNotExist:
+        return Response({"error": "المحادثة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
+
+    assignment = thread.assignment
+    if request.user != assignment.doctor_user and request.user != assignment.patient_user:
+        return Response({"error": "غير مصرح لك بالإرسال في هذه المحادثة"}, status=status.HTTP_403_FORBIDDEN)
+
+    content = request.data.get("content", "").strip()
+    if not content:
+        return Response({"error": "لا يمكن إرسال رسالة فارغة"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Save message
+    msg = DoctorPatientChatMessage.objects.create(
+        thread=thread,
+        sender_user=request.user,
+        content=content
+    )
+
+    # Determine recipient and sender names
+    sender_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+    if request.user == assignment.patient_user:
+        # Sender is patient, recipient is doctor
+        recipient = assignment.doctor_user
+        # Trigger Doctor Notification: new_message
+        create_notification(
+            user=recipient,
+            type="new_message",
+            title="رسالة جديدة من مريض",
+            body=f"قام المريض {sender_name} بإرسال رسالة جديدة.",
+            related_object_id=thread.id,
+            related_object_type="chat_thread"
+        )
+        sender_type = "patient"
+    else:
+        # Sender is doctor, recipient is patient
+        recipient = assignment.patient_user
+        # Trigger Patient Notification: new_message
+        create_notification(
+            user=recipient,
+            type="new_message",
+            title="رسالة جديدة من الطبيب",
+            body=f"تلقيت رسالة جديدة من الدكتور {sender_name}.",
+            related_object_id=thread.id,
+            related_object_type="chat_thread"
+        )
+        sender_type = "doctor"
+
+    return Response({
+        "id": msg.id,
+        "content": msg.content,
+        "sender": sender_type,
+        "created_at": msg.created_at.isoformat()
+    })
+

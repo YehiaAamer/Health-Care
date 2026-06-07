@@ -3,12 +3,13 @@ import { Notification } from "@/types/api";
 
 export const notificationsApi = {
   /**
-   * Get all notifications for the current user
+   * Get all notifications for the current user based on their role
    */
-  getNotifications: async (): Promise<Notification[]> => {
-    const response = await apiCall<{ notifications: Notification[] }>(
-      API_ENDPOINTS.DOCTOR_NOTIFICATIONS
-    );
+  getNotifications: async (role?: string): Promise<Notification[]> => {
+    const endpoint = role === "doctor"
+      ? API_ENDPOINTS.DOCTOR_NOTIFICATIONS
+      : "/api/patient/notifications/";
+    const response = await apiCall<{ notifications: Notification[] }>(endpoint);
     return response.notifications;
   },
 
@@ -16,7 +17,7 @@ export const notificationsApi = {
    * Mark a specific notification as read
    */
   markAsRead: async (id: number): Promise<void> => {
-    await apiCall(`${API_ENDPOINTS.DOCTOR_NOTIFICATIONS}${id}/read/`, {
+    await apiCall(`/api/notifications/${id}/read/`, {
       method: 'POST'
     });
   }

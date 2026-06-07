@@ -14,7 +14,7 @@ import joblib
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent
-DATA_PATH = Path(r"C:\Users\Yahia\Desktop\Doctor Dashboard - Copy (3) - Copy\Health-Care\cardio_reduced_with_target.xlsx")
+DATA_PATH = Path(r"C:\Users\Yahia\Desktop\Doctor Dashboard - Copy (3) - Copy\Health-Care\Health-Care-main\backend\backendfirst\api\data\cardio_train_cleaned_.csv")
 MODEL_PATH = BASE_DIR / 'resources' / 'cardio_model.pkl'
 SCALER_PATH = BASE_DIR / 'resources' / 'cardio_scaler.pkl'
 
@@ -22,15 +22,22 @@ print(f"📂 Loading data from: {DATA_PATH}")
 if not DATA_PATH.exists():
     raise FileNotFoundError(f"❌ Excel file not found at: {DATA_PATH}")
 
-df = pd.read_excel(DATA_PATH)
+df = pd.read_csv(DATA_PATH)
 
 # 1. Convert Age from days to years (Age = Years)
-df['Age_years'] = df['Age'] / 365.25
+df['Age_years'] = df['age'] / 365.25
 
 # 2. Clean Blood Pressure Outliers
 # Absolute values first to remove negative values
-df['Systolic BP'] = df['Systolic BP'].abs()
-df['Diastolic BP'] = df['Diastolic BP'].abs()
+df['Systolic BP'] = df['ap_hi'].abs()
+df['Diastolic BP'] = df['ap_lo'].abs()
+df['Gender'] = df['gender']
+df['Height'] = df['height']
+df['Weight'] = df['weight']
+df['Cholesterol'] = df['cholesterol']
+df['Glucose'] = df['gluc']
+df['Cardio'] = df['cardio']
+
 
 # Swap Systolic BP and Diastolic BP if they are swapped
 swapped_idx = df['Systolic BP'] < df['Diastolic BP']
