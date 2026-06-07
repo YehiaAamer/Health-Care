@@ -1,7 +1,6 @@
 import { NavLink, useNavigate, Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
-  Bell,
   User,
   Settings,
   LogOut,
@@ -15,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import BrandLogo from "@/components/shared/BrandLogo";
+import NotificationBell from "@/components/shared/NotificationBell";
 
 interface HeaderProps {
   variant?: "default" | "auth" | "dashboard";
@@ -120,7 +120,7 @@ const Header = ({ variant = "default" }: HeaderProps) => {
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     [
-      "relative whitespace-nowrap transition-colors duration-200",
+      "relative whitespace-nowrap text-sm transition-colors duration-200",
       "after:absolute after:start-0 after:-bottom-1.5 after:h-[2px] after:rounded-full after:bg-primary after:transition-all after:duration-200",
       isActive
         ? "text-primary font-medium after:w-full"
@@ -215,6 +215,14 @@ const Header = ({ variant = "default" }: HeaderProps) => {
             onClick={mobile ? closeMobileNav : undefined}
           >
             {t("consultations")}
+          </NavLink>
+
+          <NavLink
+            to="/messages"
+            className={cls}
+            onClick={mobile ? closeMobileNav : undefined}
+          >
+            {isArabic ? "الرسائل" : "Messages"}
           </NavLink>
         </>
       );
@@ -334,6 +342,20 @@ const Header = ({ variant = "default" }: HeaderProps) => {
             {t("settings")}
           </button>
 
+          {isPatient && (
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                navigate("/messages");
+              }}
+              className={`flex w-full items-center gap-2 px-4 py-3 text-sm text-foreground transition hover:bg-accent hover:text-primary ${
+                isArabic ? "flex-row-reverse text-right" : "text-left"
+              }`}
+            >
+              <span>{isArabic ? "الرسائل" : "Messages"}</span>
+            </button>
+          )}
+
           <button
             onClick={handleToggleLanguage}
             className={`flex w-full items-center gap-2 px-4 py-3 text-sm text-foreground transition hover:bg-accent hover:text-primary ${
@@ -371,7 +393,7 @@ const Header = ({ variant = "default" }: HeaderProps) => {
             </div>
 
             <nav
-              className={`hidden min-w-0 items-center justify-center gap-6 md:flex md:justify-self-center ${
+              className={`hidden min-w-0 items-center justify-center gap-4 md:flex md:justify-self-center lg:gap-5 ${
                 isArabic ? "flex-row-reverse" : "flex-row"
               }`}
             >
@@ -394,7 +416,9 @@ const Header = ({ variant = "default" }: HeaderProps) => {
                 size="icon"
                 onClick={handleToggleTheme}
                 className="text-primary hover:bg-primary/10 hover:text-primary"
-                aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+                aria-label={
+                  isDark ? "Switch to light mode" : "Switch to dark mode"
+                }
                 title={isDark ? "Light mode" : "Dark mode"}
               >
                 {isDark ? (
@@ -416,14 +440,7 @@ const Header = ({ variant = "default" }: HeaderProps) => {
 
               {user ? (
                 <>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-primary hover:bg-primary/10 hover:text-primary"
-                    aria-label="Notifications"
-                  >
-                    <Bell className="h-5 w-5" />
-                  </Button>
+                  {isPatient && <NotificationBell isArabic={isArabic} />}
 
                   {renderUserMenu()}
                 </>

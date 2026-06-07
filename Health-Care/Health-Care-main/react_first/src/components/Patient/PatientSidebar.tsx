@@ -23,6 +23,7 @@ import {
   PhoneCall,
   Moon,
   Sun,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/shared/BrandLogo";
@@ -218,6 +219,11 @@ export default function PatientSidebar({
       icon: Calendar,
       label: t("dashboard.bookConsultation"),
       path: "/consultations",
+    },
+    {
+      icon: MessageSquare,
+      label: t("dashboard.messages", "Messages"),
+      path: "/messages",
     },
     {
       icon: Settings,

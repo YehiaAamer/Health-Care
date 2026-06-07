@@ -18,6 +18,7 @@ import PastReports from "./pages/patient/PastReports";
 import History from "./pages/patient/History";
 import EditProfile from "./pages/patient/EditProfile";
 import Consultations from "./pages/patient/Consultations";
+import PatientMessagesPage from "./pages/patient/PatientMessagePage.tsx";
 
 import DoctorDashboard from "./pages/doctor/DoctorDashboard";
 import DoctorLayout from "./components/layout/DoctorLayout";
@@ -42,9 +43,11 @@ import NotFound from "./pages/public/NotFound";
 import { useAuth } from "@/hooks/useAuth";
 
 function AuthenticatedChatBot() {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
+  if (isLoading) return null;
   if (!isAuthenticated) return null;
+  if (user?.role !== "patient") return null;
 
   return <ChatBot />;
 }
@@ -172,6 +175,15 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="patient">
                 <Consultations />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/messages"
+            element={
+              <ProtectedRoute requiredRole="patient">
+                <PatientMessagesPage />
               </ProtectedRoute>
             }
           />

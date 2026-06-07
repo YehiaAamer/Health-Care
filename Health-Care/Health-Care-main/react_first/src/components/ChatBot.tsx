@@ -27,6 +27,27 @@ const clamp = (value: number, min: number, max: number) => {
   return Math.min(Math.max(value, min), max);
 };
 
+const getLauncherSize = () => {
+  if (window.innerWidth < 380) return 118;
+  if (window.innerWidth < 640) return 135;
+  return 210;
+};
+
+const getChatWidth = () => {
+  if (window.innerWidth < 640) return window.innerWidth - 20;
+  return 470;
+};
+
+const getChatHeight = (isMinimized = false) => {
+  if (isMinimized) return 84;
+
+  if (window.innerWidth < 640) {
+    return Math.min(window.innerHeight - 24, 560);
+  }
+
+  return Math.min(window.innerHeight - 32, 640);
+};
+
 const ChatBot = () => {
   const { t, i18n } = useTranslation();
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -61,6 +82,17 @@ const ChatBot = () => {
 
   const { user } = useAuth();
 
+  const userRole = String(
+    (user as any)?.role ||
+      (user as any)?.user_type ||
+      (user as any)?.profile?.role ||
+      ""
+  )
+    .trim()
+    .toLowerCase();
+
+  const shouldShowChatBot = userRole === "patient";
+
   const hintMessages = useMemo(
     () => [t("chatBot.floatingMessage1"), t("chatBot.floatingMessage2")],
     [t, i18n.language]
@@ -68,25 +100,31 @@ const ChatBot = () => {
 
   useEffect(() => {
     const setDefaultPositions = () => {
-      const launcherSize = window.innerWidth < 640 ? 170 : 210;
-      const chatWidth = window.innerWidth < 640 ? window.innerWidth - 24 : 470;
-      const chatHeight = 640;
+      const launcherSize = getLauncherSize();
+      const chatWidth = getChatWidth();
+      const chatHeight = getChatHeight(isMinimized);
 
       setLauncherPosition((prev) => {
-        if (prev) return prev;
+        const nextPosition = prev || {
+          x: window.innerWidth - launcherSize - 12,
+          y: window.innerHeight - launcherSize - 12,
+        };
 
         return {
-          x: window.innerWidth - launcherSize - 20,
-          y: window.innerHeight - launcherSize - 20,
+          x: clamp(nextPosition.x, 8, window.innerWidth - launcherSize - 8),
+          y: clamp(nextPosition.y, 8, window.innerHeight - launcherSize - 8),
         };
       });
 
       setChatPosition((prev) => {
-        if (prev) return prev;
+        const nextPosition = prev || {
+          x: window.innerWidth - chatWidth - 10,
+          y: Math.max(12, window.innerHeight - chatHeight - 12),
+        };
 
         return {
-          x: window.innerWidth - chatWidth - 20,
-          y: Math.max(20, window.innerHeight - chatHeight - 20),
+          x: clamp(nextPosition.x, 8, window.innerWidth - chatWidth - 8),
+          y: clamp(nextPosition.y, 8, window.innerHeight - chatHeight - 8),
         };
       });
     };
@@ -94,11 +132,13 @@ const ChatBot = () => {
     setDefaultPositions();
 
     window.addEventListener("resize", setDefaultPositions);
+    window.addEventListener("orientationchange", setDefaultPositions);
 
     return () => {
       window.removeEventListener("resize", setDefaultPositions);
+      window.removeEventListener("orientationchange", setDefaultPositions);
     };
-  }, []);
+  }, [isMinimized]);
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
@@ -113,7 +153,7 @@ const ChatBot = () => {
       }
 
       if (dragRef.current.target === "launcher") {
-        const launcherSize = window.innerWidth < 640 ? 170 : 210;
+        const launcherSize = getLauncherSize();
 
         setLauncherPosition({
           x: clamp(
@@ -130,8 +170,8 @@ const ChatBot = () => {
       }
 
       if (dragRef.current.target === "chat") {
-        const chatWidth = window.innerWidth < 640 ? window.innerWidth - 24 : 470;
-        const chatHeight = isMinimized ? 84 : 640;
+        const chatWidth = getChatWidth();
+        const chatHeight = getChatHeight(isMinimized);
 
         setChatPosition({
           x: clamp(
@@ -335,7 +375,7 @@ const ChatBot = () => {
       const response = await apiCall<{
         bot_response: string;
         conversation_id: number;
-      }>("/api/chatbot/", { // Assuming API_ENDPOINTS.CHATBOT is defined as "/api/chatbot/"
+      }>("/api/chatbot/", {
         method: "POST",
         body: JSON.stringify({
           ...(predictionId ? { prediction_id: predictionId } : {}),
@@ -418,6 +458,16 @@ const ChatBot = () => {
     }
   };
 
+  if (!shouldShowChatBot) {
+    return null;
+  }
+
+  const launcherSizeClass =
+    "h-[118px] w-[118px] min-[380px]:h-[135px] min-[380px]:w-[135px] sm:h-[210px] sm:w-[210px]";
+
+  const launcherContainerClass =
+    "relative h-[118px] w-[118px] min-[380px]:h-[135px] min-[380px]:w-[135px] sm:h-[210px] sm:w-[210px] pointer-events-none";
+
   return (
     <>
       <style>
@@ -460,11 +510,11 @@ const ChatBot = () => {
             top: launcherPosition.y,
           }}
         >
-          <div className="relative w-[170px] sm:w-[210px] h-[170px] sm:h-[210px] pointer-events-none">
+          <div className={launcherContainerClass}>
             {showHint && (
               <div
                 dir={i18n.language === "ar" ? "rtl" : "ltr"}
-                className="chatbot-hint z-20 pointer-events-auto absolute top-[6px] right-[105px] sm:top-[10px] sm:right-[132px] w-[170px] sm:w-[195px] rounded-2xl border bg-background px-3 py-2 shadow-xl"
+                className="chatbot-hint z-20 pointer-events-auto absolute bottom-[92px] right-[72px] w-[160px] rounded-2xl border bg-background px-3 py-2 shadow-xl min-[380px]:bottom-[105px] min-[380px]:right-[85px] sm:top-[10px] sm:bottom-auto sm:right-[132px] sm:w-[195px]"
               >
                 <button
                   type="button"
@@ -484,7 +534,7 @@ const ChatBot = () => {
                   <X className="h-3 w-3" />
                 </button>
 
-                <p className="pr-4 text-[12px] sm:text-sm font-medium leading-5 text-foreground min-h-[20px]">
+                <p className="pr-4 text-[11px] sm:text-sm font-medium leading-5 text-foreground min-h-[20px]">
                   {displayedHint}
                   <span className="ms-1 inline-block h-4 w-[1px] align-middle bg-current animate-pulse" />
                 </p>
@@ -503,7 +553,7 @@ const ChatBot = () => {
               <Lottie
                 animationData={chatbot}
                 loop
-                className="pointer-events-none h-[170px] w-[170px] sm:h-[210px] sm:w-[210px]"
+                className={`pointer-events-none ${launcherSizeClass}`}
               />
             </button>
           </div>
@@ -513,8 +563,11 @@ const ChatBot = () => {
       {isChatOpen && chatPosition && (
         <div
           dir={i18n.language === "ar" ? "rtl" : "ltr"}
-          className={`fixed z-[999] w-[calc(100vw-1.5rem)] sm:w-[430px] md:w-[470px] bg-background/95 backdrop-blur-xl border border-border/60 rounded-[30px] shadow-[0_20px_60px_rgba(0,0,0,0.18)] overflow-hidden transition-[height] duration-300 flex flex-col ${isMinimized ? "h-[84px]" : "h-[640px]"
-            }`}
+          className={`fixed z-[999] w-[calc(100vw-1.25rem)] sm:w-[430px] md:w-[470px] bg-background/95 backdrop-blur-xl border border-border/60 rounded-[24px] sm:rounded-[30px] shadow-[0_20px_60px_rgba(0,0,0,0.18)] overflow-hidden transition-[height] duration-300 flex flex-col ${
+            isMinimized
+              ? "h-[84px]"
+              : "h-[min(calc(100vh-1.5rem),560px)] sm:h-[min(calc(100vh-2rem),640px)]"
+          }`}
           style={{
             left: chatPosition.x,
             top: chatPosition.y,
@@ -522,23 +575,23 @@ const ChatBot = () => {
         >
           <div
             onPointerDown={(e) => startDrag(e, "chat")}
-            className="cursor-move px-5 py-4 border-b border-border/50 bg-gradient-to-b from-background to-background/90 shrink-0"
+            className="cursor-move px-4 sm:px-5 py-3 sm:py-4 border-b border-border/50 bg-gradient-to-b from-background to-background/90 shrink-0"
           >
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="h-16 w-16 rounded-full overflow-hidden bg-transparent shrink-0">
+                <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full overflow-hidden bg-transparent shrink-0">
                   <Lottie
                     animationData={chatbot}
                     loop
-                    className="h-16 w-16 pointer-events-none"
+                    className="h-12 w-12 sm:h-16 sm:w-16 pointer-events-none"
                   />
                 </div>
 
                 <div className="min-w-0">
-                  <h3 className="text-base sm:text-lg font-semibold truncate">
+                  <h3 className="text-sm sm:text-lg font-semibold truncate">
                     {t("chatBot.title")}
                   </h3>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                  <p className="text-[11px] sm:text-xs text-muted-foreground truncate mt-0.5">
                     {predictionId
                       ? t("chatBot.connectedToLastPrediction")
                       : t("chatBot.generalMode")}
@@ -578,14 +631,16 @@ const ChatBot = () => {
                   {messages.map((msg, index) => (
                     <div
                       key={index}
-                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
-                        }`}
+                      className={`flex ${
+                        msg.role === "user" ? "justify-end" : "justify-start"
+                      }`}
                     >
                       <div
-                        className={`max-w-[84%] px-4 py-3 shadow-sm ${msg.role === "user"
-                          ? "bg-primary text-primary-foreground rounded-[26px] rounded-br-md"
-                          : "bg-accent text-accent-foreground rounded-[26px] rounded-bl-md"
-                          }`}
+                        className={`max-w-[84%] px-4 py-3 shadow-sm ${
+                          msg.role === "user"
+                            ? "bg-primary text-primary-foreground rounded-[26px] rounded-br-md"
+                            : "bg-accent text-accent-foreground rounded-[26px] rounded-bl-md"
+                        }`}
                       >
                         <p className="text-sm leading-6 whitespace-pre-wrap">
                           {msg.content}
