@@ -5,10 +5,19 @@ import {
   useMemo,
   type ChangeEvent,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { messagesApi } from "@/api/messages";
 import { patientsApi } from "@/api/patients";
-import type { ChatThread, ChatMessage, User, Prediction } from "@/types/api";
+import { apiCall, API_ENDPOINTS } from "@/lib/api";
+import type {
+  ChatThread,
+  ChatMessage,
+  User,
+  Prediction,
+  DiseaseType,
+  DoctorProfileResponse,
+} from "@/types/api";
 
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,33 +30,42 @@ import {
   MessageSquare,
   Search,
   Send,
-  MoreHorizontal,
   FileText,
-  AlertTriangle,
   CheckCheck,
-  Activity,
-  Sparkles,
-  ArrowUpRight,
   TrendingUp,
-  MoreVertical,
   User as UserIcon,
   X,
   Paperclip,
   ChevronDown,
+  PhoneCall,
+  Video,
 } from "lucide-react";
 
 import LoadingDots from "@/components/shared/LoadingDots";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+type IndicatorColor = "red" | "green" | "primary";
+
+type SummaryIndicator = {
+  label: string;
+  value: string | number;
+  unit: string;
+  color: IndicatorColor;
+};
+
+const ARCHIVE_PREVIEW_LIMIT = 1;
+
 export default function MessagesPage() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const isArabic = i18n.language === "ar";
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const selectedThreadRef = useRef<number | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [messagesLoading, setMessagesLoading] = useState(false);
   const [sending, setSending] = useState(false);
 
   const [search, setSearch] = useState("");
@@ -56,6 +74,10 @@ export default function MessagesPage() {
     (User & { predictions: Prediction[] }) | null
   >(null);
 
+  const [doctorSpecialties, setDoctorSpecialties] = useState<DiseaseType[]>([
+    "diabetes",
+  ]);
+
   const [newMessage, setNewMessage] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   const [activeRiskFilter, setActiveRiskFilter] = useState("all");
@@ -63,26 +85,171 @@ export default function MessagesPage() {
 
   const [conversations, setConversations] = useState<ChatThread[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messagesLoaded, setMessagesLoaded] = useState(false);
 
-  const [openMenu, setOpenMenu] = useState<
-    "threads" | "chat" | "summary" | null
-  >(null);
-  const [openConversationMenu, setOpenConversationMenu] = useState<
-    number | null
-  >(null);
+  const doctorDiseaseType: DiseaseType = doctorSpecialties[0] || "diabetes";
 
-  const getPatientNumericId = (patientId?: string) => {
-    const numericId = parseInt(patientId?.replace(/^\D+/g, "") || "0");
+  const getPatientNumericId = (patientId?: string | number) => {
+    const numericId = parseInt(String(patientId ?? "").replace(/\D/g, ""), 10);
     return Number.isNaN(numericId) ? 0 : numericId;
   };
 
   const normalizeRisk = (risk?: string) =>
     risk?.toLowerCase().replace(/\s|_/g, "") || "";
 
+  const isFemaleGender = (gender?: string | number | null) => {
+    const normalizedGender = String(gender || "").trim().toLowerCase();
+
+    return (
+      normalizedGender === "female" ||
+      normalizedGender === "f" ||
+      normalizedGender === "woman" ||
+      normalizedGender === "girl" ||
+      normalizedGender === "أنثى" ||
+      normalizedGender === "انثى" ||
+      normalizedGender === "بنت"
+    );
+  };
+
+  const getPatientInitials = (name?: string, fallbackId?: string | number) => {
+    const cleanName = String(name || "").trim();
+
+    if (cleanName) {
+      const initials = cleanName
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase();
+
+      return initials || "P";
+    }
+
+    const id = getPatientNumericId(fallbackId);
+    return id ? `P${id}` : "P";
+  };
+
+  const getConversationTime = (time?: string) => {
+    if (!time) return "";
+
+    const date = new Date(time);
+    if (Number.isNaN(date.getTime())) return "";
+
+    return date.toLocaleTimeString(isArabic ? "ar-EG" : "en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getDateLabel = (date?: string) => {
+    if (!date) return "--";
+
+    const parsedDate = new Date(date);
+    if (Number.isNaN(parsedDate.getTime())) return "--";
+
+    return parsedDate.toLocaleDateString(isArabic ? "ar-EG" : "en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const formatNumber = (value?: number | string | null, digits = 0) => {
+    if (value === null || value === undefined || value === "") return "--";
+
+    const numericValue = Number(value);
+
+    if (Number.isNaN(numericValue)) return String(value);
+
+    return digits > 0 ? numericValue.toFixed(digits) : Math.round(numericValue);
+  };
+
+  const getDiseaseLabel = (diseaseType?: DiseaseType | string) => {
+    if (diseaseType === "cardiovascular") {
+      return isArabic ? "القلب و الأوعية الدموية" : "Cardiovascular";
+    }
+
+    if (diseaseType === "diabetes") {
+      return isArabic ? "السكري" : "Diabetes";
+    }
+
+    return diseaseType || "--";
+  };
+
   const closeMenus = () => {
-    setOpenMenu(null);
-    setOpenConversationMenu(null);
     setRiskDropdownOpen(false);
+  };
+
+  const openPatientReportsArchive = () => {
+    const patientId = getPatientNumericId(selectedConv?.patient_id);
+
+    if (!patientId) {
+      toast.info(
+        isArabic
+          ? "اختار مريض الأول لفتح الأرشيف"
+          : "Select a patient first to open the archive"
+      );
+      return;
+    }
+
+    navigate(
+      `/doctor-dashboard/reports?patientId=${patientId}&diseaseType=${doctorDiseaseType}`,
+      {
+        state: {
+          patientId,
+          patientName: selectedConv?.patient_name,
+          diseaseType: doctorDiseaseType,
+          fromPatientArchive: true,
+        },
+      }
+    );
+  };
+
+  const openPredictionInReports = (predictionId?: number) => {
+    const patientId = getPatientNumericId(selectedConv?.patient_id);
+
+    if (!predictionId) {
+      toast.info(
+        isArabic
+          ? "لا يوجد تحليل متاح لفتحه"
+          : "No assessment is available to open"
+      );
+      return;
+    }
+
+    navigate(
+      `/doctor-dashboard/reports?patientId=${patientId}&diseaseType=${doctorDiseaseType}&openReportId=${predictionId}`,
+      {
+        state: {
+          openReportId: predictionId,
+          patientId,
+          patientName: selectedConv?.patient_name,
+          diseaseType: doctorDiseaseType,
+          fromPatientArchive: true,
+        },
+      }
+    );
+  };
+
+  const fetchDoctorProfile = async () => {
+    try {
+      const profile = await apiCall<DoctorProfileResponse>(
+        API_ENDPOINTS.DOCTOR_PROFILE
+      );
+
+      const specialties = Array.isArray(profile?.specialties)
+        ? profile.specialties.filter(
+            (specialty): specialty is DiseaseType =>
+              specialty === "diabetes" || specialty === "cardiovascular"
+          )
+        : [];
+
+      setDoctorSpecialties(specialties.length > 0 ? specialties : ["diabetes"]);
+    } catch (error) {
+      console.error("Failed to fetch doctor profile", error);
+      setDoctorSpecialties(["diabetes"]);
+    }
   };
 
   const fetchConversations = async (showToast = false) => {
@@ -113,22 +280,30 @@ export default function MessagesPage() {
 
   const fetchMessages = async (threadId: number, showToast = false) => {
     try {
-      setMessagesLoading(true);
       const data = await messagesApi.getMessages(threadId);
-      setMessages(Array.isArray(data) ? data : []);
+
+      if (selectedThreadRef.current === threadId) {
+        setMessages(Array.isArray(data) ? data : []);
+        setMessagesLoaded(true);
+      }
 
       if (showToast) {
         toast.success(isArabic ? "تم تحديث الرسائل" : "Messages refreshed");
       }
     } catch (error) {
       console.error("Failed to fetch messages", error);
-      toast.error(isArabic ? "فشل تحميل الرسائل" : "Failed to load messages");
-    } finally {
-      setMessagesLoading(false);
+
+      if (selectedThreadRef.current === threadId) {
+        setMessagesLoaded(true);
+      }
+
+      if (showToast) {
+        toast.error(isArabic ? "فشل تحميل الرسائل" : "Failed to load messages");
+      }
     }
   };
 
-  const fetchPatientProfile = async (patientId: string, showToast = false) => {
+  const fetchPatientProfile = async (patientId: string | number) => {
     try {
       const numericId = getPatientNumericId(patientId);
 
@@ -139,44 +314,16 @@ export default function MessagesPage() {
 
       const data = await patientsApi.getPatientProfile(numericId);
       setPatientProfile(data);
-
-      if (showToast) {
-        toast.success(
-          isArabic ? "تم تحديث بيانات المريض" : "Patient profile refreshed"
-        );
-      }
     } catch (error) {
       console.error("Failed to fetch patient profile", error);
       setPatientProfile(null);
     }
   };
 
-  const refreshSelectedConversation = async () => {
-    if (!selectedConv) {
-      toast.info(isArabic ? "اختار مريض الأول" : "Select patient first");
-      return;
-    }
-
-    closeMenus();
-
-    await Promise.all([
-      fetchMessages(selectedConv.id, true),
-      fetchPatientProfile(selectedConv.patient_id, true),
-    ]);
-  };
-
-  const refreshPatientContext = async () => {
-    if (!selectedConv) {
-      toast.info(isArabic ? "اختار مريض الأول" : "Select patient first");
-      return;
-    }
-
-    closeMenus();
-    await fetchPatientProfile(selectedConv.patient_id, true);
-  };
-
   const handleSelectConversation = (conv: ChatThread) => {
     closeMenus();
+    selectedThreadRef.current = conv.id;
+    setMessagesLoaded(false);
     setSelectedConv(conv);
   };
 
@@ -197,14 +344,41 @@ export default function MessagesPage() {
 
     toast.info(
       isArabic
-        ? `تم اختيار الملف: ${file.name} — محتاج endpoint من الباك لإرساله`
-        : `Selected file: ${file.name} — backend upload endpoint is needed to send it`
+        ? `تم اختيار الملف: ${file.name} — رفع الملفات يحتاج endpoint من الباك`
+        : `Selected file: ${file.name} — backend upload endpoint is needed`
     );
 
     event.target.value = "";
   };
 
+  const handleStartVoiceCall = () => {
+    if (!selectedConv) {
+      toast.info(isArabic ? "اختار مريض الأول" : "Select patient first");
+      return;
+    }
+
+    toast.info(
+      isArabic
+        ? "مكالمة الصوت تحتاج ربط WebRTC أو خدمة مكالمات من الباك"
+        : "Voice call needs WebRTC or backend call integration"
+    );
+  };
+
+  const handleStartVideoCall = () => {
+    if (!selectedConv) {
+      toast.info(isArabic ? "اختار مريض الأول" : "Select patient first");
+      return;
+    }
+
+    toast.info(
+      isArabic
+        ? "مكالمة الفيديو تحتاج ربط WebRTC أو خدمة مكالمات من الباك"
+        : "Video call needs WebRTC or backend call integration"
+    );
+  };
+
   useEffect(() => {
+    fetchDoctorProfile();
     fetchConversations();
 
     const interval = setInterval(() => fetchConversations(), 30000);
@@ -213,15 +387,25 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (!selectedConv) {
+      selectedThreadRef.current = null;
       setMessages([]);
+      setMessagesLoaded(false);
       setPatientProfile(null);
       return;
     }
 
+    selectedThreadRef.current = selectedConv.id;
+    setMessagesLoaded(false);
+
     fetchMessages(selectedConv.id);
     fetchPatientProfile(selectedConv.patient_id);
 
-    const interval = setInterval(() => fetchMessages(selectedConv.id), 10000);
+    const interval = setInterval(() => {
+      if (selectedThreadRef.current === selectedConv.id) {
+        fetchMessages(selectedConv.id);
+      }
+    }, 15000);
+
     return () => clearInterval(interval);
   }, [selectedConv?.id]);
 
@@ -241,29 +425,42 @@ export default function MessagesPage() {
     if (!newMessage.trim() || !selectedConv || sending) return;
 
     const messageText = newMessage.trim();
+    const activeThreadId = selectedConv.id;
 
     try {
       setSending(true);
 
-      const sentMsg = await messagesApi.sendMessage(
-        selectedConv.id,
-        messageText
-      );
+      const sentMsg = await messagesApi.sendMessage(activeThreadId, messageText);
 
-      setMessages((prev) => [...prev, sentMsg]);
+      if (selectedThreadRef.current === activeThreadId) {
+        setMessagesLoaded(true);
+        setMessages((prev) => [...prev, sentMsg]);
+      }
+
       setNewMessage("");
 
       setConversations((prev) =>
         prev.map((conv) =>
-          conv.id === selectedConv.id
+          conv.id === activeThreadId
             ? {
                 ...conv,
                 last_message: messageText,
-                time: isArabic ? "الآن" : "Just now",
+                time: new Date().toISOString(),
+                unread_count: 0,
               }
             : conv
         )
       );
+
+      window.dispatchEvent(new Event("refreshDoctorMessagesBadge"));
+
+      setTimeout(() => {
+        if (selectedThreadRef.current === activeThreadId) {
+          fetchMessages(activeThreadId);
+        }
+      }, 400);
+
+      toast.success(isArabic ? "تم إرسال الرسالة" : "Message sent");
     } catch (error) {
       console.error("Failed to send message", error);
       toast.error(isArabic ? "فشل إرسال الرسالة" : "Failed to send message");
@@ -281,7 +478,7 @@ export default function MessagesPage() {
       const matchesSearch =
         !searchValue ||
         conv.patient_name?.toLowerCase().includes(searchValue) ||
-        conv.patient_id?.toLowerCase().includes(searchValue) ||
+        String(conv.patient_id ?? "").toLowerCase().includes(searchValue) ||
         conv.last_message?.toLowerCase().includes(searchValue);
 
       const matchesMainFilter =
@@ -302,15 +499,30 @@ export default function MessagesPage() {
   const getRiskBadgeStyles = (level?: string) => {
     switch (normalizeRisk(level)) {
       case "veryhigh":
-        return "border-red-500 bg-red-600 text-white dark:border-red-400 dark:bg-red-500 dark:text-white";
+        return "border-red-200 bg-red-50 text-red-700 hover:!bg-red-50 hover:!text-red-700 dark:border-red-400/40 dark:bg-red-900/35 dark:text-red-100 dark:hover:!bg-red-900/35 dark:hover:!text-red-100";
       case "high":
-        return "border-red-100 bg-red-50 text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300";
+        return "border-orange-200 bg-orange-50 text-orange-700 hover:!bg-orange-50 hover:!text-orange-700 dark:border-orange-400/40 dark:bg-orange-900/35 dark:text-orange-100 dark:hover:!bg-orange-900/35 dark:hover:!text-orange-100";
       case "medium":
-        return "border-amber-100 bg-amber-50 text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300";
+        return "border-amber-200 bg-amber-50 text-amber-700 hover:!bg-amber-50 hover:!text-amber-700 dark:border-amber-400/40 dark:bg-amber-900/35 dark:text-amber-100 dark:hover:!bg-amber-900/35 dark:hover:!text-amber-100";
       case "low":
-        return "border-emerald-100 bg-emerald-50 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300";
+        return "border-emerald-200 bg-emerald-50 text-emerald-700 hover:!bg-emerald-50 hover:!text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-900/35 dark:text-emerald-100 dark:hover:!bg-emerald-900/35 dark:hover:!text-emerald-100";
       default:
-        return "border-primary/15 bg-primary/10 text-primary";
+        return "border-primary/15 bg-primary/10 text-primary hover:!bg-primary/10 hover:!text-primary dark:border-primary/30 dark:bg-primary/20 dark:text-primary dark:hover:!bg-primary/20 dark:hover:!text-primary";
+    }
+  };
+
+  const getRiskTrendCardStyles = (level?: string) => {
+    switch (normalizeRisk(level)) {
+      case "veryhigh":
+        return "border-red-200 bg-red-50 text-red-900 dark:border-red-400/40 dark:bg-red-950/45 dark:text-red-50";
+      case "high":
+        return "border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-400/40 dark:bg-orange-950/45 dark:text-orange-50";
+      case "medium":
+        return "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-400/40 dark:bg-amber-950/45 dark:text-amber-50";
+      case "low":
+        return "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/40 dark:bg-emerald-950/45 dark:text-emerald-50";
+      default:
+        return "border-primary/20 bg-primary/10 text-primary dark:border-primary/30 dark:bg-primary/20 dark:text-primary";
     }
   };
 
@@ -332,11 +544,8 @@ export default function MessagesPage() {
     return "Unknown Risk";
   };
 
-  const getIndicatorDotClass = (color: "red" | "green" | "primary") => {
-    if (color === "red") {
-      return "bg-red-500 ring-red-100 dark:ring-red-500/20";
-    }
-
+  const getIndicatorDotClass = (color: IndicatorColor) => {
+    if (color === "red") return "bg-red-500 ring-red-100 dark:ring-red-500/20";
     if (color === "green") {
       return "bg-emerald-500 ring-emerald-100 dark:ring-emerald-500/20";
     }
@@ -344,8 +553,171 @@ export default function MessagesPage() {
     return "bg-primary ring-primary/10";
   };
 
-  const latestPrediction = patientProfile?.predictions?.[0];
+  const specialtyPredictions = useMemo(() => {
+    const predictions = patientProfile?.predictions || [];
+
+    return predictions.filter(
+      (prediction) => prediction.disease_type === doctorDiseaseType
+    );
+  }, [patientProfile?.predictions, doctorDiseaseType]);
+
+  const archivePreviewPredictions = useMemo(() => {
+    return specialtyPredictions.slice(0, ARCHIVE_PREVIEW_LIMIT);
+  }, [specialtyPredictions]);
+
+  const latestPrediction = specialtyPredictions[0];
+  const latestExtraFields = latestPrediction?.extra_fields || {};
   const selectedPatientId = getPatientNumericId(selectedConv?.patient_id);
+
+  const summaryIndicators: SummaryIndicator[] = useMemo(() => {
+    const extra = latestExtraFields as Record<
+      string,
+      string | number | boolean | undefined
+    >;
+
+    const gender = extra.gender || "--";
+    const weight = extra.weight || "--";
+    const height = extra.height || "--";
+
+    const systolic = extra.systolic_bp || extra.systolicBloodPressure || "--";
+
+    const diastolic =
+      extra.diastolic_bp ||
+      extra.diastolicBloodPressure ||
+      latestPrediction?.blood_pressure ||
+      "--";
+
+    const glucose = latestPrediction?.glucose || "--";
+    const cholesterol = extra.cholesterol || "--";
+
+    const femaleOnlyIndicators: SummaryIndicator[] = isFemaleGender(gender)
+      ? [
+          {
+            label: isArabic ? "عدد مرات الحمل" : "Pregnancies",
+            value: formatNumber(latestPrediction?.pregnancies),
+            unit: "",
+            color: "primary",
+          },
+        ]
+      : [];
+
+    if (doctorDiseaseType === "cardiovascular") {
+      return [
+        {
+          label: isArabic ? "النوع" : "Gender",
+          value: String(gender),
+          unit: "",
+          color: "primary",
+        },
+        {
+          label: isArabic ? "الطول" : "Height",
+          value: formatNumber(height, 1),
+          unit: "cm",
+          color: "primary",
+        },
+        {
+          label: isArabic ? "الوزن" : "Weight",
+          value: formatNumber(weight, 1),
+          unit: "kg",
+          color: "primary",
+        },
+        {
+          label: isArabic ? "الضغط الانقباضي" : "Systolic BP",
+          value: formatNumber(systolic),
+          unit: "mmHg",
+          color: Number(systolic || 0) >= 140 ? "red" : "primary",
+        },
+        {
+          label: isArabic ? "الضغط الانبساطي" : "Diastolic BP",
+          value: formatNumber(diastolic),
+          unit: "mmHg",
+          color: Number(diastolic || 0) >= 90 ? "red" : "primary",
+        },
+        {
+          label: t("dashboard.glucose", "Glucose"),
+          value: formatNumber(glucose),
+          unit: "mg/dL",
+          color: Number(glucose || 0) > 140 ? "red" : "green",
+        },
+        {
+          label: isArabic ? "الكوليسترول" : "Cholesterol",
+          value: formatNumber(cholesterol),
+          unit: "mg/dL",
+          color: Number(cholesterol || 0) >= 240 ? "red" : "green",
+        },
+        ...femaleOnlyIndicators,
+        {
+          label: t("dashboard.age", "Age"),
+          value: formatNumber(latestPrediction?.age),
+          unit: isArabic ? "سنة" : "Years",
+          color: "primary",
+        },
+      ];
+    }
+
+    return [
+      {
+        label: isArabic ? "النوع" : "Gender",
+        value: String(gender),
+        unit: "",
+        color: "primary",
+      },
+      {
+        label: isArabic ? "الطول" : "Height",
+        value: formatNumber(height, 1),
+        unit: "cm",
+        color: "primary",
+      },
+      {
+        label: isArabic ? "الوزن" : "Weight",
+        value: formatNumber(weight, 1),
+        unit: "kg",
+        color: "primary",
+      },
+      {
+        label: isArabic ? "الضغط الانبساطي" : "Diastolic BP",
+        value: formatNumber(diastolic),
+        unit: "mmHg",
+        color: Number(diastolic || 0) >= 90 ? "red" : "primary",
+      },
+      {
+        label: t("dashboard.glucose", "Glucose"),
+        value: formatNumber(glucose),
+        unit: "mg/dL",
+        color: Number(glucose || 0) > 140 ? "red" : "green",
+      },
+      {
+        label: isArabic ? "سُمك الجلد" : "Skin Thickness",
+        value: formatNumber(latestPrediction?.skin_thickness),
+        unit: "mm",
+        color: "primary",
+      },
+      {
+        label: isArabic ? "مستوى الإنسولين" : "Insulin Level",
+        value: formatNumber(latestPrediction?.insulin),
+        unit: "mu U/ml",
+        color: Number(latestPrediction?.insulin || 0) > 25 ? "red" : "green",
+      },
+      {
+        label: isArabic
+          ? "العامل الوراثي للسكري"
+          : "Diabetes Pedigree Function",
+        value: formatNumber(latestPrediction?.diabetes_pedigree_function, 2),
+        unit: "",
+        color:
+          Number(latestPrediction?.diabetes_pedigree_function || 0) >= 0.5
+            ? "red"
+            : "green",
+      },
+      ...femaleOnlyIndicators,
+      {
+        label: t("dashboard.age", "Age"),
+        value: formatNumber(latestPrediction?.age),
+        unit: isArabic ? "سنة" : "Years",
+        color: "primary",
+      },
+    ];
+  }, [doctorDiseaseType, latestExtraFields, latestPrediction, isArabic, t]);
 
   if (loading) {
     return (
@@ -372,61 +744,12 @@ export default function MessagesPage() {
         onChange={handleFileSelected}
       />
 
-      <Card className="relative z-30 flex h-[360px] min-h-0 flex-col overflow-visible rounded-3xl border border-border bg-card text-card-foreground shadow-sm sm:h-[420px] xl:h-[calc(100vh-100px)]">
-        <div className="shrink-0 rounded-t-3xl border-b border-border bg-card p-4 sm:p-5">
+      <Card className="relative z-50 flex h-[520px] min-h-0 flex-col overflow-visible rounded-3xl border border-border bg-card text-card-foreground shadow-sm sm:h-[620px] xl:h-[calc(100vh-100px)]">
+        <div className="relative z-[80] shrink-0 rounded-t-3xl border-b border-border bg-card p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
               {t("doctorDashboard.sidebar.messages.title")}
             </h2>
-
-            <div className="relative">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpenMenu(openMenu === "threads" ? null : "threads");
-                  setOpenConversationMenu(null);
-                  setRiskDropdownOpen(false);
-                }}
-                className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-
-              {openMenu === "threads" && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  className={cn(
-                    "absolute top-11 z-[100] w-48 rounded-2xl border border-border bg-popover p-2 text-popover-foreground shadow-xl",
-                    isArabic ? "left-0" : "right-0"
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      closeMenus();
-                      fetchConversations(true);
-                    }}
-                    className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                  >
-                    {isArabic ? "تحديث المحادثات" : "Refresh conversations"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearch("");
-                      closeMenus();
-                    }}
-                    className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                  >
-                    {isArabic ? "مسح البحث" : "Clear search"}
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
 
           <div className="relative mb-4">
@@ -450,9 +773,12 @@ export default function MessagesPage() {
             {search && (
               <button
                 type="button"
-                onClick={() => setSearch("")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSearch("");
+                }}
                 className={cn(
-                  "absolute top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary",
+                  "absolute top-1/2 -translate-y-1/2 text-muted-foreground hover:!bg-transparent hover:!text-primary",
                   isArabic ? "left-3" : "right-3"
                 )}
               >
@@ -475,12 +801,15 @@ export default function MessagesPage() {
               <button
                 key={filter.id}
                 type="button"
-                onClick={() => setActiveFilter(filter.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveFilter(filter.id);
+                }}
                 className={cn(
                   "whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold transition-none",
                   activeFilter === filter.id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-primary/10 text-primary hover:bg-primary/10"
+                    ? "bg-primary text-primary-foreground hover:!bg-primary hover:!text-primary-foreground"
+                    : "bg-primary/10 text-primary hover:!bg-primary/10 hover:!text-primary"
                 )}
               >
                 {filter.label}
@@ -493,14 +822,12 @@ export default function MessagesPage() {
                 onClick={(e) => {
                   e.stopPropagation();
                   setRiskDropdownOpen((prev) => !prev);
-                  setOpenMenu(null);
-                  setOpenConversationMenu(null);
                 }}
                 className={cn(
                   "flex items-center gap-1 whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold transition-none",
                   activeRiskFilter !== "all"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-primary/10 text-primary hover:bg-primary/10"
+                    ? "bg-primary text-primary-foreground hover:!bg-primary hover:!text-primary-foreground"
+                    : "bg-primary/10 text-primary hover:!bg-primary/10 hover:!text-primary"
                 )}
               >
                 {activeRiskFilter === "veryHighRisk"
@@ -530,7 +857,7 @@ export default function MessagesPage() {
                 <div
                   onClick={(e) => e.stopPropagation()}
                   className={cn(
-                    "absolute top-11 z-[100] w-44 rounded-2xl border border-border bg-popover p-2 text-popover-foreground shadow-xl",
+                    "absolute top-11 z-[9999] w-44 rounded-2xl border border-border bg-popover p-2 text-popover-foreground shadow-2xl",
                     isArabic ? "right-0" : "left-0"
                   )}
                 >
@@ -555,9 +882,9 @@ export default function MessagesPage() {
                         setRiskDropdownOpen(false);
                       }}
                       className={cn(
-                        "w-full rounded-xl px-3 py-2 text-start text-xs font-bold hover:bg-primary/10 hover:text-primary",
+                        "w-full rounded-xl px-3 py-2 text-start text-xs font-bold hover:!bg-primary/10 hover:!text-primary",
                         activeRiskFilter === risk.id
-                          ? "bg-primary/10 text-primary"
+                          ? "bg-primary text-primary-foreground hover:!bg-primary hover:!text-primary-foreground"
                           : "text-muted-foreground"
                       )}
                     >
@@ -570,8 +897,8 @@ export default function MessagesPage() {
           </div>
         </div>
 
-        <ScrollArea className="min-h-0 flex-1">
-          <div className="space-y-2 p-3">
+        <ScrollArea className="relative z-10 min-h-0 flex-1 overflow-hidden">
+          <div className="space-y-3 p-3">
             {filteredConversations.length === 0 ? (
               <div className="py-10 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 {search
@@ -591,128 +918,56 @@ export default function MessagesPage() {
                     if (e.key === "Enter") handleSelectConversation(conv);
                   }}
                   className={cn(
-                    "relative flex w-full cursor-pointer items-center gap-3 rounded-3xl border p-4 text-start transition-none",
+                    "relative flex min-h-[106px] w-full cursor-pointer items-center gap-3 overflow-hidden rounded-3xl border p-4 text-start transition-none",
                     selectedConv?.id === conv.id
-                      ? "border-primary/20 bg-primary/10"
-                      : "border-transparent bg-card hover:bg-primary/[0.04]"
+                      ? "border-primary/30 bg-primary/10"
+                      : "border-transparent bg-card hover:border-primary/20 hover:!bg-primary/[0.04]"
                   )}
                 >
-                  <div className="relative shrink-0">
-                    <Avatar className="h-11 w-11 border border-primary/15 bg-primary/5">
-                      <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
-                        {conv.patient_name
-                          ?.split(" ")
-                          .filter(Boolean)
-                          .map((name) => name[0])
-                          .join("")
-                          .toUpperCase() || "P"}
-                      </AvatarFallback>
-                    </Avatar>
+                  <Avatar className="h-12 w-12 shrink-0 border border-primary/15 bg-primary/5">
+                    <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
+                      {getPatientInitials(conv.patient_name, conv.patient_id)}
+                    </AvatarFallback>
+                  </Avatar>
 
-                    {conv.online && (
-                      <span
-                        className={cn(
-                          "absolute bottom-0 h-3 w-3 rounded-full border-2 border-card bg-emerald-500",
-                          isArabic ? "left-0" : "right-0"
-                        )}
-                      />
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1 pe-8">
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <h4 className="truncate text-sm font-bold text-foreground">
-                        {conv.patient_name}
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex min-w-0 items-start justify-between gap-2">
+                      <h4 className="min-w-0 flex-1 truncate text-sm font-bold leading-5 text-foreground">
+                        {conv.patient_name || (isArabic ? "مريض" : "Patient")}
                       </h4>
 
-                      <span className="shrink-0 text-[10px] font-bold text-muted-foreground">
-                        {conv.time}
+                      <span className="shrink-0 text-[10px] font-bold leading-5 text-muted-foreground">
+                        {getConversationTime(conv.time)}
                       </span>
                     </div>
 
-                    <p className="mb-2 truncate text-xs font-medium text-muted-foreground">
+                    <p className="mb-2 line-clamp-1 min-h-[18px] text-xs font-medium leading-5 text-muted-foreground">
                       {conv.last_message ||
                         (isArabic ? "لا توجد رسائل بعد" : "No messages yet")}
                     </p>
 
-                    <Badge
-                      className={cn(
-                        "rounded-full border px-2 py-0.5 text-[10px] font-bold shadow-none",
-                        getRiskBadgeStyles(conv.risk_level)
-                      )}
-                    >
-                      {getRiskLabel(conv.risk_level)}
-                    </Badge>
-                  </div>
-
-                  <div
-                    className={cn(
-                      "absolute top-3",
-                      isArabic ? "left-3" : "right-3"
-                    )}
-                  >
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenConversationMenu(
-                          openConversationMenu === conv.id ? null : conv.id
-                        );
-                        setOpenMenu(null);
-                        setRiskDropdownOpen(false);
-                      }}
-                      className="h-7 w-7 rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-
-                    {openConversationMenu === conv.id && (
-                      <div
-                        onClick={(e) => e.stopPropagation()}
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge
                         className={cn(
-                          "absolute top-9 z-[100] w-44 rounded-2xl border border-border bg-popover p-2 text-popover-foreground shadow-xl",
-                          isArabic ? "left-0" : "right-0"
+                          "max-w-full rounded-full border px-2 py-0.5 text-[10px] font-bold shadow-none",
+                          getRiskBadgeStyles(conv.risk_level)
                         )}
                       >
-                        <button
-                          type="button"
-                          onClick={() => handleSelectConversation(conv)}
-                          className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                        >
-                          {isArabic ? "اختيار المريض" : "Select patient"}
-                        </button>
+                        <span className="truncate">
+                          {getRiskLabel(conv.risk_level)}
+                        </span>
+                      </Badge>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            closeMenus();
-                            fetchConversations(true);
-                          }}
-                          className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                        >
-                          {isArabic ? "تحديث القائمة" : "Refresh list"}
-                        </button>
-
-                        <div className="mt-1 border-t border-border px-3 py-2 text-[10px] font-bold text-muted-foreground">
-                          #{conv.patient_id}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {Number(conv.unread_count) > 0 &&
-                    selectedConv?.id !== conv.id && (
-                      <span
-                        className={cn(
-                          "absolute top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground",
-                          isArabic ? "left-10" : "right-10"
+                      {Number(conv.unread_count) > 0 &&
+                        selectedConv?.id !== conv.id && (
+                          <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                            {Number(conv.unread_count) > 99
+                              ? "99+"
+                              : conv.unread_count}
+                          </span>
                         )}
-                      >
-                        {conv.unread_count}
-                      </span>
-                    )}
+                    </div>
+                  </div>
                 </div>
               ))
             )}
@@ -726,12 +981,10 @@ export default function MessagesPage() {
             {selectedConv && (
               <Avatar className="h-12 w-12 border border-primary/15 bg-primary/5">
                 <AvatarFallback className="bg-primary/10 text-sm font-bold text-primary">
-                  {selectedConv.patient_name
-                    ?.split(" ")
-                    .filter(Boolean)
-                    .map((name) => name[0])
-                    .join("")
-                    .toUpperCase() || "P"}
+                  {getPatientInitials(
+                    selectedConv.patient_name,
+                    selectedConv.patient_id
+                  )}
                 </AvatarFallback>
               </Avatar>
             )}
@@ -755,98 +1008,41 @@ export default function MessagesPage() {
                   </Badge>
                 )}
               </div>
-
-              {selectedConv && (
-                <p className="mt-1 text-xs font-semibold text-muted-foreground">
-                  {`${t("doctorDashboard.sidebar.messages.id")}: #${
-                    selectedConv.patient_id
-                  }`}
-                </p>
-              )}
             </div>
           </div>
 
-          <div className="relative">
+          <div className="flex shrink-0 items-center gap-2">
             <Button
               type="button"
               variant="ghost"
               size="icon"
+              disabled={!selectedConv}
               onClick={(e) => {
                 e.stopPropagation();
-                setOpenMenu(openMenu === "chat" ? null : "chat");
-                setOpenConversationMenu(null);
-                setRiskDropdownOpen(false);
+                handleStartVoiceCall();
               }}
-              className="h-10 w-10 rounded-2xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
+              className="h-12 w-12 rounded-2xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground disabled:bg-primary/5 disabled:text-primary/40 disabled:opacity-60"
+              title={isArabic ? "مكالمة صوتية" : "Voice call"}
             >
-              <MoreHorizontal className="h-5 w-5" />
+              <PhoneCall className="h-6 w-6" />
             </Button>
 
-            {openMenu === "chat" && (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className={cn(
-                  "absolute top-12 z-[100] w-52 rounded-2xl border border-border bg-popover p-2 text-popover-foreground shadow-xl",
-                  isArabic ? "left-0" : "right-0"
-                )}
-              >
-                {!selectedConv && (
-                  <div className="px-3 py-2 text-xs font-bold text-muted-foreground">
-                    {isArabic ? "اختار مريض الأول" : "Select patient first"}
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={refreshSelectedConversation}
-                  className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                >
-                  {isArabic ? "تحديث الرسائل" : "Refresh messages"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleFileSelectClick}
-                  className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                >
-                  {isArabic ? "رفع ملف" : "Upload file"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewMessage("");
-                    closeMenus();
-                  }}
-                  className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                >
-                  {isArabic ? "مسح الرسالة" : "Clear message"}
-                </button>
-              </div>
-            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={!selectedConv}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleStartVideoCall();
+              }}
+              className="h-12 w-12 rounded-2xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground disabled:bg-primary/5 disabled:text-primary/40 disabled:opacity-60"
+              title={isArabic ? "مكالمة فيديو" : "Video call"}
+            >
+              <Video className="h-6 w-6" />
+            </Button>
           </div>
         </div>
-
-        {(normalizeRisk(selectedConv?.risk_level) === "high" ||
-          normalizeRisk(selectedConv?.risk_level) === "veryhigh") && (
-          <div className="flex min-h-10 shrink-0 items-center justify-between gap-3 bg-red-500 px-4 sm:px-5">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-white" />
-
-              <p className="text-xs font-bold text-white">
-                {t("doctorDashboard.sidebar.messages.chat.emergencyAlert")}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={refreshPatientContext}
-              className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-bold text-white hover:bg-white/25"
-            >
-              {t("doctorDashboard.sidebar.messages.viewIndicators")}
-            </button>
-          </div>
-        )}
 
         <ScrollArea
           className="min-h-0 flex-1 bg-primary/[0.03] px-4 md:px-8"
@@ -855,10 +1051,8 @@ export default function MessagesPage() {
           <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-end space-y-6 py-8">
             {!selectedConv ? (
               <div className="flex flex-1" />
-            ) : messagesLoading && messages.length === 0 ? (
-              <div className="flex justify-center py-10">
-                <LoadingDots />
-              </div>
+            ) : !messagesLoaded ? (
+              <div className="flex flex-1" />
             ) : messages.length === 0 ? (
               <div className="flex flex-1 flex-col justify-end">
                 <div className="mx-auto mb-8 max-w-md rounded-3xl border border-border bg-card p-6 text-center shadow-sm">
@@ -867,21 +1061,20 @@ export default function MessagesPage() {
                   </div>
 
                   <h3 className="text-base font-bold text-foreground">
-                    {isArabic
-                      ? "ابدأ المحادثة الآن"
-                      : "Start the conversation"}
+                    {isArabic ? "لا توجد رسائل" : "No messages"}
                   </h3>
 
                   <p className="mt-2 text-sm font-medium leading-6 text-muted-foreground">
                     {isArabic
-                      ? `اكتب رسالة إلى ${selectedConv.patient_name} من صندوق الرسائل بالأسفل.`
-                      : `Write a message to ${selectedConv.patient_name} using the message box below.`}
+                      ? "ابدأ المحادثة بإرسال رسالة للمريض."
+                      : "Start the conversation by sending a message to the patient."}
                   </p>
                 </div>
               </div>
             ) : (
               messages.map((msg) => {
-                const isDoctorMessage = msg.sender_user !== selectedPatientId;
+                const isDoctorMessage =
+                  getPatientNumericId(msg.sender_user) !== selectedPatientId;
 
                 return (
                   <div
@@ -911,10 +1104,13 @@ export default function MessagesPage() {
                       <div className="mt-2 flex items-center gap-2 px-2">
                         <span className="text-[10px] font-bold text-muted-foreground">
                           {msg.created_at
-                            ? new Date(msg.created_at).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
+                            ? new Date(msg.created_at).toLocaleTimeString(
+                                isArabic ? "ar-EG" : "en-US",
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                }
+                              )
                             : "--:--"}
                         </span>
 
@@ -943,7 +1139,7 @@ export default function MessagesPage() {
               size="icon"
               disabled={!selectedConv}
               onClick={handleFileSelectClick}
-              className="h-10 w-10 shrink-0 rounded-2xl text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-40"
+              className="h-10 w-10 shrink-0 rounded-2xl text-muted-foreground hover:!bg-primary/10 hover:!text-primary disabled:opacity-40"
             >
               <Paperclip className="h-5 w-5" />
             </Button>
@@ -975,7 +1171,7 @@ export default function MessagesPage() {
               type="button"
               onClick={handleSendMessage}
               disabled={!selectedConv || !newMessage.trim() || sending}
-              className="h-11 shrink-0 rounded-2xl bg-primary px-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 sm:px-4"
+              className="h-11 shrink-0 rounded-2xl bg-primary px-3 text-sm font-bold text-primary-foreground hover:!bg-primary/90 hover:!text-primary-foreground disabled:opacity-50 sm:px-4"
             >
               {sending ? (
                 <LoadingDots color="white" />
@@ -1003,58 +1199,9 @@ export default function MessagesPage() {
             {t("doctorDashboard.sidebar.messages.summary.title")}
           </h2>
 
-          <div className="relative">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpenMenu(openMenu === "summary" ? null : "summary");
-                setOpenConversationMenu(null);
-                setRiskDropdownOpen(false);
-              }}
-              className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
-            >
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-
-            {openMenu === "summary" && (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className={cn(
-                  "absolute top-11 z-[100] w-52 rounded-2xl border border-border bg-popover p-2 text-popover-foreground shadow-xl",
-                  isArabic ? "left-0" : "right-0"
-                )}
-              >
-                {!selectedConv && (
-                  <div className="px-3 py-2 text-xs font-bold text-muted-foreground">
-                    {isArabic ? "اختار مريض الأول" : "Select patient first"}
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={refreshPatientContext}
-                  className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                >
-                  {isArabic ? "تحديث بيانات المريض" : "Refresh patient data"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    closeMenus();
-                    setActiveFilter("all");
-                    setActiveRiskFilter("highRisk");
-                  }}
-                  className="w-full rounded-xl px-3 py-2 text-start text-xs font-bold text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                >
-                  {isArabic ? "عرض الحالات عالية الخطورة" : "Show high risk"}
-                </button>
-              </div>
-            )}
-          </div>
+          <Badge className="rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-[10px] font-bold text-primary shadow-none hover:!bg-primary/10 hover:!text-primary dark:hover:!bg-primary/10 dark:hover:!text-primary">
+            {getDiseaseLabel(doctorDiseaseType)}
+          </Badge>
         </div>
 
         <ScrollArea className="min-h-0 flex-1">
@@ -1066,103 +1213,59 @@ export default function MessagesPage() {
                     {t("doctorDashboard.sidebar.messages.summary.riskTrend")}
                   </p>
 
-                  <div className="relative overflow-hidden rounded-3xl bg-primary p-5 text-primary-foreground shadow-sm">
+                  <div
+                    className={cn(
+                      "relative overflow-hidden rounded-3xl border p-5 shadow-sm",
+                      getRiskTrendCardStyles(latestPrediction?.risk_level)
+                    )}
+                  >
                     <div className="relative z-10">
                       <div className="mb-2 flex items-center gap-2">
-                        <span className="text-4xl font-bold">
+                        <span className="text-4xl font-bold text-current">
                           {latestPrediction
-                            ? Math.round(latestPrediction.probability)
+                            ? Math.round(Number(latestPrediction.probability))
                             : 0}
                           %
                         </span>
 
                         <Badge
                           className={cn(
-                            "rounded-full border-none px-2 py-0.5 text-[10px] font-bold shadow-none",
-                            normalizeRisk(latestPrediction?.risk_level) ===
-                              "high" ||
-                              normalizeRisk(latestPrediction?.risk_level) ===
-                                "veryhigh"
-                              ? "bg-red-500 text-white"
-                              : "bg-white/20 text-white"
+                            "rounded-full border px-2 py-0.5 text-[10px] font-bold shadow-none",
+                            getRiskBadgeStyles(latestPrediction?.risk_level)
                           )}
                         >
                           {getRiskLabel(latestPrediction?.risk_level)}
                         </Badge>
                       </div>
 
-                      <div className="flex items-center gap-2 text-white/80">
+                      <div className="flex flex-wrap items-center gap-2 text-current/75">
                         <TrendingUp className="h-4 w-4" />
 
                         <span className="text-xs font-semibold">
-                          {isArabic
-                            ? `بناءً على ${
-                                patientProfile.predictions?.length || 0
-                              } تقييمات`
-                            : `Based on ${
-                                patientProfile.predictions?.length || 0
-                              } assessments`}
+                          {latestPrediction
+                            ? `${getDiseaseLabel(
+                                doctorDiseaseType
+                              )} • ${getDateLabel(latestPrediction.created_at)}`
+                            : isArabic
+                            ? "لا يوجد تحليل لهذا التخصص"
+                            : "No assessment for this specialty"}
                         </span>
                       </div>
                     </div>
-
-                    <Sparkles className="absolute -bottom-5 -right-5 h-24 w-24 text-white/10" />
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                      {t(
-                        "doctorDashboard.sidebar.messages.summary.latestIndicators"
-                      )}
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={refreshPatientContext}
-                      className="text-[10px] font-bold uppercase tracking-widest text-primary"
-                    >
-                      {t("doctorDashboard.sidebar.messages.fullRecord")}
-                    </button>
-                  </div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    {t(
+                      "doctorDashboard.sidebar.messages.summary.latestIndicators"
+                    )}
+                  </p>
 
                   <div className="grid grid-cols-2 gap-3">
-                    {[
-                      {
-                        label: t("dashboard.glucose"),
-                        value: latestPrediction?.glucose || "--",
-                        unit: "mg/dL",
-                        color:
-                          latestPrediction?.glucose &&
-                          latestPrediction.glucose > 140
-                            ? "red"
-                            : "green",
-                      },
-                      {
-                        label: t("dashboard.bmi"),
-                        value: latestPrediction?.bmi || "--",
-                        unit: "kg/m²",
-                        color:
-                          latestPrediction?.bmi && latestPrediction.bmi > 30
-                            ? "red"
-                            : "green",
-                      },
-                      {
-                        label: t("dashboard.bloodPressure"),
-                        value: latestPrediction?.blood_pressure || "--",
-                        unit: "mmHg",
-                        color: "primary",
-                      },
-                      {
-                        label: t("dashboard.age"),
-                        value: latestPrediction?.age || "--",
-                        unit: isArabic ? "سنة" : "Years",
-                        color: "primary",
-                      },
-                    ].map((indicator, index) => (
+                    {summaryIndicators.map((indicator, index) => (
                       <div
-                        key={index}
+                        key={`${indicator.label}-${index}`}
                         className="rounded-2xl border border-border bg-background/60 p-4 shadow-sm"
                       >
                         <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -1170,19 +1273,19 @@ export default function MessagesPage() {
                         </p>
 
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-bold text-foreground">
+                          <p className="truncate text-sm font-bold text-foreground">
                             {indicator.value}{" "}
-                            <span className="text-[10px] font-semibold text-muted-foreground">
-                              {indicator.unit}
-                            </span>
+                            {indicator.unit && (
+                              <span className="text-[10px] font-semibold text-muted-foreground">
+                                {indicator.unit}
+                              </span>
+                            )}
                           </p>
 
                           <span
                             className={cn(
-                              "h-2 w-2 rounded-full ring-4",
-                              getIndicatorDotClass(
-                                indicator.color as "red" | "green" | "primary"
-                              )
+                              "h-2 w-2 shrink-0 rounded-full ring-4",
+                              getIndicatorDotClass(indicator.color)
                             )}
                           />
                         </div>
@@ -1192,68 +1295,71 @@ export default function MessagesPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                    {t("doctorDashboard.sidebar.messages.recentAssessments")}
-                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                      {isArabic ? "أرشيف التحاليل" : "Assessment Archive"}
+                    </p>
+
+                    <span className="text-[10px] font-bold text-primary">
+                      {specialtyPredictions.length}
+                    </span>
+                  </div>
 
                   <div className="space-y-3">
-                    {patientProfile.predictions?.slice(0, 3).map((pred) => {
-                      const predRisk = normalizeRisk(pred.risk_level);
-
-                      return (
-                        <div
-                          key={pred.id}
-                          className="flex items-center justify-between rounded-2xl border border-border bg-background/60 p-4 shadow-sm"
+                    {specialtyPredictions.length > 0 ? (
+                      archivePreviewPredictions.map((prediction) => (
+                        <button
+                          key={prediction.id}
+                          type="button"
+                          onClick={() => openPredictionInReports(prediction.id)}
+                          className="w-full rounded-2xl border border-border bg-background/60 p-4 text-start shadow-sm transition hover:!border-primary/20 hover:!bg-primary/[0.04] hover:!text-foreground"
                         >
-                          <div className="flex items-center gap-3">
-                            <div
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <p className="truncate text-xs font-bold text-foreground">
+                              {getDiseaseLabel(prediction.disease_type)}
+                            </p>
+
+                            <Badge
                               className={cn(
-                                "flex h-9 w-9 items-center justify-center rounded-xl",
-                                predRisk === "high" || predRisk === "veryhigh"
-                                  ? "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300"
-                                  : predRisk === "medium"
-                                  ? "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300"
-                                  : "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
+                                "rounded-full border px-2 py-0.5 text-[10px] font-bold shadow-none",
+                                getRiskBadgeStyles(prediction.risk_level)
                               )}
                             >
-                              <Activity className="h-4 w-4" />
-                            </div>
-
-                            <div>
-                              <p className="text-xs font-bold text-foreground">
-                                {new Date(pred.created_at).toLocaleDateString(
-                                  isArabic ? "ar-EG" : "en-US"
-                                )}
-                              </p>
-
-                              <p className="mt-1 text-[10px] font-bold text-muted-foreground">
-                                {getRiskLabel(pred.risk_level)} •{" "}
-                                {Math.round(pred.probability)}%
-                              </p>
-                            </div>
+                              {getRiskLabel(prediction.risk_level)}
+                            </Badge>
                           </div>
 
-                          <ArrowUpRight
-                            className={cn(
-                              "h-4 w-4 text-muted-foreground",
-                              isArabic && "rotate-[-90deg]"
-                            )}
-                          />
-                        </div>
-                      );
-                    })}
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[10px] font-semibold text-muted-foreground">
+                              {getDateLabel(prediction.created_at)}
+                            </p>
+
+                            <p className="text-xs font-bold text-primary">
+                              {Math.round(Number(prediction.probability))}%
+                            </p>
+                          </div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="rounded-2xl border border-border bg-background/60 p-4 text-center text-xs font-bold text-muted-foreground">
+                        {isArabic
+                          ? "لا توجد تحاليل محفوظة لهذا التخصص"
+                          : "No saved assessments for this specialty"}
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <Button
                   type="button"
-                  onClick={refreshPatientContext}
-                  className="h-12 w-full rounded-2xl bg-primary text-sm font-bold text-primary-foreground hover:bg-primary/90"
+                  disabled={!selectedConv}
+                  className="h-12 w-full rounded-2xl bg-primary text-sm font-bold text-primary-foreground hover:!bg-primary/90 hover:!text-primary-foreground disabled:opacity-50"
+                  onClick={openPatientReportsArchive}
                 >
                   <FileText
                     className={cn("h-4 w-4", isArabic ? "ml-2" : "mr-2")}
                   />
-                  {t("doctorDashboard.sidebar.messages.openRecord")}
+                  {isArabic ? "عرض أرشيف التحاليل" : "View Assessment Archive"}
                 </Button>
               </>
             ) : (
@@ -1264,7 +1370,9 @@ export default function MessagesPage() {
 
                 <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                   {selectedConv
-                    ? t("doctorDashboard.sidebar.messages.loadingContext")
+                    ? isArabic
+                      ? "جاري تحميل بيانات المريض أو لا توجد بيانات متاحة"
+                      : "Loading patient data or no data available"
                     : isArabic
                     ? "اختار مريض لعرض الملخص"
                     : "Select a patient to view summary"}

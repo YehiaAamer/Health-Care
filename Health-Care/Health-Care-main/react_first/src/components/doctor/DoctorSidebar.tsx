@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { messagesApi } from "@/api/messages";
 import {
   LayoutDashboard,
   Users,
@@ -45,8 +46,28 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>("light");
+  const [messagesBadge, setMessagesBadge] = useState(0);
 
   const isDark = theme === "dark";
+  const isCompact = collapsed;
+
+  const fetchMessagesBadge = useCallback(async () => {
+    try {
+      const threads = await messagesApi.getThreads();
+
+      const unreadTotal = Array.isArray(threads)
+        ? threads.reduce(
+            (total, thread) => total + Number(thread.unread_count || 0),
+            0
+          )
+        : 0;
+
+      setMessagesBadge(unreadTotal);
+    } catch (error) {
+      console.error("Failed to fetch messages badge", error);
+      setMessagesBadge(0);
+    }
+  }, []);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as Theme | null;
@@ -60,6 +81,23 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
     document.documentElement.classList.remove("dark");
     setTheme("light");
   }, []);
+
+  useEffect(() => {
+    fetchMessagesBadge();
+
+    const interval = window.setInterval(fetchMessagesBadge, 15000);
+
+    const refreshBadge = () => {
+      fetchMessagesBadge();
+    };
+
+    window.addEventListener("refreshDoctorMessagesBadge", refreshBadge);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("refreshDoctorMessagesBadge", refreshBadge);
+    };
+  }, [fetchMessagesBadge]);
 
   useEffect(() => {
     const openSidebar = () => {
@@ -122,58 +160,59 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
   const doctorName =
     `${user?.first_name || ""} ${user?.last_name || ""}`.trim() ||
     user?.username ||
-    t("doctorDashboard.sidebar.doctor");
+    t("doctorDashboard.sidebar.doctor", "Doctor");
 
   const navItems = [
     {
       icon: LayoutDashboard,
-      label: t("doctorDashboard.sidebar.dashboard"),
+      label: t("doctorDashboard.sidebar.dashboard", "Dashboard"),
       path: "/doctor-dashboard",
     },
     {
       icon: Users,
-      label: t("doctorDashboard.sidebar.patients"),
+      label: t("doctorDashboard.sidebar.patients", "Patients"),
       path: "/doctor-dashboard/patients",
     },
     {
       icon: Calendar,
-      label: t("doctorDashboard.sidebar.appointments"),
+      label: t("doctorDashboard.sidebar.appointments", "Appointments"),
       path: "/doctor-dashboard/appointments",
     },
     {
       icon: FileText,
-      label: t("doctorDashboard.sidebar.reports"),
+      label: t("doctorDashboard.sidebar.reports", "Reports"),
       path: "/doctor-dashboard/reports",
     },
     {
       icon: MessageSquare,
-      label: t("doctorDashboard.sidebar.messages.title"),
+      label: t("doctorDashboard.sidebar.messages.title", "Messaging"),
       path: "/doctor-dashboard/messages",
-      badge: 3,
+      badge: messagesBadge,
     },
     {
       icon: Clock3,
-      label: t("doctorDashboard.sidebar.recentActivity"),
+      label: t("doctorDashboard.sidebar.recentActivity", "Recent Activity"),
       path: "/doctor-dashboard/activity",
     },
     {
       icon: Settings,
-      label: t("doctorDashboard.sidebar.settings"),
+      label: t("doctorDashboard.sidebar.settings", "Settings"),
       path: "/doctor-dashboard/settings",
     },
     {
       icon: HelpCircle,
-      label: t("doctorDashboard.sidebar.help"),
+      label: t("doctorDashboard.sidebar.help", "Help"),
       path: "/doctor-dashboard/help",
     },
     {
       icon: ShieldCheck,
-      label: isRTL ? "خصوصية البيانات" : "Data Privacy",
+      label: t("doctorDashboard.sidebar.dataPrivacy", "Data Privacy"),
       path: "/doctor-dashboard/privacy",
     },
   ];
 
-  const isCompact = collapsed;
+  const menuButtonClass =
+    "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary";
 
   const sidebarContent = (forceOpen = false) => (
     <>
@@ -188,7 +227,7 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
             <BrandLogo className="max-w-full overflow-hidden" />
 
             <p className="mt-1.5 w-full translate-x-4 text-center text-sm font-semibold tracking-wide text-primary">
-              {t("doctorDashboard.sidebar.doctorPortal")}
+              {t("doctorDashboard.sidebar.doctorPortal", "Doctor Portal")}
             </p>
           </div>
         )}
@@ -200,10 +239,10 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
           className="shrink-0 text-primary hover:bg-primary/10 hover:text-primary"
           aria-label={
             forceOpen
-              ? t("doctorDashboard.sidebar.collapseSidebar")
+              ? t("doctorDashboard.sidebar.collapseSidebar", "Close sidebar")
               : isCompact
-              ? t("doctorDashboard.sidebar.openSidebar")
-              : t("doctorDashboard.sidebar.collapseSidebar")
+              ? t("doctorDashboard.sidebar.openSidebar", "Open sidebar")
+              : t("doctorDashboard.sidebar.collapseSidebar", "Collapse sidebar")
           }
         >
           {forceOpen ? (
@@ -222,10 +261,10 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
         <button
           type="button"
           onClick={handleToggleTheme}
-          title={isDark ? "Light mode" : "Dark mode"}
+          title={isDark ? "Light Mode" : "Dark Mode"}
           aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
           className={cn(
-            "flex w-full items-center gap-3 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-primary/10 hover:text-primary",
+            "flex w-full items-center gap-3 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-primary/10 hover:text-primary",
             isCompact && !forceOpen && "justify-center px-0"
           )}
         >
@@ -237,9 +276,7 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
 
           {(!isCompact || forceOpen) && (
             <span className="truncate">
-              {isDark
-                ? t("theme.light", "Light Mode")
-                : t("theme.dark", "Dark Mode")}
+              {isDark ? "Light Mode" : "Dark Mode"}
             </span>
           )}
         </button>
@@ -259,35 +296,50 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
                   "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    : "text-muted-foreground hover:bg-primary/10 hover:text-primary",
                   isCompact && !forceOpen && "justify-center px-0"
                 )
               }
             >
-              <item.icon
-                className={cn(
-                  "h-5 w-5 shrink-0",
-                  isCompact && !forceOpen && "mx-auto"
-                )}
-              />
+              {({ isActive }) => (
+                <>
+                  <item.icon
+                    className={cn(
+                      "h-5 w-5 shrink-0 transition-colors",
+                      isActive
+                        ? "text-primary-foreground"
+                        : "text-muted-foreground group-hover:text-primary",
+                      isCompact && !forceOpen && "mx-auto"
+                    )}
+                  />
 
-              {(!isCompact || forceOpen) && (
-                <span className="flex-1 truncate">{item.label}</span>
-              )}
-
-              {item.badge && (!isCompact || forceOpen) && (
-                <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground">
-                  {item.badge}
-                </span>
-              )}
-
-              {item.badge && isCompact && !forceOpen && (
-                <span
-                  className={cn(
-                    "absolute top-2 h-2 w-2 rounded-full bg-destructive",
-                    isRTL ? "left-2" : "right-2"
+                  {(!isCompact || forceOpen) && (
+                    <span className="flex-1 truncate">{item.label}</span>
                   )}
-                />
+
+                  {Number(item.badge) > 0 && (!isCompact || forceOpen) && (
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                        isActive
+                          ? "bg-primary-foreground text-primary"
+                          : "bg-primary text-primary-foreground"
+                      )}
+                    >
+                      {Number(item.badge) > 99 ? "99+" : item.badge}
+                    </span>
+                  )}
+
+                  {Number(item.badge) > 0 && isCompact && !forceOpen && (
+                    <span
+                      className={cn(
+                        "absolute top-2 h-2.5 w-2.5 rounded-full",
+                        isActive ? "bg-primary-foreground" : "bg-primary",
+                        isRTL ? "left-2" : "right-2"
+                      )}
+                    />
+                  )}
+                </>
               )}
             </NavLink>
           ))}
@@ -305,29 +357,29 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
             <button
               type="button"
               onClick={handleGoHome}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className={menuButtonClass}
             >
               <Home className="h-4 w-4 shrink-0" />
               {(!isCompact || forceOpen) && (
-                <span>{t("doctorDashboard.sidebar.home")}</span>
+                <span>{t("doctorDashboard.sidebar.home", "Home")}</span>
               )}
             </button>
 
             <button
               type="button"
               onClick={handleGoToProfile}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className={menuButtonClass}
             >
               <User className="h-4 w-4 shrink-0" />
               {(!isCompact || forceOpen) && (
-                <span>{t("doctorDashboard.sidebar.profile")}</span>
+                <span>{t("doctorDashboard.sidebar.profile", "Profile")}</span>
               )}
             </button>
 
             <button
               type="button"
               onClick={handleToggleLanguage}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
+              className={menuButtonClass}
             >
               <Globe className="h-4 w-4 shrink-0" />
               {(!isCompact || forceOpen) && (
@@ -338,7 +390,7 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
             <button
               type="button"
               onClick={handleToggleTheme}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
+              className={menuButtonClass}
             >
               {isDark ? (
                 <Sun className="h-4 w-4 shrink-0" />
@@ -347,22 +399,18 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
               )}
 
               {(!isCompact || forceOpen) && (
-                <span>
-                  {isDark
-                    ? t("theme.light", "Light Mode")
-                    : t("theme.dark", "Dark Mode")}
-                </span>
+                <span>{isDark ? "Light Mode" : "Dark Mode"}</span>
               )}
             </button>
 
             <button
               type="button"
               onClick={handleLogout}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+              className={menuButtonClass}
             >
               <LogOut className="h-4 w-4 shrink-0" />
               {(!isCompact || forceOpen) && (
-                <span>{t("doctorDashboard.sidebar.logout")}</span>
+                <span>{t("doctorDashboard.sidebar.logout", "Logout")}</span>
               )}
             </button>
           </div>
@@ -372,7 +420,7 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
           type="button"
           onClick={() => setAccountMenuOpen((prev) => !prev)}
           className={cn(
-            "group flex w-full items-center gap-3 rounded-xl transition-colors hover:bg-primary/10",
+            "group flex w-full items-center gap-3 rounded-xl transition-colors hover:bg-primary/10 hover:text-primary",
             isCompact && !forceOpen ? "justify-center px-0 py-2" : "p-2"
           )}
         >
@@ -385,14 +433,17 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
 
           {(!isCompact || forceOpen) && (
             <div className="min-w-0 flex-1 text-start">
-              <p className="truncate text-sm font-medium text-foreground">
+              <p className="truncate text-sm font-medium text-foreground group-hover:text-primary">
                 {doctorName}
               </p>
 
-              <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground group-hover:text-primary">
                 <Stethoscope className="h-3.5 w-3.5 shrink-0 text-primary" />
                 <span className="truncate">
-                  {t("doctorDashboard.sidebar.specialistDoctor")}
+                  {t(
+                    "doctorDashboard.sidebar.specialistDoctor",
+                    "Specialist Doctor"
+                  )}
                 </span>
               </div>
             </div>

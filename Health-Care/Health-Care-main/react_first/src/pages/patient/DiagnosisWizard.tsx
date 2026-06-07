@@ -1,4 +1,4 @@
-// src/pages/DiagnosisWizard.tsx
+// src/pages/patient/DiagnosisWizard.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -107,19 +107,38 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 type StepKey = "basic" | "vitals" | "risk";
 
-type CardiovascularRiskLevel = "low" | "medium" | "high" | "very_high";
-
-type CardiovascularPrediction = {
-  probability: number;
-  percentage: number;
-  risk_level: CardiovascularRiskLevel;
-  message: string;
-  z_score: number;
+type PredictionResponse = {
+  session_id: string;
+  diabetes: {
+    prediction_id: number;
+    probability: number;
+    percentage?: number;
+    risk_level: string;
+    arabic_risk_level?: string;
+    message: string;
+  };
+  cardiovascular: {
+    prediction_id: number;
+    probability: number;
+    percentage?: number;
+    risk_level: string;
+    arabic_risk_level?: string;
+    message: string;
+    z_score?: number;
+  };
 };
 
 const DESKTOP_HEADER_HEIGHT = 72;
 
-// Backend handles cardiovascular prediction logic
+const normalizePercentageValue = (value: number) => {
+  if (typeof value !== "number" || Number.isNaN(value)) return 0;
+
+  if (value <= 1) {
+    return Number((value * 100).toFixed(2));
+  }
+
+  return Number(value.toFixed(2));
+};
 
 export default function DiagnosisWizard() {
   const navigate = useNavigate();
@@ -208,39 +227,54 @@ export default function DiagnosisWizard() {
     setIsLoading(true);
 
     try {
+      const pregnanciesValue =
+        values.gender === "female" ? values.pregnancies : 0;
+
       const backendData = {
+        // Basic shared fields
         gender: values.gender,
         age: values.age,
-        pregnancies: values.gender === "female" ? values.pregnancies : 0,
+        pregnancies: pregnanciesValue,
         glucose: values.glucose,
-        systolicBloodPressure: values.systolicBloodPressure,
-        diastolicBloodPressure: values.diastolicBloodPressure,
-        skinThickness: values.skinThickness,
         insulin: values.insulin,
         weight: values.weight,
         height: values.height,
         cholesterol: values.cholesterol,
+
+        // CamelCase names
+        systolicBloodPressure: values.systolicBloodPressure,
+        diastolicBloodPressure: values.diastolicBloodPressure,
+        skinThickness: values.skinThickness,
         diabetesPedigreeFunction: values.diabetesPedigreeFunction,
+
+        // snake_case names
+        systolic_bp: values.systolicBloodPressure,
+        diastolic_bp: values.diastolicBloodPressure,
+        systolic_blood_pressure: values.systolicBloodPressure,
+        diastolic_blood_pressure: values.diastolicBloodPressure,
+        skin_thickness: values.skinThickness,
+        diabetes_pedigree_function: values.diabetesPedigreeFunction,
+
+        // Old diabetes aliases
+        bloodPressure: values.diastolicBloodPressure,
+        blood_pressure: values.diastolicBloodPressure,
       };
 
-      const result = await apiCall<{
-        session_id: string;
-        diabetes: {
-          prediction_id: number;
-          probability: number;
-          risk_level: string;
-          message: string;
-        };
-        cardiovascular: {
-          prediction_id: number;
-          probability: number;
-          risk_level: string;
-          message: string;
-        };
-      }>(API_ENDPOINTS.PREDICT_V2, {
-        method: "POST",
-        body: JSON.stringify(backendData),
-      });
+      const result = await apiCall<PredictionResponse>(
+        API_ENDPOINTS.PREDICT_V2,
+        {
+          method: "POST",
+          body: JSON.stringify(backendData),
+        }
+      );
+
+      const diabetesPercentage = normalizePercentageValue(
+        result.diabetes.percentage ?? result.diabetes.probability
+      );
+
+      const cardiovascularPercentage = normalizePercentageValue(
+        result.cardiovascular.percentage ?? result.cardiovascular.probability
+      );
 
       toast.success(t("diagnosisWizard.success"));
 
@@ -248,9 +282,8 @@ export default function DiagnosisWizard() {
         state: {
           formData: {
             gender: values.gender,
-            pregnancies: values.gender === "female" ? values.pregnancies : 0,
+            pregnancies: pregnanciesValue,
             glucose: values.glucose,
-            bloodPressure: values.diastolicBloodPressure,
             systolicBloodPressure: values.systolicBloodPressure,
             diastolicBloodPressure: values.diastolicBloodPressure,
             skinThickness: values.skinThickness,
@@ -262,14 +295,27 @@ export default function DiagnosisWizard() {
             age: values.age,
           },
 
-          probability: result.diabetes.probability,
+          probability: diabetesPercentage,
+          percentage: diabetesPercentage,
           riskLevel: result.diabetes.risk_level,
           message: result.diabetes.message,
           predictionId: result.diabetes.prediction_id,
           sessionId: result.session_id,
 
-          diabetesPrediction: result.diabetes,
-          cardiovascularPrediction: result.cardiovascular,
+          diabetesPrediction: {
+            ...result.diabetes,
+            probability: diabetesPercentage,
+            percentage: diabetesPercentage,
+          },
+
+          cardiovascularPrediction: {
+            ...result.cardiovascular,
+            probability:
+              result.cardiovascular.probability <= 1
+                ? result.cardiovascular.probability
+                : Number((cardiovascularPercentage / 100).toFixed(4)),
+            percentage: cardiovascularPercentage,
+          },
         },
       });
     } catch (error) {

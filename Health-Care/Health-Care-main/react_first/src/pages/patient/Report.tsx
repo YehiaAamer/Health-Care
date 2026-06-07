@@ -1,3 +1,4 @@
+// src/pages/Report.tsx
 import { useLocation, Link, useNavigate } from "react-router-dom";
 import { useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
@@ -70,6 +71,43 @@ const getRiskLevelFromPercentage = (percentage: number): RiskLevel => {
   return "low";
 };
 
+const normalizeGenderValue = (
+  value: unknown
+): "male" | "female" | undefined => {
+  const gender = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u064B-\u065F]/g, "");
+
+  if (
+    gender === "male" ||
+    gender === "m" ||
+    gender === "man" ||
+    gender === "boy" ||
+    gender === "ذكر" ||
+    gender === "رجل" ||
+    gender === "ولد"
+  ) {
+    return "male";
+  }
+
+  if (
+    gender === "female" ||
+    gender === "f" ||
+    gender === "woman" ||
+    gender === "girl" ||
+    gender === "انثى" ||
+    gender === "أنثى" ||
+    gender === "امرأة" ||
+    gender === "بنت"
+  ) {
+    return "female";
+  }
+
+  return undefined;
+};
+
 export default function Report() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -87,7 +125,7 @@ export default function Report() {
   const cardiovascularPrediction = result.cardiovascularPrediction || null;
 
   const probability = normalizePercentageValue(
-    Number(diabetesPrediction?.probability ?? result.probability ?? 0)
+    Number(diabetesPrediction?.percentage ?? diabetesPrediction?.probability ?? result.percentage ?? result.probability ?? 0)
   );
 
   const cardiovascularProbability = normalizePercentageValue(
@@ -99,6 +137,15 @@ export default function Report() {
   );
 
   const formData = result.formData || {};
+
+  const normalizedGender = normalizeGenderValue(
+    formData.gender ??
+      result.gender ??
+      result.diabetesPrediction?.gender ??
+      result.cardiovascularPrediction?.gender
+  );
+
+  const shouldShowPregnancies = normalizedGender === "female";
 
   useEffect(() => {
     if (
@@ -403,9 +450,6 @@ export default function Report() {
         return t("report.fields.pregnancies");
       case "glucose":
         return t("report.fields.glucose");
-      case "bloodPressure":
-      case "blood_pressure":
-        return t("report.fields.bloodPressure");
       case "systolicBloodPressure":
       case "systolic_blood_pressure":
         return isArabic ? "ضغط الدم الانقباضي" : "Systolic Blood Pressure";
@@ -437,8 +481,12 @@ export default function Report() {
 
   const getDisplayValue = (key: string, value: unknown) => {
     if (key === "gender") {
-      if (value === "male") return isArabic ? "ذكر" : "Male";
-      if (value === "female") return isArabic ? "أنثى" : "Female";
+      const gender = normalizeGenderValue(value);
+
+      if (gender === "male") return isArabic ? "ذكر" : "Male";
+      if (gender === "female") return isArabic ? "أنثى" : "Female";
+
+      return isArabic ? "غير محدد" : "Not specified";
     }
 
     if (key === "weight") return `${value} kg`;
@@ -447,8 +495,6 @@ export default function Report() {
     if (key === "cholesterol") return `${value} mg/dL`;
 
     if (
-      key === "bloodPressure" ||
-      key === "blood_pressure" ||
       key === "systolicBloodPressure" ||
       key === "systolic_blood_pressure" ||
       key === "diastolicBloodPressure" ||
@@ -468,9 +514,6 @@ export default function Report() {
         return "Pregnancies";
       case "glucose":
         return "Glucose";
-      case "bloodPressure":
-      case "blood_pressure":
-        return "Blood Pressure";
       case "systolicBloodPressure":
       case "systolic_blood_pressure":
         return "Systolic Blood Pressure";
@@ -502,8 +545,12 @@ export default function Report() {
 
   const getPdfDisplayValue = (key: string, value: unknown) => {
     if (key === "gender") {
-      if (value === "male") return "Male";
-      if (value === "female") return "Female";
+      const gender = normalizeGenderValue(value);
+
+      if (gender === "male") return "Male";
+      if (gender === "female") return "Female";
+
+      return "Not specified";
     }
 
     if (key === "weight") return `${value} kg`;
@@ -512,8 +559,6 @@ export default function Report() {
     if (key === "cholesterol") return `${value} mg/dL`;
 
     if (
-      key === "bloodPressure" ||
-      key === "blood_pressure" ||
       key === "systolicBloodPressure" ||
       key === "systolic_blood_pressure" ||
       key === "diastolicBloodPressure" ||
@@ -541,15 +586,26 @@ export default function Report() {
     }
   };
 
-  const filteredFormEntries = Object.entries(formData).filter(([key]) => {
+  const filteredFormEntries = Object.entries(formData).filter(([key, value]) => {
     const hiddenKeys = new Set([
       "bmi",
+      "bloodPressure",
+      "blood_pressure",
       "smoke",
       "physicalActivity",
       "physical_activity",
     ]);
 
-    return !hiddenKeys.has(key);
+    const isEmptyValue =
+      value === undefined ||
+      value === null ||
+      value === "" ||
+      (typeof value === "number" && Number.isNaN(value));
+
+    const shouldHidePregnancies =
+      key === "pregnancies" && !shouldShowPregnancies;
+
+    return !hiddenKeys.has(key) && !isEmptyValue && !shouldHidePregnancies;
   });
 
   const reportDate = new Date().toLocaleDateString(

@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { useLocation } from "react-router-dom";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { reportsApi } from "@/api/reports";
 import type { Prediction, ReviewStatus } from "@/types/api";
@@ -27,7 +27,6 @@ import {
 import {
   Search,
   FileText,
-  AlertCircle,
   Clock,
   CheckCircle2,
   Eye,
@@ -47,10 +46,30 @@ import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
 
+type ReportsLocationState = {
+  openReportId?: number | string;
+  filterReportId?: number | string;
+  patientId?: number | string;
+  patientName?: string;
+  diseaseType?: string;
+  fromPatientArchive?: boolean;
+  openDrawer?: boolean;
+};
+
+type KeyIndicator = {
+  label: string;
+  value: string | number;
+  unit: string;
+  severity: number;
+};
+
 export default function ReportsPage() {
   const { t, i18n } = useTranslation();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const isArabic = i18n.language === "ar";
+
+  const ignoreRouteFiltersRef = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -67,6 +86,177 @@ export default function ReportsPage() {
   const [medication, setMedication] = useState("");
   const [decision, setDecision] = useState<ReviewStatus>("pending");
 
+  const getText = (
+    key: string,
+    arabicFallback: string,
+    englishFallback: string
+  ) => {
+    const fallback = isArabic ? arabicFallback : englishFallback;
+    const translated = t(key);
+
+    return translated === key ? fallback : translated;
+  };
+
+  const labels = {
+    title: getText("doctorDashboard.reports.title", "التقارير", "Reports"),
+    subtitle: getText(
+      "doctorDashboard.reports.subtitle",
+      "راجع تقارير المرضى وقرارات المتابعة الطبية.",
+      "Review patient reports and medical follow-up decisions."
+    ),
+    filter: getText(
+      "doctorDashboard.reports.filter",
+      "فلترة التقارير",
+      "Filter Reports"
+    ),
+    resultFound: isArabic ? "نتيجة" : "result found",
+    resultsFound: isArabic ? "نتيجة" : "results found",
+    searchPlaceholder: getText(
+      "doctorDashboard.reports.searchPlaceholder",
+      "ابحث باسم المريض...",
+      "Search by patient name..."
+    ),
+    loading: getText(
+      "doctorDashboard.reports.loading",
+      "جاري تحميل التقارير",
+      "Loading reports"
+    ),
+    noReports: getText(
+      "doctorDashboard.reports.noReports",
+      "لا توجد تقارير",
+      "No reports found"
+    ),
+    tablePatient: getText(
+      "doctorDashboard.reports.table.patient",
+      "المريض",
+      "Patient"
+    ),
+    tableProbability: getText(
+      "doctorDashboard.reports.table.probability",
+      "نسبة الخطورة",
+      "Probability"
+    ),
+    tableIndicators: isArabic ? "أهم المؤشرات" : "Key Indicators",
+    tableStatus: getText(
+      "doctorDashboard.reports.table.status",
+      "حالة المراجعة",
+      "Review Status"
+    ),
+    tableDate: getText("doctorDashboard.reports.table.date", "التاريخ", "Date"),
+    tableActions: getText(
+      "doctorDashboard.reports.table.actions",
+      "الإجراء",
+      "Actions"
+    ),
+    reviewBtn: getText(
+      "doctorDashboard.pendingReviews.reviewBtn",
+      "مراجعة",
+      "Review"
+    ),
+    clinicalDecision: getText(
+      "doctorDashboard.reports.clinicalDecision",
+      "قرار المراجعة الطبية",
+      "Medical Review Decision"
+    ),
+    notesTitle: getText(
+      "doctorDashboard.reports.notesTitle",
+      "ملاحظات الطبيب",
+      "Doctor Notes"
+    ),
+    notesPlaceholder: getText(
+      "doctorDashboard.reports.notesPlaceholder",
+      "اكتب ملاحظاتك الطبية هنا...",
+      "Write your medical notes here..."
+    ),
+    notified: getText(
+      "doctorDashboard.reports.notified",
+      "سيتم حفظ القرار وإتاحته في سجل المريض.",
+      "The decision will be saved and reflected in the patient record."
+    ),
+    saveReview: getText(
+      "doctorDashboard.reports.drawer.saveReview",
+      "حفظ المراجعة",
+      "Save Review"
+    ),
+    predictionTab: getText(
+      "doctorDashboard.reports.drawer.tabs.prediction",
+      "التوقع",
+      "Prediction"
+    ),
+    reviewTab: getText(
+      "doctorDashboard.reports.drawer.tabs.review",
+      "المراجعة",
+      "Review"
+    ),
+    approve: getText(
+      "doctorDashboard.reports.drawer.actions.approve",
+      "اعتماد",
+      "Approve"
+    ),
+    reject: getText(
+      "doctorDashboard.reports.drawer.actions.reject",
+      "رفض",
+      "Reject"
+    ),
+    followUp: getText(
+      "doctorDashboard.reports.drawer.actions.followUp",
+      "يحتاج متابعة",
+      "Needs Follow-up"
+    ),
+    fullPatientValues: isArabic ? "قيم المريض الكاملة" : "Full patient values",
+    reportReview: isArabic ? "مراجعة التقرير" : "Report Review",
+    aiProbability: isArabic ? "نسبة الخطورة" : "Risk Probability",
+    risk: isArabic ? "الخطورة" : "Risk",
+    statusPlaceholder: isArabic ? "اختر حالة المراجعة" : "Review Status",
+    allStatuses: isArabic ? "كل حالات المراجعة" : "All Review Statuses",
+    page: isArabic ? "صفحة" : "Page",
+    of: isArabic ? "من" : "of",
+    anonymous: isArabic ? "مريض غير محدد" : "Anonymous",
+    close: isArabic ? "إغلاق" : "Close",
+    medicationTitle: isArabic ? "الأدوية / الروشتة" : "Medication / Prescription",
+    medicationPlaceholder: isArabic
+      ? "اكتب اسم الدواء، الجرعة، عدد المرات، ومدة الاستخدام..."
+      : "Write medication name, dosage, frequency, and duration...",
+  };
+
+  const normalizeId = (value: unknown) => {
+    const numericId = Number(String(value ?? "").replace(/\D/g, ""));
+    return Number.isNaN(numericId) ? 0 : numericId;
+  };
+
+  const toNumber = (value: unknown) => {
+    if (value === null || value === undefined || value === "") return 0;
+    const numericValue = Number(value);
+    return Number.isNaN(numericValue) ? 0 : numericValue;
+  };
+
+  const clearTemporaryReportFilters = () => {
+    const params = new URLSearchParams(window.location.search);
+
+    params.delete("filterReportId");
+    params.delete("openReportId");
+    params.delete("patientId");
+    params.delete("patientName");
+    params.delete("diseaseType");
+    params.delete("fromPatientArchive");
+    params.delete("openDrawer");
+
+    const cleanSearch = params.toString();
+    const cleanUrl = `${window.location.pathname}${cleanSearch ? `?${cleanSearch}` : ""}`;
+
+    const currentHistoryState = window.history.state;
+
+    const nextHistoryState =
+      currentHistoryState && typeof currentHistoryState === "object"
+        ? {
+            ...currentHistoryState,
+            usr: null,
+          }
+        : currentHistoryState;
+
+    window.history.replaceState(nextHistoryState, document.title, cleanUrl);
+  };
+
   const getMedicationValue = (report: Prediction) => {
     return (
       (report as any).medication ||
@@ -76,20 +266,168 @@ export default function ReportsPage() {
     );
   };
 
+  const getReportPatientId = (report: Prediction) => {
+    const item = report as any;
+
+    return normalizeId(
+      item.patient_id ||
+        item.patient ||
+        item.patient_user_id ||
+        item.user_id ||
+        item.patientId ||
+        item.patient_details?.id ||
+        item.patient_data?.id ||
+        item.patient_profile?.id ||
+        item.patient?.id
+    );
+  };
+
+  const getExtraValue = (
+    report: Prediction,
+    keys: string[],
+    fallback = "N/A"
+  ) => {
+    const item = report as any;
+    const extra = report.extra_fields || {};
+
+    for (const key of keys) {
+      const value = extra?.[key] ?? item?.[key];
+
+      if (value !== undefined && value !== null && value !== "") {
+        return value;
+      }
+    }
+
+    return fallback;
+  };
+
+  const getGenderValue = (report: Prediction) => {
+    return getExtraValue(report, ["gender", "sex"], "N/A");
+  };
+
+  const isFemaleGender = (value: unknown) => {
+    const normalized = String(value || "").trim().toLowerCase();
+
+    return (
+      normalized === "female" ||
+      normalized === "f" ||
+      normalized === "woman" ||
+      normalized === "girl" ||
+      normalized === "أنثى" ||
+      normalized === "انثى" ||
+      normalized === "بنت"
+    );
+  };
+
+  const getPregnanciesValue = (report: Prediction) => {
+    return getExtraValue(
+      report,
+      ["pregnancies", "pregnancy"],
+      report.pregnancies ?? "N/A"
+    );
+  };
+
+  const getStatusLabel = (status?: string) => {
+    switch (status) {
+      case "pending":
+        return isArabic ? "قيد المراجعة" : "Pending";
+      case "reviewed":
+        return isArabic ? "تمت المراجعة" : "Reviewed";
+      case "needs_followup":
+        return isArabic ? "يحتاج متابعة" : "Needs Follow-up";
+      case "approved":
+        return isArabic ? "معتمد" : "Approved";
+      case "rejected":
+        return isArabic ? "مرفوض" : "Rejected";
+      default:
+        return status || (isArabic ? "غير محدد" : "Unknown");
+    }
+  };
+
   const fetchReports = async () => {
     try {
       setLoading(true);
+
+      const state = (location.state || {}) as ReportsLocationState;
+      const shouldIgnoreRouteFilters = ignoreRouteFiltersRef.current;
+
+      const patientIdFromState = shouldIgnoreRouteFilters
+        ? 0
+        : normalizeId(state.patientId);
+
+      const patientIdFromUrl = shouldIgnoreRouteFilters
+        ? 0
+        : normalizeId(searchParams.get("patientId"));
+
+      const selectedPatientId = patientIdFromState || patientIdFromUrl;
+
+      const selectedPatientName = shouldIgnoreRouteFilters
+        ? ""
+        : String(state.patientName || searchParams.get("patientName") || "")
+            .trim()
+            .toLowerCase();
+
+      const selectedDiseaseType = shouldIgnoreRouteFilters
+        ? ""
+        : state.diseaseType || searchParams.get("diseaseType") || "";
+
+      const openReportId = shouldIgnoreRouteFilters
+        ? 0
+        : normalizeId(state.openReportId) ||
+          normalizeId(searchParams.get("openReportId"));
+
+      const filterReportId = shouldIgnoreRouteFilters
+        ? 0
+        : normalizeId(state.filterReportId) ||
+          normalizeId(searchParams.get("filterReportId"));
+
+      const fromPatientArchive = shouldIgnoreRouteFilters
+        ? false
+        : Boolean(state.fromPatientArchive || searchParams.get("fromPatientArchive"));
+
+      const shouldOpenDrawer =
+        openReportId > 0 && state.openDrawer !== false && !fromPatientArchive;
+
+      const hasTemporaryFilters =
+        selectedPatientId > 0 ||
+        !!selectedPatientName ||
+        !!selectedDiseaseType ||
+        openReportId > 0 ||
+        filterReportId > 0 ||
+        fromPatientArchive;
 
       const data = await reportsApi.getReports({
         status: statusFilter || undefined,
       });
 
-      setReports(data);
+      const filteredData = data.filter((report: Prediction) => {
+        const item = report as any;
 
-      const state = location.state as { openReportId?: number };
+        const reportId = normalizeId(item.id);
+        const reportPatientId = getReportPatientId(report);
+        const reportPatientName = String(item.patient_name || "")
+          .trim()
+          .toLowerCase();
 
-      if (state?.openReportId) {
-        const reportToOpen = data.find((r) => r.id === state.openReportId);
+        const matchesReport = !filterReportId || reportId === filterReportId;
+
+        const matchesPatient =
+          !selectedPatientId ||
+          reportPatientId === selectedPatientId ||
+          (!!selectedPatientName && reportPatientName === selectedPatientName);
+
+        const matchesDisease =
+          !selectedDiseaseType || item.disease_type === selectedDiseaseType;
+
+        return matchesReport && matchesPatient && matchesDisease;
+      });
+
+      setReports(filteredData);
+
+      if (shouldOpenDrawer) {
+        const reportToOpen = filteredData.find(
+          (report) => Number(report.id) === openReportId
+        );
 
         if (reportToOpen) {
           setSelectedReport(reportToOpen);
@@ -97,13 +435,22 @@ export default function ReportsPage() {
           setDoctorNotes(reportToOpen.message || "");
           setMedication(getMedicationValue(reportToOpen));
           setIsDrawerOpen(true);
-
-          window.history.replaceState({}, document.title);
         }
+      }
+
+      if (hasTemporaryFilters && !shouldIgnoreRouteFilters) {
+        ignoreRouteFiltersRef.current = true;
+        clearTemporaryReportFilters();
       }
     } catch (error) {
       console.error("Failed to fetch reports", error);
-      toast.error(t("doctorDashboard.reports.fetchError"));
+      toast.error(
+        getText(
+          "doctorDashboard.reports.fetchError",
+          "فشل تحميل التقارير",
+          "Failed to fetch reports"
+        )
+      );
     } finally {
       setLoading(false);
     }
@@ -111,7 +458,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     fetchReports();
-  }, [statusFilter]);
+  }, [statusFilter, location.search]);
 
   const filteredReports = useMemo(() => {
     const searchValue = search.trim().toLowerCase();
@@ -125,7 +472,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, location.search]);
 
   const totalPages = Math.max(1, Math.ceil(filteredReports.length / PAGE_SIZE));
 
@@ -168,7 +515,14 @@ export default function ReportsPage() {
         medication,
       } as any);
 
-      toast.success(t("doctorDashboard.reports.saveSuccess"));
+      toast.success(
+        getText(
+          "doctorDashboard.reports.saveSuccess",
+          "تم حفظ المراجعة بنجاح",
+          "Review saved successfully"
+        )
+      );
+
       setIsDrawerOpen(false);
       setSelectedReport(null);
       setDoctorNotes("");
@@ -176,7 +530,13 @@ export default function ReportsPage() {
       fetchReports();
     } catch (error) {
       console.error("Failed to save review", error);
-      toast.error(t("doctorDashboard.reports.saveError"));
+      toast.error(
+        getText(
+          "doctorDashboard.reports.saveError",
+          "فشل حفظ المراجعة",
+          "Failed to save review"
+        )
+      );
     } finally {
       setSubmitting(false);
     }
@@ -184,15 +544,25 @@ export default function ReportsPage() {
 
   const getRiskColor = (level: string) => {
     const normalized = level?.toLowerCase()?.trim();
-    if (["high", "very high", "مرتفع", "مرتفع جدًا", "مرتفع جداً"].includes(normalized)) {
+
+    if (
+      [
+        "very high",
+        "very_high",
+        "veryhigh",
+        "critical",
+        "مرتفع جدًا",
+        "مرتفع جداً",
+        "حرج",
+      ].includes(normalized)
+    ) {
       return "red";
     }
-    if (["medium", "متوسط"].includes(normalized)) {
-      return "orange";
-    }
-    if (["low", "منخفض"].includes(normalized)) {
-      return "green";
-    }
+
+    if (["high", "مرتفع"].includes(normalized)) return "orange";
+    if (["medium", "متوسط"].includes(normalized)) return "orange";
+    if (["low", "منخفض"].includes(normalized)) return "green";
+
     return "blue";
   };
 
@@ -204,8 +574,6 @@ export default function ReportsPage() {
           bg: "bg-red-50 dark:bg-red-500/10",
           border: "border-red-100 dark:border-red-500/30",
           progress: "bg-red-500",
-          badge:
-            "bg-red-50 text-red-600 border-red-100 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30",
         };
       case "orange":
         return {
@@ -213,8 +581,6 @@ export default function ReportsPage() {
           bg: "bg-amber-50 dark:bg-amber-500/10",
           border: "border-amber-100 dark:border-amber-500/30",
           progress: "bg-amber-500",
-          badge:
-            "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30",
         };
       case "green":
         return {
@@ -222,8 +588,6 @@ export default function ReportsPage() {
           bg: "bg-emerald-50 dark:bg-emerald-500/10",
           border: "border-emerald-100 dark:border-emerald-500/30",
           progress: "bg-emerald-500",
-          badge:
-            "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30",
         };
       default:
         return {
@@ -231,47 +595,291 @@ export default function ReportsPage() {
           bg: "bg-primary/10",
           border: "border-primary/15",
           progress: "bg-primary",
-          badge: "bg-primary/10 text-primary border-primary/15",
         };
     }
+  };
+
+  const getIndicatorSeverity = (label: string, value: unknown) => {
+    const numericValue = toNumber(value);
+    const normalizedLabel = label.toLowerCase();
+
+    if (normalizedLabel.includes("glucose") || label.includes("الجلوكوز")) {
+      if (numericValue >= 200) return 100;
+      if (numericValue >= 126) return 85;
+      if (numericValue >= 100) return 60;
+      return 20;
+    }
+
+    if (normalizedLabel.includes("systolic") || label.includes("الانقباضي")) {
+      if (numericValue >= 180) return 100;
+      if (numericValue >= 140) return 85;
+      if (numericValue >= 130) return 65;
+      return 20;
+    }
+
+    if (normalizedLabel.includes("diastolic") || label.includes("الانبساطي")) {
+      if (numericValue >= 120) return 100;
+      if (numericValue >= 90) return 85;
+      if (numericValue >= 80) return 65;
+      return 20;
+    }
+
+    if (
+      normalizedLabel.includes("cholesterol") ||
+      label.includes("الكوليسترول")
+    ) {
+      if (numericValue >= 240) return 90;
+      if (numericValue >= 200) return 70;
+      return 20;
+    }
+
+    if (normalizedLabel.includes("insulin") || label.includes("الإنسولين")) {
+      if (numericValue > 25) return 80;
+      if (numericValue > 15) return 55;
+      return 20;
+    }
+
+    if (normalizedLabel.includes("pedigree") || label.includes("العامل الوراثي")) {
+      if (numericValue >= 1) return 85;
+      if (numericValue >= 0.5) return 65;
+      return 20;
+    }
+
+    if (normalizedLabel.includes("skin") || label.includes("سماكة الجلد")) {
+      if (numericValue >= 40) return 70;
+      if (numericValue >= 30) return 55;
+      return 20;
+    }
+
+    if (normalizedLabel.includes("age") || label.includes("العمر")) {
+      if (numericValue >= 60) return 65;
+      if (numericValue >= 45) return 50;
+      return 20;
+    }
+
+    if (normalizedLabel.includes("weight") || label.includes("الوزن")) {
+      if (numericValue >= 100) return 55;
+      if (numericValue >= 85) return 40;
+      return 20;
+    }
+
+    if (normalizedLabel.includes("pregnancies") || label.includes("الحمل")) {
+      if (numericValue >= 8) return 65;
+      if (numericValue >= 4) return 45;
+      return 20;
+    }
+
+    return 10;
+  };
+
+  const buildKeyIndicators = (report: Prediction): KeyIndicator[] => {
+    const gender = getGenderValue(report);
+    const showPregnancies = isFemaleGender(gender);
+
+    const diabetesDiastolicValue =
+      getExtraValue(report, [
+        "diastolic_bp",
+        "diastolicBloodPressure",
+        "diastolic_blood_pressure",
+      ]) ||
+      report.blood_pressure ||
+      "N/A";
+
+    const diabetesIndicators: KeyIndicator[] = [
+      {
+        label: isArabic ? "الجلوكوز" : "Glu",
+        value: report.glucose || "N/A",
+        unit: "",
+        severity: getIndicatorSeverity("glucose", report.glucose),
+      },
+      {
+        label: isArabic ? "DIA BP" : "Dia BP",
+        value: diabetesDiastolicValue,
+        unit: "",
+        severity: getIndicatorSeverity("diastolic", diabetesDiastolicValue),
+      },
+      {
+        label: isArabic ? "الإنسولين" : "Ins",
+        value: report.insulin || "N/A",
+        unit: "",
+        severity: getIndicatorSeverity("insulin", report.insulin),
+      },
+      {
+        label: isArabic ? "سُمك الجلد" : "Skin",
+        value: report.skin_thickness || "N/A",
+        unit: "",
+        severity: getIndicatorSeverity("skin", report.skin_thickness),
+      },
+      {
+        label: isArabic ? "وراثي" : "DPF",
+        value: report.diabetes_pedigree_function || "N/A",
+        unit: "",
+        severity: getIndicatorSeverity(
+          "pedigree",
+          report.diabetes_pedigree_function
+        ),
+      },
+      {
+        label: isArabic ? "العمر" : "Age",
+        value: report.age || "N/A",
+        unit: "",
+        severity: getIndicatorSeverity("age", report.age),
+      },
+      ...(showPregnancies
+        ? [
+            {
+              label: isArabic ? "الحمل" : "Preg",
+              value: getPregnanciesValue(report),
+              unit: "",
+              severity: getIndicatorSeverity(
+                "pregnancies",
+                getPregnanciesValue(report)
+              ),
+            },
+          ]
+        : []),
+    ];
+
+    const cardiovascularSystolicValue = getExtraValue(report, [
+      "systolic_bp",
+      "systolicBloodPressure",
+      "systolic_blood_pressure",
+    ]);
+
+    const cardiovascularDiastolicValue = getExtraValue(report, [
+      "diastolic_bp",
+      "diastolicBloodPressure",
+      "diastolic_blood_pressure",
+    ]);
+
+    const cardiovascularIndicators: KeyIndicator[] = [
+      {
+        label: isArabic ? "SYS BP" : "Sys BP",
+        value: cardiovascularSystolicValue,
+        unit: "",
+        severity: getIndicatorSeverity("systolic", cardiovascularSystolicValue),
+      },
+      {
+        label: isArabic ? "DIA BP" : "Dia BP",
+        value: cardiovascularDiastolicValue,
+        unit: "",
+        severity: getIndicatorSeverity("diastolic", cardiovascularDiastolicValue),
+      },
+      {
+        label: isArabic ? "الكوليسترول" : "Chol",
+        value: getExtraValue(report, ["cholesterol"]),
+        unit: "",
+        severity: getIndicatorSeverity(
+          "cholesterol",
+          getExtraValue(report, ["cholesterol"])
+        ),
+      },
+      {
+        label: isArabic ? "الجلوكوز" : "Glu",
+        value: report.glucose || "N/A",
+        unit: "",
+        severity: getIndicatorSeverity("glucose", report.glucose),
+      },
+      {
+        label: isArabic ? "العمر" : "Age",
+        value: report.age || "N/A",
+        unit: "",
+        severity: getIndicatorSeverity("age", report.age),
+      },
+      {
+        label: isArabic ? "الوزن" : "Weight",
+        value: getExtraValue(report, ["weight"]),
+        unit: "",
+        severity: getIndicatorSeverity(
+          "weight",
+          getExtraValue(report, ["weight"])
+        ),
+      },
+    ];
+
+    const source =
+      report.disease_type === "cardiovascular"
+        ? cardiovascularIndicators
+        : diabetesIndicators;
+
+    return source
+      .filter((indicator) => indicator.value !== "N/A")
+      .sort((a, b) => b.severity - a.severity)
+      .slice(0, 3);
+  };
+
+  const renderKeyIndicators = (report: Prediction) => {
+    const keyIndicators = buildKeyIndicators(report);
+
+    if (keyIndicators.length === 0) {
+      return (
+        <span className="text-xs font-bold text-muted-foreground">
+          {isArabic ? "لا توجد مؤشرات" : "No indicators"}
+        </span>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-3 gap-2 md:max-w-[190px] md:gap-x-4 md:gap-y-1">
+        {keyIndicators.map((indicator, index) => (
+          <div
+            key={`${indicator.label}-${index}`}
+            className="min-w-0 rounded-2xl border border-border bg-background/60 p-3 md:rounded-none md:border-0 md:bg-transparent md:p-0"
+          >
+            <p className="truncate text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground md:tracking-[0.16em]">
+              {indicator.label}
+            </p>
+
+            <p className="mt-1 truncate text-xs font-bold text-foreground">
+              {indicator.value}
+              {indicator.unit && (
+                <span className="ml-1 text-[9px] font-semibold text-muted-foreground">
+                  {indicator.unit}
+                </span>
+              )}
+            </p>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
         return (
-          <Badge className="rounded-xl border border-border bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            {t("doctorDashboard.reports.status.pending")}
+          <Badge className="rounded-xl border border-border bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground shadow-none transition-none hover:bg-muted hover:text-muted-foreground">
+            {getStatusLabel(status)}
           </Badge>
         );
       case "reviewed":
         return (
-          <Badge className="rounded-xl border border-primary/15 bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-primary">
-            {t("doctorDashboard.reports.status.reviewed")}
+          <Badge className="rounded-xl border border-primary/15 bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-primary shadow-none transition-none hover:bg-primary/10 hover:text-primary">
+            {getStatusLabel(status)}
           </Badge>
         );
       case "needs_followup":
         return (
-          <Badge className="rounded-xl border border-amber-100 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-            {t("doctorDashboard.reports.status.needsFollowUp")}
+          <Badge className="rounded-xl border border-amber-100 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-600 shadow-none transition-none hover:bg-amber-50 hover:text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/10 dark:hover:text-amber-300">
+            {getStatusLabel(status)}
           </Badge>
         );
       case "approved":
         return (
-          <Badge className="rounded-xl border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
-            {t("doctorDashboard.reports.status.approved")}
+          <Badge className="rounded-xl border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-600 shadow-none transition-none hover:bg-emerald-50 hover:text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-300">
+            {getStatusLabel(status)}
           </Badge>
         );
       case "rejected":
         return (
-          <Badge className="rounded-xl border border-red-100 bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-            {t("doctorDashboard.reports.status.rejected")}
+          <Badge className="rounded-xl border border-red-100 bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-600 shadow-none transition-none hover:bg-red-50 hover:text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-300">
+            {getStatusLabel(status)}
           </Badge>
         );
       default:
         return (
-          <Badge className="rounded-xl border border-border bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            {status}
+          <Badge className="rounded-xl border border-border bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground shadow-none transition-none hover:bg-muted hover:text-muted-foreground">
+            {getStatusLabel(status)}
           </Badge>
         );
     }
@@ -279,26 +887,42 @@ export default function ReportsPage() {
 
   const statCards = [
     {
-      label: t("doctorDashboard.reports.stats.total"),
+      label: getText(
+        "doctorDashboard.reports.stats.total",
+        "إجمالي التقارير",
+        "Total Reports"
+      ),
       value: stats.total,
       icon: FileText,
       className: "bg-primary/10 text-primary border-primary/15",
     },
     {
-      label: t("doctorDashboard.reports.stats.pending"),
+      label: getText(
+        "doctorDashboard.reports.stats.pending",
+        "قيد المراجعة",
+        "Pending"
+      ),
       value: stats.pending,
       icon: Clock,
       className:
         "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30",
     },
     {
-      label: t("doctorDashboard.reports.stats.followUp"),
+      label: getText(
+        "doctorDashboard.reports.stats.followUp",
+        "يحتاج متابعة",
+        "Needs Follow-up"
+      ),
       value: stats.followUp,
       icon: Calendar,
       className: "bg-primary/10 text-primary border-primary/15",
     },
     {
-      label: t("doctorDashboard.reports.stats.approved"),
+      label: getText(
+        "doctorDashboard.reports.stats.approved",
+        "معتمد",
+        "Approved"
+      ),
       value: stats.approved,
       icon: CheckCircle2,
       className:
@@ -307,158 +931,142 @@ export default function ReportsPage() {
   ];
 
   const statusSelectOptions = [
-    { value: "all", label: isArabic ? "كل الحالات" : "All Review Statuses" },
-    { value: "pending", label: t("doctorDashboard.reports.status.pending") },
-    { value: "approved", label: t("doctorDashboard.reports.status.approved") },
-    {
-      value: "needs_followup",
-      label: t("doctorDashboard.reports.status.needsFollowUp"),
-    },
+    { value: "all", label: labels.allStatuses },
+    { value: "pending", label: getStatusLabel("pending") },
+    { value: "approved", label: getStatusLabel("approved") },
+    { value: "needs_followup", label: getStatusLabel("needs_followup") },
   ];
 
   const clinicalIndicators = selectedReport
-    ? selectedReport.disease_type === "cardiovascular"
-      ? [
+    ? (() => {
+        const gender = getGenderValue(selectedReport);
+        const showPregnancies = isFemaleGender(gender);
+
+        const baseIdentityIndicators = [
           {
-            label: isArabic ? "الكوليسترول" : "Cholesterol",
-            value: selectedReport.extra_fields?.cholesterol || "N/A",
-            unit: "mg/dL",
-          },
-          {
-            label: isArabic ? "الضغط الانقباضي" : "Systolic BP",
-            value: selectedReport.extra_fields?.systolic_bp || "N/A",
-            unit: "mmHg",
-          },
-          {
-            label: isArabic ? "الضغط الانبساطي" : "Diastolic BP",
-            value: selectedReport.extra_fields?.diastolic_bp || "N/A",
-            unit: "mmHg",
-          },
-          {
-            label: isArabic ? "الوزن" : "Weight",
-            value: selectedReport.extra_fields?.weight || "N/A",
-            unit: "kg",
-          },
-          {
-            label: isArabic ? "الطول" : "Height",
-            value: selectedReport.extra_fields?.height || "N/A",
-            unit: "cm",
-          },
-          {
-            label: isArabic ? "السن" : "Age",
-            value: selectedReport.age,
-            unit: isArabic ? "سنة" : "Years",
-          },
-          {
-            label: isArabic ? "التدخين" : "Smoking",
-            value: selectedReport.extra_fields?.smoke !== undefined
-              ? (selectedReport.extra_fields?.smoke ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
-              : (selectedReport.extra_fields?.smoking !== undefined
-                ? (selectedReport.extra_fields?.smoking ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
-                : "N/A"),
+            label: isArabic ? "النوع" : "Gender",
+            value: gender,
             unit: "",
           },
-          {
-            label: isArabic ? "النشاط البدني" : "Physical Activity",
-            value: selectedReport.extra_fields?.physical_activity !== undefined
-              ? (selectedReport.extra_fields?.physical_activity ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
-              : (selectedReport.extra_fields?.active !== undefined
-                ? (selectedReport.extra_fields?.active ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
-                : "N/A"),
-            unit: "",
-          },
-        ]
-      : [
-          {
-            label: t("dashboard.glucose"),
-            value: selectedReport.glucose,
-            unit: "mg/dL",
-          },
-          {
-            label: t("dashboard.bloodPressure"),
-            value: selectedReport.blood_pressure,
-            unit: "mmHg",
-          },
-          {
-            label: t("dashboard.bmi"),
-            value: selectedReport.bmi,
-            unit: "kg/m²",
-          },
-          {
-            label: t("dashboard.insulin"),
-            value: selectedReport.insulin,
-            unit: "mu U/ml",
-          },
-          {
-            label: isArabic ? "سماكة الجلد" : "Skin",
-            value: selectedReport.skin_thickness,
-            unit: "mm",
-          },
-          {
-            label: t("dashboard.age"),
-            value: selectedReport.age,
-            unit: "Years",
-          },
-          {
-            label: t("dashboard.diabetesPedigree"),
-            value: selectedReport.diabetes_pedigree_function,
-            unit: "Score",
-          },
-          {
-            label: t("dashboard.pregnancies"),
-            value: selectedReport.pregnancies,
-            unit: "Count",
-          },
-          // Shared fields from extra_fields if available on Diabetes prediction
-          ...(selectedReport.extra_fields
+          ...(showPregnancies
             ? [
                 {
-                  label: isArabic ? "الكوليسترول" : "Cholesterol",
-                  value: selectedReport.extra_fields.cholesterol || "N/A",
-                  unit: "mg/dL",
-                },
-                {
-                  label: isArabic ? "الضغط الانقباضي" : "Systolic BP",
-                  value: selectedReport.extra_fields.systolic_bp || "N/A",
-                  unit: "mmHg",
-                },
-                {
-                  label: isArabic ? "الوزن" : "Weight",
-                  value: selectedReport.extra_fields.weight || "N/A",
-                  unit: "kg",
-                },
-                {
-                  label: isArabic ? "الطول" : "Height",
-                  value: selectedReport.extra_fields.height || "N/A",
-                  unit: "cm",
-                },
-                {
-                  label: isArabic ? "التدخين" : "Smoking",
-                  value: selectedReport.extra_fields.smoke !== undefined
-                    ? (selectedReport.extra_fields.smoke ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
-                    : (selectedReport.extra_fields.smoking !== undefined
-                      ? (selectedReport.extra_fields.smoking ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
-                      : "N/A"),
-                  unit: "",
-                },
-                {
-                  label: isArabic ? "النشاط البدني" : "Physical Activity",
-                  value: selectedReport.extra_fields.physical_activity !== undefined
-                    ? (selectedReport.extra_fields.physical_activity ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
-                    : (selectedReport.extra_fields.active !== undefined
-                      ? (selectedReport.extra_fields.active ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
-                      : "N/A"),
+                  label: isArabic ? "عدد مرات الحمل" : "Pregnancies",
+                  value: getPregnanciesValue(selectedReport),
                   unit: "",
                 },
               ]
             : []),
-        ]
+        ];
+
+        if (selectedReport.disease_type === "cardiovascular") {
+          return [
+            ...baseIdentityIndicators,
+            {
+              label: isArabic ? "الجلوكوز" : "Glucose",
+              value: selectedReport.glucose || "N/A",
+              unit: "mg/dL",
+            },
+            {
+              label: isArabic ? "الكوليسترول" : "Cholesterol",
+              value: getExtraValue(selectedReport, ["cholesterol"]),
+              unit: "mg/dL",
+            },
+            {
+              label: isArabic ? "الضغط الانقباضي" : "Systolic BP",
+              value: getExtraValue(selectedReport, [
+                "systolic_bp",
+                "systolicBloodPressure",
+                "systolic_blood_pressure",
+              ]),
+              unit: "mmHg",
+            },
+            {
+              label: isArabic ? "الضغط الانبساطي" : "Diastolic BP",
+              value: getExtraValue(selectedReport, [
+                "diastolic_bp",
+                "diastolicBloodPressure",
+                "diastolic_blood_pressure",
+              ]),
+              unit: "mmHg",
+            },
+            {
+              label: isArabic ? "الوزن" : "Weight",
+              value: getExtraValue(selectedReport, ["weight"]),
+              unit: "kg",
+            },
+            {
+              label: isArabic ? "الطول" : "Height",
+              value: getExtraValue(selectedReport, ["height"]),
+              unit: "cm",
+            },
+            {
+              label: isArabic ? "العمر" : "Age",
+              value: selectedReport.age,
+              unit: isArabic ? "سنة" : "Years",
+            },
+          ];
+        }
+
+        return [
+          ...baseIdentityIndicators,
+          {
+            label: isArabic ? "الجلوكوز" : "Glucose",
+            value: selectedReport.glucose || "N/A",
+            unit: "mg/dL",
+          },
+          {
+            label: isArabic ? "الضغط الانبساطي" : "Diastolic BP",
+            value:
+              getExtraValue(selectedReport, [
+                "diastolic_bp",
+                "diastolicBloodPressure",
+                "diastolic_blood_pressure",
+              ]) ||
+              selectedReport.blood_pressure ||
+              "N/A",
+            unit: "mmHg",
+          },
+          {
+            label: isArabic ? "الإنسولين" : "Insulin",
+            value: selectedReport.insulin || "N/A",
+            unit: "mu U/ml",
+          },
+          {
+            label: isArabic ? "سماكة الجلد" : "Skin Thickness",
+            value: selectedReport.skin_thickness || "N/A",
+            unit: "mm",
+          },
+          {
+            label: isArabic ? "العمر" : "Age",
+            value: selectedReport.age,
+            unit: isArabic ? "سنة" : "Years",
+          },
+          {
+            label: isArabic
+              ? "العامل الوراثي للسكري"
+              : "Diabetes Pedigree Function",
+            value: selectedReport.diabetes_pedigree_function || "N/A",
+            unit: "",
+          },
+          {
+            label: isArabic ? "الوزن" : "Weight",
+            value: getExtraValue(selectedReport, ["weight"]),
+            unit: "kg",
+          },
+          {
+            label: isArabic ? "الطول" : "Height",
+            value: getExtraValue(selectedReport, ["height"]),
+            unit: "cm",
+          },
+        ];
+      })()
     : [];
 
   const reviewActions = [
     {
       id: "approved" as ReviewStatus,
-      label: t("doctorDashboard.reports.drawer.actions.approve"),
+      label: labels.approve,
       icon: Check,
       activeClass:
         "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300",
@@ -467,7 +1075,7 @@ export default function ReportsPage() {
     },
     {
       id: "rejected" as ReviewStatus,
-      label: t("doctorDashboard.reports.drawer.actions.reject"),
+      label: labels.reject,
       icon: X,
       activeClass:
         "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300",
@@ -476,7 +1084,7 @@ export default function ReportsPage() {
     },
     {
       id: "needs_followup" as ReviewStatus,
-      label: t("doctorDashboard.reports.drawer.actions.followUp"),
+      label: labels.followUp,
       icon: Calendar,
       activeClass: "border-primary/25 bg-primary/10 text-primary",
       iconClass: "bg-primary/15 text-primary",
@@ -494,11 +1102,11 @@ export default function ReportsPage() {
     >
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">
-          {t("doctorDashboard.reports.title")}
+          {labels.title}
         </h1>
 
         <p className="mt-1 text-sm font-semibold text-muted-foreground">
-          {t("doctorDashboard.reports.subtitle")}
+          {labels.subtitle}
         </p>
       </div>
 
@@ -541,28 +1149,17 @@ export default function ReportsPage() {
 
                 <div>
                   <p className="text-sm font-bold text-foreground">
-                    {t("doctorDashboard.reports.filter")}
+                    {labels.filter}
                   </p>
 
                   <p className="text-[11px] font-semibold text-muted-foreground">
-                    {filteredReports.length} result
-                    {filteredReports.length === 1 ? "" : "s"} found
+                    {filteredReports.length}{" "}
+                    {filteredReports.length === 1
+                      ? labels.resultFound
+                      : labels.resultsFound}
                   </p>
                 </div>
               </div>
-
-              {(statusFilter || search) && (
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setStatusFilter(null);
-                    setSearch("");
-                  }}
-                  className="h-9 rounded-xl px-3 text-[10px] font-bold uppercase tracking-widest text-red-500 hover:bg-red-500/10 hover:text-red-600 dark:text-red-300 dark:hover:text-red-200"
-                >
-                  {t("doctorDashboard.reports.clearFilters")}
-                </Button>
-              )}
             </div>
 
             <div className="mx-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-full border border-border bg-background shadow-sm transition-all focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/10 md:h-12 md:flex-row md:items-center">
@@ -575,7 +1172,7 @@ export default function ReportsPage() {
                 />
 
                 <Input
-                  placeholder={t("doctorDashboard.reports.searchPlaceholder")}
+                  placeholder={labels.searchPlaceholder}
                   className={cn(
                     "h-12 rounded-none border-0 bg-transparent text-sm font-semibold text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0",
                     isArabic ? "pr-10 pl-10 text-right" : "pl-10 pr-10"
@@ -602,13 +1199,19 @@ export default function ReportsPage() {
 
               <Select
                 value={statusFilter || "all"}
-                onValueChange={(value) =>
-                  setStatusFilter(value === "all" ? null : value)
-                }
+                onValueChange={(value) => {
+                  ignoreRouteFiltersRef.current = true;
+                  clearTemporaryReportFilters();
+                  setSelectedReport(null);
+                  setIsDrawerOpen(false);
+                  setSearch("");
+                  setCurrentPage(1);
+                  setStatusFilter(value === "all" ? null : value);
+                }}
                 dir={isArabic ? "rtl" : "ltr"}
               >
                 <SelectTrigger className="h-12 w-full rounded-none border-0 bg-transparent px-4 text-sm font-bold text-primary shadow-none transition-none hover:bg-primary/5 hover:text-primary focus:ring-0 focus:ring-offset-0 md:w-[230px]">
-                  <SelectValue placeholder={isArabic ? "اختر الحالة" : "Status"} />
+                  <SelectValue placeholder={labels.statusPlaceholder} />
                 </SelectTrigger>
 
                 <SelectContent className="rounded-2xl border-border bg-popover p-1 text-popover-foreground shadow-xl">
@@ -633,7 +1236,7 @@ export default function ReportsPage() {
               <LoadingDots />
 
               <p className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                {t("doctorDashboard.reports.loading")}
+                {labels.loading}
               </p>
             </div>
           ) : filteredReports.length === 0 ? (
@@ -643,7 +1246,7 @@ export default function ReportsPage() {
               </div>
 
               <p className="text-xs font-bold uppercase tracking-widest">
-                {t("doctorDashboard.reports.noReports")}
+                {labels.noReports}
               </p>
             </div>
           ) : (
@@ -678,7 +1281,7 @@ export default function ReportsPage() {
 
                           <div className="min-w-0">
                             <p className="truncate text-sm font-bold text-foreground">
-                              {report.patient_name || "Anonymous"}
+                              {report.patient_name || labels.anonymous}
                             </p>
                           </div>
                         </div>
@@ -691,7 +1294,7 @@ export default function ReportsPage() {
                       <div className="mb-4 rounded-2xl bg-muted/30 p-3">
                         <div className="mb-2 flex items-center justify-between gap-3">
                           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                            {t("doctorDashboard.reports.table.probability")}
+                            {labels.tableProbability}
                           </p>
 
                           <span
@@ -715,37 +1318,7 @@ export default function ReportsPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="rounded-2xl border border-border bg-background/60 p-3">
-                          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                            Glu
-                          </p>
-
-                          <p className="mt-1 text-sm font-bold text-foreground">
-                            {report.glucose}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-border bg-background/60 p-3">
-                          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                            BMI
-                          </p>
-
-                          <p className="mt-1 text-sm font-bold text-foreground">
-                            {report.bmi}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-border bg-background/60 p-3">
-                          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                            BP
-                          </p>
-
-                          <p className="mt-1 text-sm font-bold text-foreground">
-                            {report.blood_pressure}
-                          </p>
-                        </div>
-                      </div>
+                      <div className="mb-4">{renderKeyIndicators(report)}</div>
 
                       <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -774,7 +1347,7 @@ export default function ReportsPage() {
                               isArabic ? "ml-2" : "mr-2"
                             )}
                           />
-                          {t("doctorDashboard.pendingReviews.reviewBtn")}
+                          {labels.reviewBtn}
                         </Button>
                       </div>
                     </Card>
@@ -784,33 +1357,36 @@ export default function ReportsPage() {
 
               <div className="hidden overflow-x-auto md:block">
                 <table
-                  className="w-full border-collapse text-left"
+                  className={cn(
+                    "w-full table-fixed border-collapse",
+                    isArabic ? "text-right" : "text-left"
+                  )}
                   dir={isArabic ? "rtl" : "ltr"}
                 >
                   <thead>
                     <tr className="border-b border-border bg-muted/40">
-                      <th className="p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {t("doctorDashboard.reports.table.patient")}
+                      <th className="w-[24%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        {labels.tablePatient}
                       </th>
 
-                      <th className="p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {t("doctorDashboard.reports.table.probability")}
+                      <th className="w-[18%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        {labels.tableProbability}
                       </th>
 
-                      <th className="p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {t("doctorDashboard.reports.table.indicators")}
+                      <th className="w-[28%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        {labels.tableIndicators}
                       </th>
 
-                      <th className="p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {t("doctorDashboard.reports.table.status")}
+                      <th className="w-[14%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        {labels.tableStatus}
                       </th>
 
-                      <th className="p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {t("doctorDashboard.reports.table.date")}
+                      <th className="w-[12%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        {labels.tableDate}
                       </th>
 
-                      <th className="p-5 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {t("doctorDashboard.reports.table.actions")}
+                      <th className="w-[14%] p-5 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        {labels.tableActions}
                       </th>
                     </tr>
                   </thead>
@@ -825,7 +1401,7 @@ export default function ReportsPage() {
                           className="group cursor-pointer transition-colors hover:bg-muted/30"
                           onClick={() => handleViewReport(report)}
                         >
-                          <td className="p-5">
+                          <td className="p-5 align-middle">
                             <div className="flex items-center gap-4">
                               <Avatar className="h-11 w-11 border border-border shadow-sm">
                                 <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
@@ -838,15 +1414,15 @@ export default function ReportsPage() {
                                 </AvatarFallback>
                               </Avatar>
 
-                              <div>
-                                <p className="font-bold tracking-tight text-foreground">
-                                  {report.patient_name || "Anonymous"}
+                              <div className="min-w-0">
+                                <p className="truncate font-bold tracking-tight text-foreground">
+                                  {report.patient_name || labels.anonymous}
                                 </p>
                               </div>
                             </div>
                           </td>
 
-                          <td className="p-5">
+                          <td className="p-5 align-middle">
                             <div className="flex items-center gap-4">
                               <div className="h-2 max-w-[100px] flex-1 overflow-hidden rounded-full bg-muted">
                                 <div
@@ -869,45 +1445,15 @@ export default function ReportsPage() {
                             </div>
                           </td>
 
-                          <td className="p-5">
-                            <div className="flex items-center gap-6">
-                              <div className="flex flex-col">
-                                <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                                  Glu
-                                </span>
-
-                                <span className="text-xs font-bold text-foreground">
-                                  {report.glucose}
-                                </span>
-                              </div>
-
-                              <div className="flex flex-col">
-                                <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                                  BMI
-                                </span>
-
-                                <span className="text-xs font-bold text-foreground">
-                                  {report.bmi}
-                                </span>
-                              </div>
-
-                              <div className="flex flex-col">
-                                <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                                  BP
-                                </span>
-
-                                <span className="text-xs font-bold text-foreground">
-                                  {report.blood_pressure}
-                                </span>
-                              </div>
-                            </div>
+                          <td className="p-5 align-middle">
+                            {renderKeyIndicators(report)}
                           </td>
 
-                          <td className="p-5">
+                          <td className="p-5 align-middle">
                             {getStatusBadge(report.review_status)}
                           </td>
 
-                          <td className="p-5">
+                          <td className="p-5 align-middle">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                               {new Date(report.created_at).toLocaleDateString(
                                 i18n.language,
@@ -920,7 +1466,7 @@ export default function ReportsPage() {
                             </p>
                           </td>
 
-                          <td className="p-5 text-center">
+                          <td className="p-5 text-center align-middle">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -936,7 +1482,7 @@ export default function ReportsPage() {
                                   isArabic ? "ml-2" : "mr-2"
                                 )}
                               />
-                              {t("doctorDashboard.pendingReviews.reviewBtn")}
+                              {labels.reviewBtn}
                             </Button>
                           </td>
                         </tr>
@@ -968,8 +1514,10 @@ export default function ReportsPage() {
 
                     <div className="flex h-10 min-w-[120px] items-center justify-center rounded-2xl border border-border bg-muted/30 px-4">
                       <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-                        Page <span className="text-primary">{currentPage}</span>{" "}
-                        of <span className="text-foreground">{totalPages}</span>
+                        {labels.page}{" "}
+                        <span className="text-primary">{currentPage}</span>{" "}
+                        {labels.of}{" "}
+                        <span className="text-foreground">{totalPages}</span>
                       </span>
                     </div>
 
@@ -998,7 +1546,7 @@ export default function ReportsPage() {
       </Card>
 
       <Dialog open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-        <DialogContent className="max-h-[88vh] w-[92vw] max-w-4xl overflow-hidden rounded-[1.75rem] border border-border bg-card p-0 text-card-foreground shadow-2xl">
+        <DialogContent className="max-h-[88vh] w-[92vw] max-w-4xl overflow-hidden rounded-[1.75rem] border border-border bg-card p-0 text-card-foreground shadow-2xl [&>button]:hidden">
           {selectedReport && (
             <div className="flex max-h-[88vh] flex-col overflow-hidden bg-card text-card-foreground">
               <DialogHeader className="border-b border-border bg-card px-5 py-4 md:px-6">
@@ -1010,11 +1558,11 @@ export default function ReportsPage() {
 
                     <div className="min-w-0">
                       <DialogTitle className="truncate text-lg font-bold tracking-tight text-foreground md:text-xl">
-                        {isArabic ? "مراجعة التقرير" : "Report Review"}
+                        {labels.reportReview}
                       </DialogTitle>
 
                       <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
-                        {selectedReport.patient_name || "Anonymous Patient"}
+                        {selectedReport.patient_name || labels.anonymous}
                       </p>
                     </div>
                   </div>
@@ -1038,12 +1586,12 @@ export default function ReportsPage() {
 
                       <div className="min-w-0">
                         <h2 className="truncate text-base font-bold tracking-tight text-foreground md:text-lg">
-                          {selectedReport.patient_name || "Anonymous Patient"}
+                          {selectedReport.patient_name || labels.anonymous}
                         </h2>
 
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
                           <span>
-                            {selectedReport.age} {t("dashboard.age")}
+                            {selectedReport.age} {isArabic ? "سنة" : "Years"}
                           </span>
 
                           <span>•</span>
@@ -1066,7 +1614,7 @@ export default function ReportsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="rounded-full border border-primary/15 bg-primary/10 px-4 py-2">
                         <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                          AI Probability
+                          {labels.aiProbability}
                         </span>
 
                         <span className="ml-2 text-lg font-bold text-primary">
@@ -1082,7 +1630,7 @@ export default function ReportsPage() {
                         )}
                       >
                         <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                          Risk
+                          {labels.risk}
                         </span>
 
                         <span
@@ -1105,14 +1653,14 @@ export default function ReportsPage() {
                         value="prediction"
                         className="h-full rounded-none border-b-2 border-transparent px-0 text-[11px] font-bold uppercase tracking-widest text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
                       >
-                        {t("doctorDashboard.reports.drawer.tabs.prediction")}
+                        {labels.predictionTab}
                       </TabsTrigger>
 
                       <TabsTrigger
                         value="review"
                         className="h-full rounded-none border-b-2 border-transparent px-0 text-[11px] font-bold uppercase tracking-widest text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
                       >
-                        {t("doctorDashboard.reports.drawer.tabs.review")}
+                        {labels.reviewTab}
                       </TabsTrigger>
                     </TabsList>
                   </div>
@@ -1124,12 +1672,8 @@ export default function ReportsPage() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-3">
                         <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                          {t("doctorDashboard.reports.clinicalIndicators")}
+                          {labels.fullPatientValues}
                         </h4>
-
-                        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                          Full patient values
-                        </span>
                       </div>
 
                       <div className="overflow-hidden rounded-2xl border border-border bg-background/40">
@@ -1186,21 +1730,6 @@ export default function ReportsPage() {
                         </div>
                       </div>
                     </div>
-
-                    <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4">
-                      <div className="mb-2 flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 text-primary" />
-
-                        <h4 className="text-[11px] font-bold uppercase tracking-widest text-primary">
-                          {t("doctorDashboard.reports.aiInsight")}
-                        </h4>
-                      </div>
-
-                      <p className="text-sm font-medium leading-6 text-foreground">
-                        {selectedReport.message ||
-                          "Based on the clinical indicators provided, the AI model has identified risk patterns. Medical review is recommended."}
-                      </p>
-                    </div>
                   </TabsContent>
 
                   <TabsContent
@@ -1209,7 +1738,7 @@ export default function ReportsPage() {
                   >
                     <div className="space-y-3">
                       <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                        {t("doctorDashboard.reports.clinicalDecision")}
+                        {labels.clinicalDecision}
                       </h4>
 
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -1247,12 +1776,12 @@ export default function ReportsPage() {
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div className="space-y-2">
                         <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                          {t("doctorDashboard.reports.notesTitle")}
+                          {labels.notesTitle}
                         </h4>
 
                         <textarea
                           className="h-36 w-full resize-none rounded-2xl border border-border bg-muted/30 p-4 text-sm font-medium leading-6 text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/20 focus:bg-background focus:ring-4 focus:ring-primary/10"
-                          placeholder={t("doctorDashboard.reports.notesPlaceholder")}
+                          placeholder={labels.notesPlaceholder}
                           value={doctorNotes}
                           onChange={(e) => setDoctorNotes(e.target.value)}
                         />
@@ -1263,19 +1792,13 @@ export default function ReportsPage() {
                           <Pill className="h-4 w-4 text-primary" />
 
                           <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                            {isArabic
-                              ? "الأدوية / الروشتة"
-                              : "Medication / Prescription"}
+                            {labels.medicationTitle}
                           </h4>
                         </div>
 
                         <textarea
                           className="h-36 w-full resize-none rounded-2xl border border-border bg-muted/30 p-4 text-sm font-medium leading-6 text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/20 focus:bg-background focus:ring-4 focus:ring-primary/10"
-                          placeholder={
-                            isArabic
-                              ? "اكتب اسم الدواء، الجرعة، عدد المرات، ومدة الاستخدام..."
-                              : "Write medication name, dosage, frequency, and duration..."
-                          }
+                          placeholder={labels.medicationPlaceholder}
                           value={medication}
                           onChange={(e) => setMedication(e.target.value)}
                         />
@@ -1284,7 +1807,7 @@ export default function ReportsPage() {
 
                     <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                        {t("doctorDashboard.reports.notified")}
+                        {labels.notified}
                       </p>
 
                       <Button
@@ -1298,13 +1821,24 @@ export default function ReportsPage() {
                           <div className="flex items-center gap-2">
                             <Save className="h-4 w-4" />
 
-                            {t("doctorDashboard.reports.drawer.saveReview")}
+                            {labels.saveReview}
                           </div>
                         )}
                       </Button>
                     </div>
                   </TabsContent>
                 </Tabs>
+              </div>
+
+              <div className="flex justify-end border-t border-border bg-card px-5 py-4 md:px-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDrawerOpen(false)}
+                  className="h-10 rounded-2xl border-primary/30 bg-transparent px-6 text-sm font-bold text-primary hover:bg-primary/10 hover:text-primary"
+                >
+                  {labels.close}
+                </Button>
               </div>
             </div>
           )}

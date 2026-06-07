@@ -14,30 +14,56 @@ import joblib
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent
-DATA_PATH = Path(r"C:\Users\Yahia\Desktop\Doctor Dashboard - Copy (3) - Copy\Health-Care\Health-Care-main\backend\backendfirst\api\data\cardio_train_cleaned_.csv")
+
+# Support both datasets (Excel and CSV) as requested
+DATA_PATH_CSV = BASE_DIR / 'data' / 'cardio_train_cleaned_.csv'
+DATA_PATH_XLSX = BASE_DIR / 'data' / 'cardio_reduced_with_target.xlsx'
+
+# Absolute path fallbacks from the conflicts
+ABS_PATH_CSV = Path(r"C:\Users\Yahia\Desktop\Doctor Dashboard - Copy (3) - Copy\Health-Care\Health-Care-main\backend\backendfirst\api\data\cardio_train_cleaned_.csv")
+ABS_PATH_XLSX = Path(r"E:\Final-Project\Health-Care\Health-Care-main\backend\backendfirst\api\data\cardio_reduced_with_target.xlsx")
+
+# Toggle to select dataset (defaulting to Excel for the new dataset)
+USE_EXCEL = True 
+
+if USE_EXCEL:
+    DATA_PATH = DATA_PATH_XLSX if DATA_PATH_XLSX.exists() else ABS_PATH_XLSX
+else:
+    DATA_PATH = DATA_PATH_CSV if DATA_PATH_CSV.exists() else ABS_PATH_CSV
+
 MODEL_PATH = BASE_DIR / 'resources' / 'cardio_model.pkl'
 SCALER_PATH = BASE_DIR / 'resources' / 'cardio_scaler.pkl'
 
 print(f"📂 Loading data from: {DATA_PATH}")
 if not DATA_PATH.exists():
-    raise FileNotFoundError(f"❌ Excel file not found at: {DATA_PATH}")
+    raise FileNotFoundError(f"❌ Data file not found at: {DATA_PATH}")
 
-df = pd.read_csv(DATA_PATH)
+if DATA_PATH.suffix == '.csv':
+    # Code for loading CSV dataset
+    df = pd.read_csv(DATA_PATH)
 
-# 1. Convert Age from days to years (Age = Years)
-df['Age_years'] = df['age'] / 365.25
+    # 1. Convert Age from days to years (Age = Years)
+    df['Age_years'] = df['age'] / 365.25
 
-# 2. Clean Blood Pressure Outliers
-# Absolute values first to remove negative values
-df['Systolic BP'] = df['ap_hi'].abs()
-df['Diastolic BP'] = df['ap_lo'].abs()
-df['Gender'] = df['gender']
-df['Height'] = df['height']
-df['Weight'] = df['weight']
-df['Cholesterol'] = df['cholesterol']
-df['Glucose'] = df['gluc']
-df['Cardio'] = df['cardio']
+    # 2. Clean Blood Pressure Outliers
+    df['Systolic BP'] = df['ap_hi'].abs()
+    df['Diastolic BP'] = df['ap_lo'].abs()
+    df['Gender'] = df['gender']
+    df['Height'] = df['height']
+    df['Weight'] = df['weight']
+    df['Cholesterol'] = df['cholesterol']
+    df['Glucose'] = df['gluc']
+    df['Cardio'] = df['cardio']
+else:
+    # Code for loading Excel dataset
+    df = pd.read_excel(DATA_PATH)
 
+    # 1. Convert Age from days to years (Age = Years)
+    df['Age_years'] = df['Age'] / 365.25
+
+    # 2. Clean Blood Pressure Outliers
+    df['Systolic BP'] = df['Systolic BP'].abs()
+    df['Diastolic BP'] = df['Diastolic BP'].abs()
 
 # Swap Systolic BP and Diastolic BP if they are swapped
 swapped_idx = df['Systolic BP'] < df['Diastolic BP']
@@ -46,8 +72,6 @@ if swapped_idx.any():
     df.loc[swapped_idx, ['Systolic BP', 'Diastolic BP']] = df.loc[swapped_idx, ['Diastolic BP', 'Systolic BP']].values
 
 # Keep only clinically realistic values
-# Systolic BP: 80 - 250
-# Diastolic BP: 40 - 150
 before_filter = len(df)
 df_clean = df[
     (df['Systolic BP'] >= 80) & (df['Systolic BP'] <= 250) &

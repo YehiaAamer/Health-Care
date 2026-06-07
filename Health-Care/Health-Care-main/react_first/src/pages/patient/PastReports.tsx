@@ -32,12 +32,17 @@ import { useIsVisible } from "@/hooks/useIsVisible";
 
 type RiskLevel = "low" | "medium" | "high" | "very_high";
 type RiskFilterValue = "all" | RiskLevel;
-type CardiovascularRiskLevel = RiskLevel;
+
+type IndicatorItem = {
+  key: string;
+  label: string;
+  value: number | undefined;
+};
 
 type CardiovascularPrediction = {
   probability: number;
   percentage: number;
-  risk_level: CardiovascularRiskLevel;
+  risk_level: string;
   message: string;
   z_score: number;
   isFallback?: boolean;
@@ -54,66 +59,44 @@ interface Prediction {
   diabetes_pedigree_function: number;
   age: number;
   probability: number;
+  percentage?: number;
   risk_level: string;
   message: string;
   created_at: string;
 
-  gender?: "male" | "female";
-  systolic_blood_pressure?: number;
-  diastolic_blood_pressure?: number;
-  weight?: number;
-  height?: number;
-  cholesterol?: number;
+  gender?: string | null;
+  systolic_blood_pressure?: number | null;
+  diastolic_blood_pressure?: number | null;
+  weight?: number | null;
+  height?: number | null;
+  cholesterol?: number | null;
 
-  cardiovascular_probability?: number;
-  cardiovascular_percentage?: number;
-  cardiovascular_risk_level?: string;
-  cardiovascular_message?: string;
-  cardiovascular_z_score?: number;
+  cardiovascular_probability?: number | null;
+  cardiovascular_percentage?: number | null;
+  cardiovascular_risk_level?: string | null;
+  cardiovascular_message?: string | null;
+  cardiovascular_z_score?: number | null;
 
   disease_type?: "diabetes" | "cardiovascular";
-  session_id?: string;
+  session_id?: string | null;
+
+  extra_fields?: {
+    gender?: string | null;
+    weight?: number | null;
+    height?: number | null;
+    systolic_bp?: number | null;
+    diastolic_bp?: number | null;
+    cholesterol?: number | null;
+    smoke?: boolean;
+    alcohol?: boolean;
+    physical_activity?: boolean;
+  };
 }
 
 const DESKTOP_HEADER_HEIGHT = 72;
 const REPORTS_PER_PAGE = 7;
 
-const CARDIO_COEFFICIENTS = {
-  intercept: -11.2,
-  age: 0.055,
-  gender: 0.42,
-  height: -0.012,
-  weight: 0.035,
-  ap_hi: 0.052,
-  ap_lo: 0.028,
-  cholesterol: 0.48,
-  gluc: 0.32,
-};
-
-const sigmoid = (z: number) => {
-  return 1 / (1 + Math.exp(-z));
-};
-
-const normalizeCholesterolForCardio = (cholesterol: number) => {
-  if (cholesterol >= 240) return 3;
-  if (cholesterol >= 200) return 2;
-  return 1;
-};
-
-const normalizeGlucoseForCardio = (glucose: number) => {
-  if (glucose >= 126) return 3;
-  if (glucose >= 100) return 2;
-  return 1;
-};
-
-const getCardioRiskLevel = (percentage: number): CardiovascularRiskLevel => {
-  if (percentage >= 80) return "very_high";
-  if (percentage >= 60) return "high";
-  if (percentage >= 30) return "medium";
-  return "low";
-};
-
-const normalizePercentageValue = (value?: number) => {
+const normalizePercentageValue = (value?: number | null) => {
   if (typeof value !== "number" || Number.isNaN(value)) return null;
 
   if (value <= 1) {
@@ -121,6 +104,13 @@ const normalizePercentageValue = (value?: number) => {
   }
 
   return Number(value.toFixed(2));
+};
+
+const getRiskLevelFromPercentage = (percentage: number): RiskLevel => {
+  if (percentage >= 80) return "very_high";
+  if (percentage >= 60) return "high";
+  if (percentage >= 30) return "medium";
+  return "low";
 };
 
 const normalizeTextValue = (value: unknown) => {
@@ -132,10 +122,47 @@ const normalizeTextValue = (value: unknown) => {
     .replace(/\s+/g, " ");
 };
 
-const normalizeAnyRiskLevel = (riskLevel?: string): RiskLevel | "unknown" => {
+const normalizeGenderValue = (
+  value: unknown
+): "male" | "female" | undefined => {
+  const gender = normalizeTextValue(value);
+
+  if (
+    gender === "male" ||
+    gender === "m" ||
+    gender === "man" ||
+    gender === "ذكر" ||
+    gender === "رجل" ||
+    gender === "ولد" ||
+    gender === "boy"
+  ) {
+    return "male";
+  }
+
+  if (
+    gender === "female" ||
+    gender === "f" ||
+    gender === "woman" ||
+    gender === "انثى" ||
+    gender === "أنثى" ||
+    gender === "امرأة" ||
+    gender === "بنت" ||
+    gender === "girl"
+  ) {
+    return "female";
+  }
+
+  return undefined;
+};
+
+const normalizeAnyRiskLevel = (
+  riskLevel?: string | null
+): RiskLevel | "unknown" => {
   const risk = normalizeTextValue(riskLevel);
 
   if (
+    risk === "very_high" ||
+    risk === "very high" ||
     risk.includes("very_high") ||
     risk.includes("very high") ||
     risk.includes("عالي جدًا") ||
@@ -147,6 +174,7 @@ const normalizeAnyRiskLevel = (riskLevel?: string): RiskLevel | "unknown" => {
   }
 
   if (
+    risk === "high" ||
     risk.includes("high") ||
     risk.includes("عالي") ||
     risk.includes("مرتفع")
@@ -155,6 +183,8 @@ const normalizeAnyRiskLevel = (riskLevel?: string): RiskLevel | "unknown" => {
   }
 
   if (
+    risk === "medium" ||
+    risk === "moderate" ||
     risk.includes("medium") ||
     risk.includes("moderate") ||
     risk.includes("متوسط")
@@ -163,6 +193,7 @@ const normalizeAnyRiskLevel = (riskLevel?: string): RiskLevel | "unknown" => {
   }
 
   if (
+    risk === "low" ||
     risk.includes("low") ||
     risk.includes("منخفض") ||
     risk.includes("قليل")
@@ -173,120 +204,37 @@ const normalizeAnyRiskLevel = (riskLevel?: string): RiskLevel | "unknown" => {
   return "unknown";
 };
 
-const normalizeCardioRiskLevel = (
-  riskLevel?: string
-): CardiovascularRiskLevel | null => {
-  const normalized = normalizeAnyRiskLevel(riskLevel);
-  return normalized === "unknown" ? null : normalized;
-};
-
-const getCardioRiskMessage = (
-  riskLevel: CardiovascularRiskLevel,
-  isArabic: boolean
-) => {
-  if (isArabic) {
-    switch (riskLevel) {
-      case "very_high":
-        return "يشير الحساب التقديري إلى وجود خطورة عالية جدًا للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.";
-      case "high":
-        return "يشير الحساب التقديري إلى وجود خطورة عالية للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.";
-      case "medium":
-        return "يشير الحساب التقديري إلى وجود خطورة متوسطة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.";
-      case "low":
-        return "يشير الحساب التقديري إلى وجود خطورة منخفضة للإصابة بأمراض القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.";
-      default:
-        return "تم إنشاء مؤشر تقديري لخطر القلب والأوعية الدموية بناءً على المؤشرات السريرية المتاحة.";
-    }
-  }
-
-  switch (riskLevel) {
-    case "very_high":
-      return "The estimated calculation indicates a very high cardiovascular risk based on the available clinical indicators.";
-    case "high":
-      return "The estimated calculation indicates a high cardiovascular risk based on the available clinical indicators.";
-    case "medium":
-      return "The estimated calculation indicates a moderate cardiovascular risk based on the available clinical indicators.";
-    case "low":
-      return "The estimated calculation indicates a low cardiovascular risk based on the available clinical indicators.";
-    default:
-      return "An estimated cardiovascular risk score was generated based on the available clinical indicators.";
-  }
-};
-
-const calculateCardiovascularPredictionFromValues = ({
-  age,
-  gender,
-  height,
-  weight,
-  systolicBloodPressure,
-  diastolicBloodPressure,
-  cholesterol,
-  glucose,
-  isArabic,
-  isFallback = false,
-}: {
-  age: number;
-  gender: "male" | "female";
-  height: number;
-  weight: number;
-  systolicBloodPressure: number;
-  diastolicBloodPressure: number;
-  cholesterol: number;
-  glucose: number;
-  isArabic: boolean;
-  isFallback?: boolean;
-}): CardiovascularPrediction => {
-  const genderValue = gender === "male" ? 1 : 0;
-  const cholesterolValue = normalizeCholesterolForCardio(cholesterol);
-  const glucoseValue = normalizeGlucoseForCardio(glucose);
-
-  const z =
-    CARDIO_COEFFICIENTS.intercept +
-    CARDIO_COEFFICIENTS.age * age +
-    CARDIO_COEFFICIENTS.gender * genderValue +
-    CARDIO_COEFFICIENTS.height * height +
-    CARDIO_COEFFICIENTS.weight * weight +
-    CARDIO_COEFFICIENTS.ap_hi * systolicBloodPressure +
-    CARDIO_COEFFICIENTS.ap_lo * diastolicBloodPressure +
-    CARDIO_COEFFICIENTS.cholesterol * cholesterolValue +
-    CARDIO_COEFFICIENTS.gluc * glucoseValue;
-
-  const probability = sigmoid(z);
-  const percentage = Number((probability * 100).toFixed(2));
-  const riskLevel = getCardioRiskLevel(percentage);
-
-  return {
-    probability: Number(probability.toFixed(4)),
-    percentage,
-    risk_level: riskLevel,
-    message: getCardioRiskMessage(riskLevel, isArabic),
-    z_score: Number(z.toFixed(4)),
-    isFallback,
-  };
+const getEffectiveRiskLevel = (
+  riskLevel?: string | null
+): RiskLevel | "unknown" => {
+  return normalizeAnyRiskLevel(riskLevel);
 };
 
 const getCardioPrediction = (
   prediction: Prediction,
-  isArabic: boolean,
   allPredictions?: Prediction[]
-): CardiovascularPrediction => {
-  // If we have a session_id, find the cardiovascular prediction record with this session_id
+): CardiovascularPrediction | null => {
   if (prediction.session_id && allPredictions) {
     const siblingCardio = allPredictions.find(
-      (p) => p.session_id === prediction.session_id && p.disease_type === "cardiovascular"
+      (p) =>
+        p.session_id === prediction.session_id &&
+        p.disease_type === "cardiovascular"
     );
+
     if (siblingCardio) {
-      const backendPercentage = normalizePercentageValue(siblingCardio.probability);
-      const backendRiskLevel = normalizeCardioRiskLevel(siblingCardio.risk_level);
+      const backendPercentage =
+        normalizePercentageValue(siblingCardio.percentage) ??
+        normalizePercentageValue(siblingCardio.probability);
+
+      const backendRiskLevel = siblingCardio.risk_level;
+
       if (backendPercentage !== null && backendRiskLevel) {
         return {
           probability: Number((backendPercentage / 100).toFixed(4)),
           percentage: backendPercentage,
           risk_level: backendRiskLevel,
-          message:
-            siblingCardio.message ||
-            getCardioRiskMessage(backendRiskLevel, isArabic),
-          z_score: 0,
+          message: siblingCardio.message || "",
+          z_score: Number(siblingCardio.cardiovascular_z_score ?? 0),
           isFallback: false,
         };
       }
@@ -297,57 +245,21 @@ const getCardioPrediction = (
     normalizePercentageValue(prediction.cardiovascular_percentage) ??
     normalizePercentageValue(prediction.cardiovascular_probability);
 
-  const backendRiskLevel = normalizeCardioRiskLevel(
-    prediction.cardiovascular_risk_level
-  );
+  const backendRiskLevel = prediction.cardiovascular_risk_level;
 
   if (backendPercentage !== null && backendRiskLevel) {
     return {
       probability: Number((backendPercentage / 100).toFixed(4)),
       percentage: backendPercentage,
       risk_level: backendRiskLevel,
-      message:
-        prediction.cardiovascular_message ||
-        getCardioRiskMessage(backendRiskLevel, isArabic),
+      message: prediction.cardiovascular_message || "",
       z_score: Number(prediction.cardiovascular_z_score ?? 0),
       isFallback: false,
     };
   }
 
-  const height = prediction.height ?? 170;
-
-  const calculatedWeightFromBmi = Number(
-    (Number(prediction.bmi ?? 0) * Math.pow(height / 100, 2)).toFixed(1)
-  );
-
-  const weight =
-    prediction.weight ??
-    (calculatedWeightFromBmi > 0 ? calculatedWeightFromBmi : 70);
-
-  const diastolicBloodPressure =
-    prediction.diastolic_blood_pressure ?? prediction.blood_pressure ?? 80;
-
-  const systolicBloodPressure =
-    prediction.systolic_blood_pressure ??
-    Math.min(diastolicBloodPressure + 40, 260);
-
-  const cholesterol = prediction.cholesterol ?? 180;
-  const gender = prediction.gender ?? "female";
-
-  return calculateCardiovascularPredictionFromValues({
-    age: prediction.age,
-    gender,
-    height,
-    weight,
-    systolicBloodPressure,
-    diastolicBloodPressure,
-    cholesterol,
-    glucose: prediction.glucose,
-    isArabic,
-    isFallback: true,
-  });
+  return null;
 };
-
 
 export default function PastReports() {
   const { user, isAuthenticated } = useAuth();
@@ -373,6 +285,9 @@ export default function PastReports() {
 
   const selectItemClassName =
     "cursor-pointer rounded-xl px-3 py-2.5 transition-colors hover:bg-primary/10 focus:bg-primary/10 focus:text-primary data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary [&>span:first-child]:hidden";
+
+  const riskBadgeClassName =
+    "inline-flex h-5 w-fit min-w-0 shrink-0 items-center justify-center rounded-full border px-2 text-[10px] font-medium leading-none transition-none sm:h-5 sm:px-2.5 sm:text-[11px]";
 
   useEffect(() => {
     const fetchPredictions = async () => {
@@ -408,10 +323,7 @@ export default function PastReports() {
     }
   }, [isAuthenticated, user, t]);
 
-  const formatNumber = (
-    value: number,
-    options?: Intl.NumberFormatOptions
-  ) => {
+  const formatNumber = (value: number, options?: Intl.NumberFormatOptions) => {
     return value.toLocaleString(isArabic ? "ar-EG" : "en-US", options);
   };
 
@@ -420,11 +332,19 @@ export default function PastReports() {
   };
 
   const getDiabetesPercentage = (prediction: Prediction) => {
-    return normalizePercentageValue(prediction.probability) ?? 0;
+    return (
+      normalizePercentageValue(prediction.percentage) ??
+      normalizePercentageValue(prediction.probability) ??
+      0
+    );
   };
 
-  const getLocalizedRiskLabel = (riskLevel?: string) => {
-    const normalized = normalizeAnyRiskLevel(riskLevel);
+  const getEffectiveDiabetesRiskLevel = (prediction: Prediction): RiskLevel => {
+    return getRiskLevelFromPercentage(getDiabetesPercentage(prediction));
+  };
+
+  const getLocalizedRiskLabel = (riskLevel?: string | null) => {
+    const normalized = getEffectiveRiskLevel(riskLevel);
 
     switch (normalized) {
       case "very_high":
@@ -436,11 +356,11 @@ export default function PastReports() {
       case "low":
         return isArabic ? "منخفض" : "Low";
       default:
-        return isArabic ? "غير معروف" : "Unknown";
+        return isArabic ? "غير متاح" : "N/A";
     }
   };
 
-  const getRiskSearchText = (riskLevel?: string) => {
+  const getRiskSearchText = (riskLevel?: string | null) => {
     const normalized = normalizeAnyRiskLevel(riskLevel);
 
     switch (normalized) {
@@ -457,8 +377,10 @@ export default function PastReports() {
     }
   };
 
-  const getRiskBadgeColor = (riskLevel?: string) => {
-    switch (normalizeAnyRiskLevel(riskLevel)) {
+  const getRiskBadgeColor = (riskLevel?: string | null) => {
+    const normalized = getEffectiveRiskLevel(riskLevel);
+
+    switch (normalized) {
       case "low":
         return "border-green-200 bg-green-100 text-green-700 hover:border-green-200 hover:bg-green-100 hover:text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300 dark:hover:bg-green-500/10 dark:hover:text-green-300";
       case "medium":
@@ -479,34 +401,87 @@ export default function PastReports() {
     };
   };
 
+  const getPredictionGender = (prediction: Prediction) => {
+    return normalizeGenderValue(
+      prediction.gender ?? prediction.extra_fields?.gender
+    );
+  };
+
+  const getPredictionNumberValue = (
+    mainValue: number | null | undefined,
+    fallbackValue: number | null | undefined,
+    defaultValue: number
+  ) => {
+    if (typeof mainValue === "number" && !Number.isNaN(mainValue)) {
+      return mainValue;
+    }
+
+    if (typeof fallbackValue === "number" && !Number.isNaN(fallbackValue)) {
+      return fallbackValue;
+    }
+
+    return defaultValue;
+  };
+
   const getReportValuesForNavigation = (prediction: Prediction) => {
-    const height = prediction.height ?? 170;
+    const height = getPredictionNumberValue(
+      prediction.height,
+      prediction.extra_fields?.height,
+      170
+    );
 
     const calculatedWeightFromBmi = Number(
       (Number(prediction.bmi ?? 0) * Math.pow(height / 100, 2)).toFixed(1)
     );
 
-    const weight =
-      prediction.weight ??
-      (calculatedWeightFromBmi > 0 ? calculatedWeightFromBmi : 70);
+    const weight = getPredictionNumberValue(
+      prediction.weight,
+      prediction.extra_fields?.weight,
+      calculatedWeightFromBmi > 0 ? calculatedWeightFromBmi : 70
+    );
+
+    const diastolicBloodPressure = getPredictionNumberValue(
+      prediction.diastolic_blood_pressure,
+      prediction.extra_fields?.diastolic_bp,
+      prediction.blood_pressure ?? 80
+    );
+
+    const systolicBloodPressure = getPredictionNumberValue(
+      prediction.systolic_blood_pressure,
+      prediction.extra_fields?.systolic_bp,
+      Math.min(diastolicBloodPressure + 40, 260)
+    );
+
+    const cholesterol = getPredictionNumberValue(
+      prediction.cholesterol,
+      prediction.extra_fields?.cholesterol,
+      180
+    );
 
     return {
       height,
       weight,
-      cholesterol: prediction.cholesterol ?? 180,
-      systolicBloodPressure:
-        prediction.systolic_blood_pressure ??
-        Math.min((prediction.blood_pressure ?? 80) + 40, 260),
-      diastolicBloodPressure:
-        prediction.diastolic_blood_pressure ?? prediction.blood_pressure,
+      cholesterol,
+      systolicBloodPressure,
+      diastolicBloodPressure,
     };
+  };
+
+  const normalizeIndicators = (indicators: IndicatorItem[]) => {
+    return indicators
+      .filter(
+        (item) => typeof item.value === "number" && !Number.isNaN(item.value)
+      )
+      .sort((a, b) => Number(b.value) - Number(a.value))
+      .slice(0, 3);
   };
 
   const getTopRiskIndicators = (prediction: Prediction) => {
     const reportValues = getReportValuesForNavigation(prediction);
-    const isFemale = prediction.gender === "female";
+    const normalizedGender = getPredictionGender(prediction);
+    const isFemale = normalizedGender === "female";
 
-    const indicators = [
+    const diabetesIndicators: IndicatorItem[] = [
       ...(isFemale
         ? [
             {
@@ -517,9 +492,57 @@ export default function PastReports() {
           ]
         : []),
       {
-        key: "glucose",
+        key: "glucose_diabetes",
         label: t("dashboard.glucose"),
         value: prediction.glucose,
+      },
+      {
+        key: "blood_pressure_diabetes",
+        label: isArabic ? "ضغط السكر" : "Diabetes BP",
+        value: prediction.blood_pressure,
+      },
+      {
+        key: "skin_thickness",
+        label: t("dashboard.skinThickness"),
+        value: prediction.skin_thickness,
+      },
+      {
+        key: "insulin",
+        label: t("dashboard.insulin"),
+        value: prediction.insulin,
+      },
+      {
+        key: "bmi",
+        label: t("dashboard.bmi"),
+        value: prediction.bmi,
+      },
+      {
+        key: "diabetes_pedigree_function",
+        label: isArabic ? "عامل الوراثة" : "Pedigree",
+        value: prediction.diabetes_pedigree_function,
+      },
+      {
+        key: "age_diabetes",
+        label: t("dashboard.age"),
+        value: prediction.age,
+      },
+    ];
+
+    const cardioIndicators: IndicatorItem[] = [
+      {
+        key: "systolic_bp_cardio",
+        label: isArabic ? "ضغط انقباضي" : "Systolic BP",
+        value: reportValues.systolicBloodPressure,
+      },
+      {
+        key: "diastolic_bp_cardio",
+        label: isArabic ? "ضغط انبساطي" : "Diastolic BP",
+        value: reportValues.diastolicBloodPressure,
+      },
+      {
+        key: "cholesterol",
+        label: isArabic ? "الكوليسترول" : "Cholesterol",
+        value: reportValues.cholesterol,
       },
       {
         key: "weight",
@@ -532,33 +555,21 @@ export default function PastReports() {
         value: reportValues.height,
       },
       {
-        key: "systolic_bp",
-        label: isArabic ? "ضغط انقباضي" : "Systolic BP",
-        value: reportValues.systolicBloodPressure,
+        key: "glucose_cardio",
+        label: t("dashboard.glucose"),
+        value: prediction.glucose,
       },
       {
-        key: "diastolic_bp",
-        label: isArabic ? "ضغط انبساطي" : "Diastolic BP",
-        value: reportValues.diastolicBloodPressure,
-      },
-      {
-        key: "cholesterol",
-        label: isArabic ? "الكوليسترول" : "Cholesterol",
-        value: reportValues.cholesterol,
-      },
-      {
-        key: "age",
+        key: "age_cardio",
         label: t("dashboard.age"),
         value: prediction.age,
       },
     ];
 
-    return indicators
-      .filter(
-        (item) => typeof item.value === "number" && !Number.isNaN(item.value)
-      )
-      .sort((a, b) => Number(b.value) - Number(a.value))
-      .slice(0, 3);
+    return {
+      diabetes: normalizeIndicators(diabetesIndicators),
+      cardio: normalizeIndicators(cardioIndicators),
+    };
   };
 
   const sortedPredictions = useMemo(() => {
@@ -574,10 +585,11 @@ export default function PastReports() {
     const query = normalizeText(searchTerm);
 
     return sortedPredictions.filter((pred) => {
-      const cardio = getCardioPrediction(pred, isArabic, predictions);
+      const cardio = getCardioPrediction(pred, predictions);
+      const diabetesPercentage = getDiabetesPercentage(pred);
 
-      const diabetesRiskLevel = normalizeAnyRiskLevel(pred.risk_level);
-      const cardioRiskLevel = normalizeAnyRiskLevel(cardio.risk_level);
+      const diabetesRiskLevel = getEffectiveDiabetesRiskLevel(pred);
+      const cardioRiskLevel = getEffectiveRiskLevel(cardio?.risk_level);
 
       const matchesDiabetesFilter =
         diabetesRiskFilter === "all" ||
@@ -591,8 +603,6 @@ export default function PastReports() {
       }
 
       if (!query) return true;
-
-      const diabetesPercentage = getDiabetesPercentage(pred);
 
       const searchableText = normalizeText(
         [
@@ -629,20 +639,22 @@ export default function PastReports() {
           `${diabetesPercentage.toFixed(1)}%`,
           `${diabetesPercentage.toFixed(2)}%`,
 
+          diabetesRiskLevel,
+          getLocalizedRiskLabel(diabetesRiskLevel),
+          getRiskSearchText(diabetesRiskLevel),
           pred.risk_level,
-          getLocalizedRiskLabel(pred.risk_level),
           getRiskSearchText(pred.risk_level),
 
-          cardio.percentage,
-          cardio.percentage.toFixed(1),
-          cardio.percentage.toFixed(2),
-          `${cardio.percentage}%`,
-          `${cardio.percentage.toFixed(1)}%`,
-          `${cardio.percentage.toFixed(2)}%`,
+          cardio?.percentage,
+          cardio?.percentage?.toFixed(1),
+          cardio?.percentage?.toFixed(2),
+          cardio ? `${cardio.percentage}%` : "",
+          cardio ? `${cardio.percentage.toFixed(1)}%` : "",
+          cardio ? `${cardio.percentage.toFixed(2)}%` : "",
 
-          cardio.risk_level,
-          getLocalizedRiskLabel(cardio.risk_level),
-          getRiskSearchText(cardio.risk_level),
+          cardio?.risk_level,
+          getLocalizedRiskLabel(cardio?.risk_level),
+          getRiskSearchText(cardio?.risk_level),
 
           pred.created_at,
           new Date(pred.created_at).toLocaleDateString("en-US"),
@@ -674,15 +686,17 @@ export default function PastReports() {
   }, [sortedPredictions]);
 
   const averageCardioProbability = useMemo(() => {
-    if (!sortedPredictions.length) return 0;
+    const cardioPredictions = sortedPredictions
+      .map((prediction) => getCardioPrediction(prediction, predictions))
+      .filter((cardio): cardio is CardiovascularPrediction => cardio !== null);
+
+    if (!cardioPredictions.length) return 0;
 
     return (
-      sortedPredictions.reduce((sum, prediction) => {
-        return sum + getCardioPrediction(prediction, isArabic, predictions).percentage;
-      }, 0) / sortedPredictions.length
+      cardioPredictions.reduce((sum, cardio) => sum + cardio.percentage, 0) /
+      cardioPredictions.length
     );
-  }, [sortedPredictions, predictions, isArabic]);
-
+  }, [sortedPredictions, predictions]);
 
   const latestDate = sortedPredictions[0]
     ? new Date(sortedPredictions[0].created_at).toLocaleDateString(
@@ -709,6 +723,111 @@ export default function PastReports() {
     }
   }, [currentPage, totalPages]);
 
+  const getCardioDisplayPercentage = (
+    cardio: CardiovascularPrediction | null
+  ) => {
+    if (!cardio) return isArabic ? "غير متاح" : "N/A";
+
+    return `${formatNumber(cardio.percentage, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}%`;
+  };
+
+  const getCardioBadge = (cardio: CardiovascularPrediction | null) => {
+    if (!cardio) {
+      return (
+        <Badge
+          className={`${riskBadgeClassName} border-border bg-muted text-muted-foreground`}
+        >
+          {isArabic ? "غير متاح" : "N/A"}
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge
+        className={`${riskBadgeClassName} ${getRiskBadgeColor(
+          cardio.risk_level
+        )}`}
+      >
+        {getLocalizedRiskLabel(cardio.risk_level)}
+      </Badge>
+    );
+  };
+
+  const buildReportState = (
+  pred: Prediction,
+  cardio: CardiovascularPrediction | null,
+  diabetesPercentage: number,
+  reportValues: ReturnType<typeof getReportValuesForNavigation>,
+  normalizedGender: "male" | "female" | undefined
+) => {
+  const diabetesRiskLevel = getRiskLevelFromPercentage(diabetesPercentage);
+
+  const reportGender =
+    normalizedGender ??
+    (Number(pred.pregnancies ?? 0) > 0 ? "female" : "male");
+
+  const pregnancies =
+    reportGender === "female" ? Number(pred.pregnancies ?? 0) : 0;
+
+  const cardioPercentage = cardio?.percentage ?? 0;
+
+  return {
+    formData: {
+      gender: reportGender,
+
+      ...(reportGender === "female"
+        ? {
+            pregnancies,
+          }
+        : {}),
+
+      glucose: pred.glucose,
+      systolicBloodPressure: reportValues.systolicBloodPressure,
+      diastolicBloodPressure: reportValues.diastolicBloodPressure,
+      skinThickness: pred.skin_thickness,
+      insulin: pred.insulin,
+      weight: reportValues.weight,
+      height: reportValues.height,
+      cholesterol: reportValues.cholesterol,
+      diabetesPedigreeFunction: pred.diabetes_pedigree_function,
+      age: pred.age,
+    },
+
+    probability: diabetesPercentage,
+    percentage: diabetesPercentage,
+    riskLevel: diabetesRiskLevel,
+    message: pred.message,
+    predictionId: pred.id,
+    sessionId: pred.session_id,
+
+    diabetesPrediction: {
+      prediction_id: pred.id,
+      probability: diabetesPercentage,
+      percentage: diabetesPercentage,
+      risk_level: diabetesRiskLevel,
+      arabic_risk_level: getLocalizedRiskLabel(diabetesRiskLevel),
+      message: pred.message,
+    },
+
+    cardiovascularPrediction: cardio
+      ? {
+          probability:
+            cardioPercentage <= 1
+              ? cardioPercentage
+              : Number((cardioPercentage / 100).toFixed(4)),
+          percentage: cardioPercentage,
+          risk_level: cardio.risk_level,
+          arabic_risk_level: getLocalizedRiskLabel(cardio.risk_level),
+          message: cardio.message,
+          z_score: cardio.z_score,
+          isFallback: false,
+        }
+      : null,
+  };
+};
   const LoadingSkeleton = () => {
     return (
       <div className="w-full max-w-none animate-pulse space-y-8">
@@ -761,7 +880,7 @@ export default function PastReports() {
                   <div className="h-3 w-20 rounded bg-muted" />
                 </div>
 
-                <div className="mx-auto h-10 w-28 rounded-xl bg-muted" />
+                <div className="mx-auto h-9 w-24 rounded-full bg-muted" />
               </div>
             ))}
           </div>
@@ -796,7 +915,7 @@ export default function PastReports() {
                       </div>
                     </div>
 
-                    <div className="mt-4 h-10 w-full rounded-xl bg-muted" />
+                    <div className="mt-4 h-9 w-28 rounded-full bg-muted" />
                   </div>
                 </div>
               </div>
@@ -860,6 +979,7 @@ export default function PastReports() {
                 <h1 className="mb-2 text-3xl font-bold tracking-tight text-foreground md:text-4xl">
                   {t("pastReportsPage.title")}
                 </h1>
+
                 <p className="max-w-2xl text-muted-foreground">
                   {t("pastReportsPage.subtitle")}
                 </p>
@@ -891,9 +1011,11 @@ export default function PastReports() {
             {!isLoading && !error && sortedPredictions.length === 0 && (
               <Card className="rounded-[26px] border border-dashed border-border bg-card p-8 text-center text-card-foreground shadow-sm sm:p-12">
                 <AlertTriangle className="mx-auto mb-4 h-16 w-16 text-muted-foreground" />
+
                 <h2 className="mb-2 text-2xl font-bold text-foreground">
                   {t("pastReportsPage.emptyTitle")}
                 </h2>
+
                 <p className="mx-auto mb-6 max-w-md text-muted-foreground">
                   {t("pastReportsPage.emptySubtitle")}
                 </p>
@@ -903,75 +1025,97 @@ export default function PastReports() {
             {!isLoading && !error && sortedPredictions.length > 0 && (
               <div className="w-full max-w-none space-y-8">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <Card className="rounded-3xl border border-border bg-card p-5 text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/35 hover:bg-primary/5 hover:shadow-md">
+                  <Card className="group relative overflow-hidden rounded-[26px] border border-border bg-card p-5 text-card-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/35 hover:bg-primary/5 hover:shadow-lg">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-primary/70" />
+
                     <div className="flex items-center gap-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 transition-colors duration-300">
-                        <FileText className="h-5 w-5 text-primary" />
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:bg-primary/15">
+                        <FileText className="h-6 w-6" strokeWidth={2.4} />
                       </div>
-                      <div>
-                        <p className="mb-1 text-xs text-muted-foreground">
+
+                      <div className="min-w-0 flex-1">
+                        <p className="mb-1 text-base font-semibold tracking-tight text-primary">
                           {t("pastReportsPage.totalReports")}
                         </p>
-                        <p className="text-3xl font-bold text-foreground">
+
+                        <p className="text-2xl font-bold tracking-tight text-foreground">
                           {formatNumber(sortedPredictions.length)}
                         </p>
                       </div>
                     </div>
                   </Card>
 
-                  <Card className="rounded-3xl border border-border bg-card p-5 text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/35 hover:bg-primary/5 hover:shadow-md">
+                  <Card className="group relative overflow-hidden rounded-[26px] border border-border bg-card p-5 text-card-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/35 hover:bg-primary/5 hover:shadow-lg">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-primary/70" />
+
                     <div className="flex items-center gap-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 transition-colors duration-300">
-                        <CalendarDays className="h-5 w-5 text-primary" />
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:bg-primary/15">
+                        <CalendarDays className="h-6 w-6" strokeWidth={2.4} />
                       </div>
-                      <div>
-                        <p className="mb-1 text-xs text-muted-foreground">
+
+                      <div className="min-w-0 flex-1">
+                        <p className="mb-1 text-base font-semibold tracking-tight text-primary">
                           {t("pastReportsPage.latestTest")}
                         </p>
-                        <p className="text-2xl font-bold text-foreground">
+
+                        <p className="truncate text-xl font-bold tracking-tight text-foreground">
                           {latestDate}
                         </p>
                       </div>
                     </div>
                   </Card>
 
-                  <Card className="rounded-3xl border border-border bg-card p-5 text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/35 hover:bg-primary/5 hover:shadow-md">
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 transition-colors duration-300">
-                        <Activity className="h-5 w-5 text-primary" />
+                  <Card className="group relative overflow-hidden rounded-[26px] border border-border bg-card p-5 text-card-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/35 hover:bg-primary/5 hover:shadow-lg">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-primary/70" />
+
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:bg-primary/15">
+                        <Activity className="h-6 w-6" strokeWidth={2.4} />
                       </div>
+
                       <div className="min-w-0 flex-1">
-                        <p className="mb-2 text-xs text-muted-foreground">
+                        <p className="mb-3 text-base font-semibold tracking-tight text-primary">
                           {t("pastReportsPage.average")}
                         </p>
 
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-xs font-medium text-muted-foreground">
-                              {isArabic ? "السكري" : "Diabetes"}
-                            </span>
-                            <span className="text-lg font-bold text-foreground">
-                              {formatNumber(averageDiabetesProbability, {
-                                minimumFractionDigits: 1,
-                                maximumFractionDigits: 1,
-                              })}
-                              %
-                            </span>
-                          </div>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground">
+                                {isArabic ? "السكري" : "Diabetes"}
+                              </p>
 
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-xs font-medium text-muted-foreground">
-                              {isArabic
-                                ? "القلب و الأوعية الدموية"
-                                : "Cardiovascular"}
-                            </span>
-                            <span className="text-lg font-bold text-foreground">
-                              {formatNumber(averageCardioProbability, {
-                                minimumFractionDigits: 1,
-                                maximumFractionDigits: 1,
-                              })}
-                              %
-                            </span>
+                              <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                                {formatNumber(averageDiabetesProbability, {
+                                  minimumFractionDigits: 1,
+                                  maximumFractionDigits: 1,
+                                })}
+                                %
+                              </p>
+                            </div>
+
+                            <div className="h-10 w-px shrink-0 bg-border" />
+
+                            <div
+                              className={isArabic ? "text-left" : "text-right"}
+                            >
+                              <p className="text-xs font-medium text-muted-foreground">
+                                {isArabic
+                                  ? "القلب و الأوعية الدموية"
+                                  : "Cardiovascular"}
+                              </p>
+
+                              <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                                {averageCardioProbability > 0
+                                  ? `${formatNumber(averageCardioProbability, {
+                                      minimumFractionDigits: 1,
+                                      maximumFractionDigits: 1,
+                                    })}%`
+                                  : isArabic
+                                  ? "غير متاح"
+                                  : "N/A"}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -981,11 +1125,11 @@ export default function PastReports() {
 
                 <Card className="w-full max-w-none overflow-hidden rounded-[26px] border border-border bg-card p-4 text-card-foreground shadow-sm sm:p-5 md:p-6">
                   <div className="mb-6 flex justify-center">
-                    <div className="grid w-full max-w-6xl grid-cols-1 gap-3 lg:grid-cols-[1fr_240px_240px]">
-                      <div className="relative w-full">
+                    <div className="flex w-full max-w-5xl flex-col gap-2 rounded-[28px] border border-border bg-background p-2 shadow-sm transition-all duration-300 focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10 md:flex-row md:items-center">
+                      <div className="relative min-w-0 flex-1">
                         <Search
-                          className={`absolute top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-muted-foreground ${
-                            isArabic ? "right-5" : "left-5"
+                          className={`absolute top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground ${
+                            isArabic ? "right-4" : "left-4"
                           }`}
                         />
 
@@ -1000,15 +1144,17 @@ export default function PastReports() {
                               ? "ابحث في السكر أو القلب أو النسبة أو التاريخ..."
                               : "Search diabetes, cardio, percentage, or date..."
                           }
-                          className={`h-14 w-full rounded-full border-border bg-background text-base text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-primary/30 ${
+                          className={`h-11 border-0 bg-transparent text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 ${
                             isArabic
-                              ? "pr-14 pl-5 text-right"
-                              : "pl-14 pr-5 text-left"
+                              ? "pr-10 pl-3 text-right"
+                              : "pl-10 pr-3 text-left"
                           }`}
                         />
                       </div>
 
-                      <div className="relative w-full">
+                      <div className="hidden h-7 w-px bg-border md:block" />
+
+                      <div className="grid grid-cols-2 gap-2 md:w-[360px]">
                         <Select
                           value={diabetesRiskFilter}
                           onValueChange={(value) => {
@@ -1017,13 +1163,13 @@ export default function PastReports() {
                           }}
                         >
                           <SelectTrigger
-                            className={`h-14 w-full rounded-full border border-primary/25 bg-primary/5 px-5 text-base font-medium text-foreground shadow-sm transition-all duration-300 hover:border-primary/50 hover:bg-primary/10 focus:ring-primary/30 ${
+                            className={`h-10 rounded-full border border-border bg-card px-3 text-xs font-semibold text-foreground shadow-none transition-all hover:border-primary hover:bg-primary/10 hover:text-primary focus:ring-2 focus:ring-primary/20 ${
                               isArabic ? "text-right" : "text-left"
                             }`}
                           >
                             <SelectValue
                               placeholder={
-                                isArabic ? "حالة السكر" : "Diabetes status"
+                                isArabic ? "حالة السكر" : "Diabetes"
                               }
                             />
                           </SelectTrigger>
@@ -1032,19 +1178,31 @@ export default function PastReports() {
                             align={isArabic ? "end" : "start"}
                             className="overflow-hidden rounded-2xl border border-primary/20 bg-popover p-1 text-popover-foreground shadow-lg"
                           >
-                            <SelectItem value="all" className={selectItemClassName}>
-                              {isArabic ? "كل حالات السكر" : "All Diabetes"}
+                            <SelectItem
+                              value="all"
+                              className={selectItemClassName}
+                            >
+                              {isArabic ? "كل السكر" : "All Diabetes"}
                             </SelectItem>
 
-                            <SelectItem value="low" className={selectItemClassName}>
+                            <SelectItem
+                              value="low"
+                              className={selectItemClassName}
+                            >
                               {isArabic ? "منخفض" : "Low"}
                             </SelectItem>
 
-                            <SelectItem value="medium" className={selectItemClassName}>
+                            <SelectItem
+                              value="medium"
+                              className={selectItemClassName}
+                            >
                               {isArabic ? "متوسط" : "Medium"}
                             </SelectItem>
 
-                            <SelectItem value="high" className={selectItemClassName}>
+                            <SelectItem
+                              value="high"
+                              className={selectItemClassName}
+                            >
                               {isArabic ? "عالي" : "High"}
                             </SelectItem>
 
@@ -1056,9 +1214,7 @@ export default function PastReports() {
                             </SelectItem>
                           </SelectContent>
                         </Select>
-                      </div>
 
-                      <div className="relative w-full">
                         <Select
                           value={cardioRiskFilter}
                           onValueChange={(value) => {
@@ -1067,16 +1223,12 @@ export default function PastReports() {
                           }}
                         >
                           <SelectTrigger
-                            className={`h-14 w-full rounded-full border border-primary/25 bg-primary/5 px-5 text-base font-medium text-foreground shadow-sm transition-all duration-300 hover:border-primary/50 hover:bg-primary/10 focus:ring-primary/30 ${
+                            className={`h-10 rounded-full border border-border bg-card px-3 text-xs font-semibold text-foreground shadow-none transition-all hover:border-primary hover:bg-primary/10 hover:text-primary focus:ring-2 focus:ring-primary/20 ${
                               isArabic ? "text-right" : "text-left"
                             }`}
                           >
                             <SelectValue
-                              placeholder={
-                                isArabic
-                                  ? "حالة القلب و الأوعية الدموية"
-                                  : "Cardiovascular status"
-                              }
+                              placeholder={isArabic ? "حالة القلب" : "Cardio"}
                             />
                           </SelectTrigger>
 
@@ -1084,21 +1236,31 @@ export default function PastReports() {
                             align={isArabic ? "end" : "start"}
                             className="overflow-hidden rounded-2xl border border-primary/20 bg-popover p-1 text-popover-foreground shadow-lg"
                           >
-                            <SelectItem value="all" className={selectItemClassName}>
-                              {isArabic
-                                ? "كل حالات القلب و الأوعية الدموية"
-                                : "All Cardiovascular"}
+                            <SelectItem
+                              value="all"
+                              className={selectItemClassName}
+                            >
+                              {isArabic ? "كل القلب" : "All Cardio"}
                             </SelectItem>
 
-                            <SelectItem value="low" className={selectItemClassName}>
+                            <SelectItem
+                              value="low"
+                              className={selectItemClassName}
+                            >
                               {isArabic ? "منخفض" : "Low"}
                             </SelectItem>
 
-                            <SelectItem value="medium" className={selectItemClassName}>
+                            <SelectItem
+                              value="medium"
+                              className={selectItemClassName}
+                            >
                               {isArabic ? "متوسط" : "Medium"}
                             </SelectItem>
 
-                            <SelectItem value="high" className={selectItemClassName}>
+                            <SelectItem
+                              value="high"
+                              className={selectItemClassName}
+                            >
                               {isArabic ? "عالي" : "High"}
                             </SelectItem>
 
@@ -1120,9 +1282,11 @@ export default function PastReports() {
                   filteredPredictions.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-8 text-center sm:p-10">
                       <Search className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+
                       <h4 className="mb-2 text-lg font-semibold text-foreground">
                         {isArabic ? "لا توجد نتائج" : "No results found"}
                       </h4>
+
                       <p className="break-words text-muted-foreground">
                         {isArabic
                           ? "لا توجد تقارير مطابقة للبحث أو الفلاتر المختارة"
@@ -1132,8 +1296,8 @@ export default function PastReports() {
                   ) : (
                     <>
                       <div className="hidden w-full overflow-x-auto xl:block">
-                        <div className="min-w-[1050px] w-full overflow-hidden rounded-[22px] border border-border bg-card">
-                          <div className="grid grid-cols-[2.1fr_1.55fr_1.1fr_1.1fr] gap-4 bg-muted/30 px-5 py-4 text-sm font-semibold text-muted-foreground">
+                        <div className="w-full min-w-[1120px] overflow-hidden rounded-[22px] border border-border bg-card">
+                          <div className="grid grid-cols-[2.1fr_2.1fr_1fr_0.8fr] gap-4 bg-muted/30 px-5 py-4 text-sm font-semibold text-muted-foreground">
                             <span className="text-start">
                               {isArabic ? "نتائج التحاليل" : "Risk Results"}
                             </span>
@@ -1154,17 +1318,23 @@ export default function PastReports() {
                           {paginatedPredictions.map((pred) => {
                             const tone = getProbabilityTone();
                             const topIndicators = getTopRiskIndicators(pred);
-                            const cardio = getCardioPrediction(pred, isArabic, predictions);
+                            const cardio = getCardioPrediction(
+                              pred,
+                              predictions
+                            );
                             const reportValues =
                               getReportValuesForNavigation(pred);
                             const diabetesPercentage =
                               getDiabetesPercentage(pred);
-
+                            const diabetesRiskLevel =
+                              getRiskLevelFromPercentage(diabetesPercentage);
+                            const normalizedGender =
+                              getPredictionGender(pred);
 
                             return (
                               <div
                                 key={pred.id}
-                                className="grid grid-cols-[2.1fr_1.55fr_1.1fr_1.1fr] items-center gap-4 border-t border-border px-5 py-5 transition-all duration-300 ease-out hover:bg-muted/20"
+                                className="grid grid-cols-[2.1fr_2.1fr_1fr_0.8fr] items-center gap-4 border-t border-border px-5 py-5 transition-all duration-300 ease-out hover:bg-muted/20"
                               >
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-3">
@@ -1176,79 +1346,127 @@ export default function PastReports() {
                                       />
                                     </div>
 
-                                    <div className="grid grid-cols-[minmax(0,auto)_max-content] items-center gap-x-2 gap-y-2">
-                                      <p className="truncate text-base font-semibold text-foreground">
-                                        {isArabic
-                                          ? "خطر السكري"
-                                          : "Diabetes Risk"}
-                                        :{" "}
-                                        {formatNumber(diabetesPercentage, {
-                                          minimumFractionDigits: 2,
-                                          maximumFractionDigits: 2,
-                                        })}
-                                        %
-                                      </p>
+                                    <div className="grid min-w-0 gap-1">
+                                      <div className="flex min-w-0 items-center justify-between gap-2">
+                                        <p className="min-w-0 truncate text-base font-semibold">
+                                          <span className="text-primary">
+                                            {isArabic
+                                              ? "مخاطر السكري"
+                                              : "Diabetes Risk"}
+                                            :
+                                          </span>{" "}
+                                          <span className="font-normal text-muted-foreground">
+                                            {formatNumber(diabetesPercentage, {
+                                              minimumFractionDigits: 2,
+                                              maximumFractionDigits: 2,
+                                            })}
+                                            %
+                                          </span>
+                                        </p>
 
-                                      <Badge
-                                        className={`justify-self-start border text-xs transition-none ${getRiskBadgeColor(
-                                          pred.risk_level
-                                        )}`}
-                                      >
-                                        {getLocalizedRiskLabel(pred.risk_level)}
-                                      </Badge>
+                                        <Badge
+                                          className={`${riskBadgeClassName} ${getRiskBadgeColor(
+                                            diabetesRiskLevel
+                                          )}`}
+                                        >
+                                          {getLocalizedRiskLabel(
+                                            diabetesRiskLevel
+                                          )}
+                                        </Badge>
+                                      </div>
 
-                                      <p className="truncate text-base font-semibold text-foreground">
-                                        {isArabic
-                                          ? "خطر القلب"
-                                          : "Cardio Risk"}
-                                        :{" "}
-                                        {formatNumber(cardio.percentage, {
-                                          minimumFractionDigits: 2,
-                                          maximumFractionDigits: 2,
-                                        })}
-                                        %
-                                      </p>
+                                      <div className="flex min-w-0 items-center justify-between gap-2">
+                                        <p className="min-w-0 truncate text-base font-semibold">
+                                          <span className="text-primary">
+                                            {isArabic
+                                              ? "مخاطر القلب"
+                                              : "Cardio Risk"}
+                                            :
+                                          </span>{" "}
+                                          <span className="font-normal text-muted-foreground">
+                                            {getCardioDisplayPercentage(cardio)}
+                                          </span>
+                                        </p>
 
-                                      <Badge
-                                        className={`justify-self-start border text-xs transition-none ${getRiskBadgeColor(
-                                          cardio.risk_level
-                                        )}`}
-                                      >
-                                        {getLocalizedRiskLabel(
-                                          cardio.risk_level
-                                        )}
-                                      </Badge>
+                                        {getCardioBadge(cardio)}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
 
                                 <div className="min-w-0">
-                                  <div className="flex flex-col gap-1 text-sm">
-                                    {topIndicators.map((indicator) => (
-                                      <div
-                                        key={indicator.key}
-                                        className="flex min-w-0 items-center gap-2"
-                                      >
-                                        <span className="whitespace-nowrap font-medium text-foreground">
-                                          {indicator.label}:
-                                        </span>
-                                        <span className="whitespace-nowrap text-muted-foreground">
-                                          {formatNumber(Number(indicator.value))}
-                                        </span>
+                                  <div className="grid grid-cols-2 gap-3 text-sm">
+                                    <div className="min-w-0 border-e border-border pe-3">
+                                      <p className="mb-1.5 text-xs font-semibold text-primary">
+                                        {isArabic ? "السكر" : "Diabetes"}
+                                      </p>
+
+                                      <div className="flex flex-col gap-1">
+                                        {topIndicators.diabetes.map(
+                                          (indicator) => (
+                                            <div
+                                              key={indicator.key}
+                                              className="flex min-w-0 items-center gap-2"
+                                            >
+                                              <span className="truncate font-medium text-foreground">
+                                                {indicator.label}:
+                                              </span>
+
+                                              <span className="whitespace-nowrap text-muted-foreground">
+                                                {formatNumber(
+                                                  Number(indicator.value)
+                                                )}
+                                              </span>
+                                            </div>
+                                          )
+                                        )}
                                       </div>
-                                    ))}
+                                    </div>
+
+                                    <div className="min-w-0">
+                                      <p className="mb-1.5 text-xs font-semibold text-primary">
+                                        {isArabic
+                                          ? "القلب و الأوعية الدموية"
+                                          : "Cardiovascular"}
+                                      </p>
+
+                                      <div className="flex flex-col gap-1">
+                                        {topIndicators.cardio.map(
+                                          (indicator) => (
+                                            <div
+                                              key={indicator.key}
+                                              className="flex min-w-0 items-center gap-2"
+                                            >
+                                              <span className="truncate font-medium text-foreground">
+                                                {indicator.label}:
+                                              </span>
+
+                                              <span className="whitespace-nowrap text-muted-foreground">
+                                                {formatNumber(
+                                                  Number(indicator.value)
+                                                )}
+                                              </span>
+                                            </div>
+                                          )
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
 
                                 <div className="text-sm text-muted-foreground">
                                   <p className="whitespace-nowrap">
-                                    {new Date(pred.created_at).toLocaleDateString(
+                                    {new Date(
+                                      pred.created_at
+                                    ).toLocaleDateString(
                                       isArabic ? "ar-SA" : "en-US"
                                     )}
                                   </p>
 
                                   <p className="mt-1 whitespace-nowrap text-xs text-muted-foreground">
-                                    {new Date(pred.created_at).toLocaleTimeString(
+                                    {new Date(
+                                      pred.created_at
+                                    ).toLocaleTimeString(
                                       isArabic ? "ar-EG" : "en-US",
                                       {
                                         hour: "2-digit",
@@ -1259,49 +1477,21 @@ export default function PastReports() {
                                   </p>
                                 </div>
 
-                                <div className="flex items-center justify-center gap-2">
+                                <div className="flex items-center justify-center">
                                   <Link
                                     to="/report"
-                                    state={{
-                                      formData: {
-                                        gender: pred.gender,
-                                        pregnancies: pred.pregnancies,
-                                        glucose: pred.glucose,
-                                        bloodPressure: pred.blood_pressure,
-                                        systolicBloodPressure:
-                                          reportValues.systolicBloodPressure,
-                                        diastolicBloodPressure:
-                                          reportValues.diastolicBloodPressure,
-                                        skinThickness: pred.skin_thickness,
-                                        insulin: pred.insulin,
-                                        weight: reportValues.weight,
-                                        height: reportValues.height,
-                                        cholesterol: reportValues.cholesterol,
-                                        bmi: pred.bmi,
-                                        diabetesPedigreeFunction:
-                                          pred.diabetes_pedigree_function,
-                                        age: pred.age,
-                                      },
-                                      probability: diabetesPercentage,
-                                      riskLevel: getLocalizedRiskLabel(
-                                        pred.risk_level
-                                      ),
-                                      message: pred.message,
-                                      predictionId: pred.id,
-
-                                      diabetesPrediction: {
-                                        probability: diabetesPercentage,
-                                        risk_level: pred.risk_level,
-                                        message: pred.message,
-                                        prediction_id: pred.id,
-                                      },
-
-                                      cardiovascularPrediction: cardio,
-                                    }}
+                                    state={buildReportState(
+                                      pred,
+                                      cardio,
+                                      diabetesPercentage,
+                                      reportValues,
+                                      normalizedGender
+                                    )}
                                   >
                                     <Button
                                       type="button"
-                                      className="h-10 whitespace-nowrap rounded-full bg-primary px-6 font-semibold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md"
+                                      size="sm"
+                                      className="h-9 min-w-[108px] whitespace-nowrap rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md"
                                     >
                                       {t("pastReportsPage.viewReport")}
                                     </Button>
@@ -1316,12 +1506,14 @@ export default function PastReports() {
                       <div className="grid gap-4 xl:hidden">
                         {paginatedPredictions.map((pred) => {
                           const topIndicators = getTopRiskIndicators(pred);
-                          const cardio = getCardioPrediction(pred, isArabic, predictions);
+                          const cardio = getCardioPrediction(pred, predictions);
                           const reportValues =
                             getReportValuesForNavigation(pred);
                           const diabetesPercentage =
                             getDiabetesPercentage(pred);
-
+                          const diabetesRiskLevel =
+                            getRiskLevelFromPercentage(diabetesPercentage);
+                          const normalizedGender = getPredictionGender(pred);
 
                           return (
                             <article
@@ -1334,80 +1526,118 @@ export default function PastReports() {
                                 </div>
 
                                 <div className="min-w-0 flex-1">
-                                  <div className="grid grid-cols-[minmax(0,auto)_max-content] items-start gap-x-2 gap-y-3">
-                                    <div>
-                                      <p className="mb-1 text-xs text-muted-foreground">
-                                        {isArabic
-                                          ? "خطر السكري"
-                                          : "Diabetes Risk"}
+                                  <div className="space-y-0.5">
+                                    <div className="flex min-w-0 items-center justify-between gap-2">
+                                      <p className="min-w-0 truncate text-base font-semibold leading-snug sm:text-lg">
+                                        <span className="text-primary">
+                                          {isArabic
+                                            ? "مخاطر السكري"
+                                            : "Diabetes Risk"}
+                                          :
+                                        </span>{" "}
+                                        <span className="font-normal text-muted-foreground">
+                                          {formatNumber(diabetesPercentage, {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                          })}
+                                          %
+                                        </span>
                                       </p>
 
-                                      <p className="text-xl font-bold leading-snug text-foreground">
-                                        {formatNumber(diabetesPercentage, {
-                                          minimumFractionDigits: 2,
-                                          maximumFractionDigits: 2,
-                                        })}
-                                        %
-                                      </p>
+                                      <Badge
+                                        className={`${riskBadgeClassName} ${getRiskBadgeColor(
+                                          diabetesRiskLevel
+                                        )}`}
+                                      >
+                                        {getLocalizedRiskLabel(
+                                          diabetesRiskLevel
+                                        )}
+                                      </Badge>
                                     </div>
 
-                                    <Badge
-                                      className={`justify-self-start border text-xs transition-none ${getRiskBadgeColor(
-                                        pred.risk_level
-                                      )}`}
-                                    >
-                                      {getLocalizedRiskLabel(pred.risk_level)}
-                                    </Badge>
-
-                                    <div>
-                                      <p className="mb-1 text-xs text-muted-foreground">
-                                        {isArabic ? "خطر القلب" : "Cardio Risk"}
+                                    <div className="flex min-w-0 items-center justify-between gap-2">
+                                      <p className="min-w-0 truncate text-base font-semibold leading-snug sm:text-lg">
+                                        <span className="text-primary">
+                                          {isArabic
+                                            ? "مخاطر القلب"
+                                            : "Cardio Risk"}
+                                          :
+                                        </span>{" "}
+                                        <span className="font-normal text-muted-foreground">
+                                          {getCardioDisplayPercentage(cardio)}
+                                        </span>
                                       </p>
 
-                                      <p className="text-xl font-bold leading-snug text-foreground">
-                                        {formatNumber(cardio.percentage, {
-                                          minimumFractionDigits: 2,
-                                          maximumFractionDigits: 2,
-                                        })}
-                                        %
-                                      </p>
+                                      {getCardioBadge(cardio)}
                                     </div>
-
-                                    <Badge
-                                      className={`justify-self-start border text-xs transition-none ${getRiskBadgeColor(
-                                        cardio.risk_level
-                                      )}`}
-                                    >
-                                      {getLocalizedRiskLabel(cardio.risk_level)}
-                                    </Badge>
                                   </div>
 
                                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                    <div className="rounded-2xl bg-muted/30 p-3">
-                                      <p className="mb-2 text-xs text-muted-foreground">
+                                    <div className="rounded-2xl bg-muted/30 p-3 sm:col-span-2">
+                                      <p className="mb-3 text-xs text-muted-foreground">
                                         {t("dashboard.riskIndicators")}
                                       </p>
 
-                                      <div className="flex flex-col gap-1.5 text-sm">
-                                        {topIndicators.map((indicator) => (
-                                          <div
-                                            key={indicator.key}
-                                            className="flex items-center justify-between gap-3"
-                                          >
-                                            <span className="truncate font-medium text-foreground">
-                                              {indicator.label}
-                                            </span>
-                                            <span className="whitespace-nowrap text-muted-foreground">
-                                              {formatNumber(
-                                                Number(indicator.value)
-                                              )}
-                                            </span>
+                                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <div className="rounded-xl border border-border bg-background/50 p-3">
+                                          <p className="mb-2 text-xs font-semibold text-primary">
+                                            {isArabic ? "السكر" : "Diabetes"}
+                                          </p>
+
+                                          <div className="flex flex-col gap-1.5 text-sm">
+                                            {topIndicators.diabetes.map(
+                                              (indicator) => (
+                                                <div
+                                                  key={indicator.key}
+                                                  className="flex items-center justify-between gap-3"
+                                                >
+                                                  <span className="truncate font-medium text-foreground">
+                                                    {indicator.label}
+                                                  </span>
+
+                                                  <span className="whitespace-nowrap text-muted-foreground">
+                                                    {formatNumber(
+                                                      Number(indicator.value)
+                                                    )}
+                                                  </span>
+                                                </div>
+                                              )
+                                            )}
                                           </div>
-                                        ))}
+                                        </div>
+
+                                        <div className="rounded-xl border border-border bg-background/50 p-3">
+                                          <p className="mb-2 text-xs font-semibold text-primary">
+                                            {isArabic
+                                              ? "القلب و الأوعية الدموية"
+                                              : "Cardiovascular"}
+                                          </p>
+
+                                          <div className="flex flex-col gap-1.5 text-sm">
+                                            {topIndicators.cardio.map(
+                                              (indicator) => (
+                                                <div
+                                                  key={indicator.key}
+                                                  className="flex items-center justify-between gap-3"
+                                                >
+                                                  <span className="truncate font-medium text-foreground">
+                                                    {indicator.label}
+                                                  </span>
+
+                                                  <span className="whitespace-nowrap text-muted-foreground">
+                                                    {formatNumber(
+                                                      Number(indicator.value)
+                                                    )}
+                                                  </span>
+                                                </div>
+                                              )
+                                            )}
+                                          </div>
+                                        </div>
                                       </div>
                                     </div>
 
-                                    <div className="rounded-2xl bg-muted/30 p-3">
+                                    <div className="rounded-2xl bg-muted/30 p-3 sm:col-span-2">
                                       <p className="mb-2 text-xs text-muted-foreground">
                                         {t("pastReportsPage.date")}
                                       </p>
@@ -1435,49 +1665,26 @@ export default function PastReports() {
                                     </div>
                                   </div>
 
-                                  <div className="mt-4">
+                                  <div
+                                    className={`mt-4 flex ${
+                                      isArabic ? "justify-start" : "justify-end"
+                                    }`}
+                                  >
                                     <Link
                                       to="/report"
-                                      state={{
-                                        formData: {
-                                          gender: pred.gender,
-                                          pregnancies: pred.pregnancies,
-                                          glucose: pred.glucose,
-                                          bloodPressure: pred.blood_pressure,
-                                          systolicBloodPressure:
-                                            reportValues.systolicBloodPressure,
-                                          diastolicBloodPressure:
-                                            reportValues.diastolicBloodPressure,
-                                          skinThickness: pred.skin_thickness,
-                                          insulin: pred.insulin,
-                                          weight: reportValues.weight,
-                                          height: reportValues.height,
-                                          cholesterol: reportValues.cholesterol,
-                                          bmi: pred.bmi,
-                                          diabetesPedigreeFunction:
-                                            pred.diabetes_pedigree_function,
-                                          age: pred.age,
-                                        },
-                                        probability: diabetesPercentage,
-                                        riskLevel: getLocalizedRiskLabel(
-                                          pred.risk_level
-                                        ),
-                                        message: pred.message,
-                                        predictionId: pred.id,
-
-                                        diabetesPrediction: {
-                                          probability: diabetesPercentage,
-                                          risk_level: pred.risk_level,
-                                          message: pred.message,
-                                          prediction_id: pred.id,
-                                        },
-
-                                        cardiovascularPrediction: cardio,
-                                      }}
+                                      state={buildReportState(
+                                        pred,
+                                        cardio,
+                                        diabetesPercentage,
+                                        reportValues,
+                                        normalizedGender
+                                      )}
+                                      className="inline-flex"
                                     >
                                       <Button
                                         type="button"
-                                        className="h-10 w-full rounded-full bg-primary font-semibold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md"
+                                        size="sm"
+                                        className="h-9 min-w-[118px] rounded-full bg-primary px-5 text-xs font-semibold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md sm:h-10 sm:min-w-[132px] sm:px-6 sm:text-sm"
                                       >
                                         {t("pastReportsPage.viewReport")}
                                       </Button>
