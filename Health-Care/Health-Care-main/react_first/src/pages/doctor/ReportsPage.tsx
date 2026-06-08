@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { reportsApi } from "@/api/reports";
 import type { Prediction, ReviewStatus } from "@/types/api";
@@ -38,6 +38,7 @@ import {
   ChevronRight,
   SlidersHorizontal,
   Pill,
+  MessageCircle,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -66,6 +67,7 @@ type KeyIndicator = {
 export default function ReportsPage() {
   const { t, i18n } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isArabic = i18n.language === "ar";
 
@@ -153,6 +155,7 @@ export default function ReportsPage() {
       "مراجعة",
       "Review"
     ),
+    messageBtn: isArabic ? "رسالة" : "Message",
     clinicalDecision: getText(
       "doctorDashboard.reports.clinicalDecision",
       "قرار المراجعة الطبية",
@@ -242,7 +245,9 @@ export default function ReportsPage() {
     params.delete("openDrawer");
 
     const cleanSearch = params.toString();
-    const cleanUrl = `${window.location.pathname}${cleanSearch ? `?${cleanSearch}` : ""}`;
+    const cleanUrl = `${window.location.pathname}${
+      cleanSearch ? `?${cleanSearch}` : ""
+    }`;
 
     const currentHistoryState = window.history.state;
 
@@ -269,17 +274,79 @@ export default function ReportsPage() {
   const getReportPatientId = (report: Prediction) => {
     const item = report as any;
 
-    return normalizeId(
-      item.patient_id ||
-        item.patient ||
-        item.patient_user_id ||
-        item.user_id ||
-        item.patientId ||
-        item.patient_details?.id ||
-        item.patient_data?.id ||
-        item.patient_profile?.id ||
-        item.patient?.id
-    );
+    const candidates = [
+      item.patient_id,
+      item.patient_user,
+      item.patient_user_id,
+      item.user_id,
+      item.patientId,
+      item.patient_details?.id,
+      item.patient_data?.id,
+      item.patient_profile?.id,
+      item.patient?.id,
+      item.patient?.user_id,
+      item.patient?.patient_id,
+      item.user?.id,
+      item.owner?.id,
+      item.created_by?.id,
+      item.extra_fields?.patient_id,
+      item.extra_fields?.patient_user,
+      item.extra_fields?.user_id,
+    ];
+
+    for (const candidate of candidates) {
+      const normalizedId = normalizeId(candidate);
+
+      if (normalizedId > 0) {
+        return normalizedId;
+      }
+    }
+
+    return 0;
+  };
+
+  const getReportPatientName = (report: Prediction) => {
+    const item = report as any;
+
+    return String(
+      item.patient_name ||
+        item.patient?.name ||
+        item.patient?.full_name ||
+        item.patient_details?.name ||
+        item.patient_data?.name ||
+        item.patient_profile?.name ||
+        item.user?.full_name ||
+        item.user?.name ||
+        labels.anonymous
+    ).trim();
+  };
+
+  const handleOpenPatientMessages = (report: Prediction) => {
+    const patientId = getReportPatientId(report);
+    const patientName = getReportPatientName(report);
+
+    if (!patientId && !patientName) {
+      toast.info(
+        isArabic
+          ? "لا يوجد رقم أو اسم مريض صالح لفتح المحادثة"
+          : "No valid patient data to open messages"
+      );
+      return;
+    }
+
+    const query = patientId
+      ? `?patientId=${patientId}`
+      : `?patientName=${encodeURIComponent(patientName)}`;
+
+    navigate(`/doctor-dashboard/messages${query}`, {
+      state: {
+        patientId: patientId || undefined,
+        patientName,
+        openPatientId: patientId || undefined,
+        openPatientName: patientName,
+        fromReports: true,
+      },
+    });
   };
 
   const getExtraValue = (
@@ -383,7 +450,9 @@ export default function ReportsPage() {
 
       const fromPatientArchive = shouldIgnoreRouteFilters
         ? false
-        : Boolean(state.fromPatientArchive || searchParams.get("fromPatientArchive"));
+        : Boolean(
+            state.fromPatientArchive || searchParams.get("fromPatientArchive")
+          );
 
       const shouldOpenDrawer =
         openReportId > 0 && state.openDrawer !== false && !fromPatientArchive;
@@ -405,16 +474,16 @@ export default function ReportsPage() {
 
         const reportId = normalizeId(item.id);
         const reportPatientId = getReportPatientId(report);
-        const reportPatientName = String(item.patient_name || "")
-          .trim()
-          .toLowerCase();
+        const reportPatientName = getReportPatientName(report).toLowerCase();
 
         const matchesReport = !filterReportId || reportId === filterReportId;
 
         const matchesPatient =
           !selectedPatientId ||
           reportPatientId === selectedPatientId ||
-          (!!selectedPatientName && reportPatientName === selectedPatientName);
+          (!!selectedPatientName && reportPatientName === selectedPatientName) ||
+          (!!selectedPatientName && reportPatientName.includes(selectedPatientName)) ||
+          (!!selectedPatientName && selectedPatientName.includes(reportPatientName));
 
         const matchesDisease =
           !selectedDiseaseType || item.disease_type === selectedDiseaseType;
@@ -466,7 +535,7 @@ export default function ReportsPage() {
     return reports.filter(
       (report) =>
         !searchValue ||
-        (report.patient_name || "").toLowerCase().includes(searchValue)
+        getReportPatientName(report).toLowerCase().includes(searchValue)
     );
   }, [reports, search]);
 
@@ -639,7 +708,10 @@ export default function ReportsPage() {
       return 20;
     }
 
-    if (normalizedLabel.includes("pedigree") || label.includes("العامل الوراثي")) {
+    if (
+      normalizedLabel.includes("pedigree") ||
+      label.includes("العامل الوراثي")
+    ) {
       if (numericValue >= 1) return 85;
       if (numericValue >= 0.5) return 65;
       return 20;
@@ -763,7 +835,10 @@ export default function ReportsPage() {
         label: isArabic ? "DIA BP" : "Dia BP",
         value: cardiovascularDiastolicValue,
         unit: "",
-        severity: getIndicatorSeverity("diastolic", cardiovascularDiastolicValue),
+        severity: getIndicatorSeverity(
+          "diastolic",
+          cardiovascularDiastolicValue
+        ),
       },
       {
         label: isArabic ? "الكوليسترول" : "Chol",
@@ -1270,7 +1345,7 @@ export default function ReportsPage() {
                         <div className="flex min-w-0 items-center gap-3">
                           <Avatar className="h-11 w-11 shrink-0 border border-border shadow-sm">
                             <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
-                              {report.patient_name
+                              {getReportPatientName(report)
                                 ?.split(" ")
                                 .filter(Boolean)
                                 .map((n) => n[0])
@@ -1281,7 +1356,7 @@ export default function ReportsPage() {
 
                           <div className="min-w-0">
                             <p className="truncate text-sm font-bold text-foreground">
-                              {report.patient_name || labels.anonymous}
+                              {getReportPatientName(report) || labels.anonymous}
                             </p>
                           </div>
                         </div>
@@ -1332,23 +1407,38 @@ export default function ReportsPage() {
                           )}
                         </p>
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-9 rounded-xl bg-primary/10 px-4 text-[10px] font-bold uppercase tracking-widest text-primary hover:bg-primary hover:text-primary-foreground"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewReport(report);
-                          }}
-                        >
-                          <Eye
-                            className={cn(
-                              "h-3.5 w-3.5",
-                              isArabic ? "ml-2" : "mr-2"
-                            )}
-                          />
-                          {labels.reviewBtn}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 rounded-xl bg-primary/10 px-4 text-[10px] font-bold uppercase tracking-widest text-primary hover:bg-primary hover:text-primary-foreground"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewReport(report);
+                            }}
+                          >
+                            <Eye
+                              className={cn(
+                                "h-3.5 w-3.5",
+                                isArabic ? "ml-2" : "mr-2"
+                              )}
+                            />
+                            {labels.reviewBtn}
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title={labels.messageBtn}
+                            className="h-9 w-9 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenPatientMessages(report);
+                            }}
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </Card>
                   );
@@ -1385,7 +1475,7 @@ export default function ReportsPage() {
                         {labels.tableDate}
                       </th>
 
-                      <th className="w-[14%] p-5 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      <th className="w-[16%] p-5 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                         {labels.tableActions}
                       </th>
                     </tr>
@@ -1405,7 +1495,7 @@ export default function ReportsPage() {
                             <div className="flex items-center gap-4">
                               <Avatar className="h-11 w-11 border border-border shadow-sm">
                                 <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
-                                  {report.patient_name
+                                  {getReportPatientName(report)
                                     ?.split(" ")
                                     .filter(Boolean)
                                     .map((n) => n[0])
@@ -1416,7 +1506,8 @@ export default function ReportsPage() {
 
                               <div className="min-w-0">
                                 <p className="truncate font-bold tracking-tight text-foreground">
-                                  {report.patient_name || labels.anonymous}
+                                  {getReportPatientName(report) ||
+                                    labels.anonymous}
                                 </p>
                               </div>
                             </div>
@@ -1467,23 +1558,38 @@ export default function ReportsPage() {
                           </td>
 
                           <td className="p-5 text-center align-middle">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-10 rounded-xl bg-primary/10 px-5 text-[10px] font-bold uppercase tracking-widest text-primary transition-all hover:bg-primary hover:text-primary-foreground"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewReport(report);
-                              }}
-                            >
-                              <Eye
-                                className={cn(
-                                  "h-3.5 w-3.5",
-                                  isArabic ? "ml-2" : "mr-2"
-                                )}
-                              />
-                              {labels.reviewBtn}
-                            </Button>
+                            <div className="flex items-center justify-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-10 rounded-xl bg-primary/10 px-4 text-[10px] font-bold uppercase tracking-widest text-primary transition-all hover:bg-primary hover:text-primary-foreground"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewReport(report);
+                                }}
+                              >
+                                <Eye
+                                  className={cn(
+                                    "h-3.5 w-3.5",
+                                    isArabic ? "ml-2" : "mr-2"
+                                  )}
+                                />
+                                {labels.reviewBtn}
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title={labels.messageBtn}
+                                className="h-10 w-10 rounded-xl bg-primary/10 text-primary transition-all hover:bg-primary hover:text-primary-foreground"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenPatientMessages(report);
+                                }}
+                              >
+                                <MessageCircle className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1562,7 +1668,8 @@ export default function ReportsPage() {
                       </DialogTitle>
 
                       <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
-                        {selectedReport.patient_name || labels.anonymous}
+                        {getReportPatientName(selectedReport) ||
+                          labels.anonymous}
                       </p>
                     </div>
                   </div>
@@ -1575,7 +1682,7 @@ export default function ReportsPage() {
                     <div className="flex min-w-0 items-center gap-3">
                       <Avatar className="h-12 w-12 shrink-0 border-2 border-background shadow-sm ring-1 ring-border">
                         <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
-                          {selectedReport.patient_name
+                          {getReportPatientName(selectedReport)
                             ?.split(" ")
                             .filter(Boolean)
                             .map((n) => n[0])
@@ -1586,7 +1693,8 @@ export default function ReportsPage() {
 
                       <div className="min-w-0">
                         <h2 className="truncate text-base font-bold tracking-tight text-foreground md:text-lg">
-                          {selectedReport.patient_name || labels.anonymous}
+                          {getReportPatientName(selectedReport) ||
+                            labels.anonymous}
                         </h2>
 
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
@@ -1612,6 +1720,21 @@ export default function ReportsPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleOpenPatientMessages(selectedReport)}
+                        className="h-10 rounded-2xl border-primary/30 bg-background px-4 text-xs font-bold text-primary hover:bg-primary/10 hover:text-primary"
+                      >
+                        <MessageCircle
+                          className={cn(
+                            "h-4 w-4",
+                            isArabic ? "ml-2" : "mr-2"
+                          )}
+                        />
+                        {labels.messageBtn}
+                      </Button>
+
                       <div className="rounded-full border border-primary/15 bg-primary/10 px-4 py-2">
                         <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                           {labels.aiProbability}
@@ -1679,8 +1802,9 @@ export default function ReportsPage() {
                       <div className="overflow-hidden rounded-2xl border border-border bg-background/40">
                         <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
                           <div className="divide-y divide-border">
-                            {clinicalIndicators.slice(0, 4).map(
-                              (indicator, index) => (
+                            {clinicalIndicators
+                              .slice(0, 4)
+                              .map((indicator, index) => (
                                 <div
                                   key={index}
                                   className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/30"
@@ -1699,13 +1823,13 @@ export default function ReportsPage() {
                                     </span>
                                   </div>
                                 </div>
-                              )
-                            )}
+                              ))}
                           </div>
 
                           <div className="divide-y divide-border">
-                            {clinicalIndicators.slice(4).map(
-                              (indicator, index) => (
+                            {clinicalIndicators
+                              .slice(4)
+                              .map((indicator, index) => (
                                 <div
                                   key={index}
                                   className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/30"
@@ -1724,8 +1848,7 @@ export default function ReportsPage() {
                                     </span>
                                   </div>
                                 </div>
-                              )
-                            )}
+                              ))}
                           </div>
                         </div>
                       </div>

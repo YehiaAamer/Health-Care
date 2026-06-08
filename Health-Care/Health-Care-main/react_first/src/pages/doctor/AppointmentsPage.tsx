@@ -10,7 +10,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +29,8 @@ import {
   ChevronRight,
   Activity,
   Mail,
+  UserCheck,
+  CalendarCheck,
 } from "lucide-react";
 import LoadingDots from "@/components/shared/LoadingDots";
 import { cn } from "@/lib/utils";
@@ -42,19 +43,18 @@ interface Appointment {
   patient_user?: number;
   time: string;
   reason: string;
-  status: "Upcoming" | "In Progress" | "Completed" | "Cancelled";
+  status: "Pending" | "Upcoming" | "In Progress" | "Completed" | "Cancelled";
   profile_picture?: string;
   meeting_url?: string;
   call_url?: string;
   video_link?: string;
   appointment_date?: string;
+  source?: "doctor" | "patient";
 }
 
 type PatientDetails = User & {
   predictions?: Prediction[];
 };
-
-type FilterType = "today" | "upcoming" | "next" | "all";
 
 export default function AppointmentsPage() {
   const { t, i18n } = useTranslation();
@@ -63,11 +63,14 @@ export default function AppointmentsPage() {
 
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<FilterType>("all");
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [selectedTime, setSelectedTime] = useState("");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
+
+  const [requestsPage, setRequestsPage] = useState(1);
+  const [appointmentsPage, setAppointmentsPage] = useState(1);
+  const [nextPage, setNextPage] = useState(1);
+
   const [showNewAppointment, setShowNewAppointment] = useState(false);
 
   const [profileLoading, setProfileLoading] = useState(false);
@@ -84,7 +87,14 @@ export default function AppointmentsPage() {
     reason: "",
   });
 
-  const pageSize = 6;
+  const requestsPageSize = 3;
+  const appointmentsPageSize = 3;
+  const nextPageSize = 3;
+
+  const requestGridClass =
+    "grid grid-cols-[1.3fr_1fr_1.4fr_0.9fr_1.8fr]";
+  const appointmentGridClass =
+    "grid grid-cols-[1.3fr_1fr_1.4fr_0.9fr_1.3fr]";
 
   const timeSlots = [
     "09:00 AM",
@@ -111,9 +121,10 @@ export default function AppointmentsPage() {
       patient_id: "PID-2241",
       patient_user: 2241,
       time: "10:00 AM - 10:30 AM",
-      reason: isArabic ? "متابعة السكري" : "Diabetes Follow-up",
-      status: "In Progress",
+      reason: isArabic ? "طلب متابعة السكري" : "Diabetes follow-up request",
+      status: "Pending",
       appointment_date: new Date().toISOString(),
+      source: "patient",
     },
     {
       id: 2,
@@ -121,9 +132,10 @@ export default function AppointmentsPage() {
       patient_id: "PID-1152",
       patient_user: 1152,
       time: "11:00 AM - 11:30 AM",
-      reason: isArabic ? "مراجعة ضغط الدم" : "Blood Pressure Review",
-      status: "Upcoming",
+      reason: isArabic ? "طلب مراجعة ضغط الدم" : "Blood pressure review request",
+      status: "Pending",
       appointment_date: new Date().toISOString(),
+      source: "patient",
     },
     {
       id: 3,
@@ -134,6 +146,7 @@ export default function AppointmentsPage() {
       reason: isArabic ? "استشارة غذائية" : "Nutritional Consultation",
       status: "Upcoming",
       appointment_date: new Date().toISOString(),
+      source: "doctor",
     },
     {
       id: 4,
@@ -144,6 +157,7 @@ export default function AppointmentsPage() {
       reason: isArabic ? "فحص سنوي" : "Annual Checkup",
       status: "Completed",
       appointment_date: new Date().toISOString(),
+      source: "doctor",
     },
     {
       id: 5,
@@ -152,8 +166,32 @@ export default function AppointmentsPage() {
       patient_user: 5590,
       time: "03:00 PM - 03:30 PM",
       reason: isArabic ? "مراجعة نتائج التحاليل" : "Lab Results Review",
-      status: "Upcoming",
+      status: "In Progress",
       appointment_date: new Date().toISOString(),
+      source: "doctor",
+    },
+  ];
+
+  const tableColumns = [
+    {
+      key: "patient",
+      label: isArabic ? "اسم المريض" : "Patient Name",
+    },
+    {
+      key: "time",
+      label: isArabic ? "وقت الموعد" : "Appointment Time",
+    },
+    {
+      key: "reason",
+      label: isArabic ? "سبب الزيارة" : "Visit Reason",
+    },
+    {
+      key: "status",
+      label: isArabic ? "حالة الموعد" : "Appointment Status",
+    },
+    {
+      key: "actions",
+      label: isArabic ? "الإجراءات" : "Actions",
     },
   ];
 
@@ -244,6 +282,45 @@ export default function AppointmentsPage() {
     window.open(meetingUrl, "_blank", "noopener,noreferrer");
   };
 
+  const handleApproveAppointment = (appt: Appointment) => {
+    setAppointments((prev) =>
+      prev.map((item) =>
+        item.id === appt.id
+          ? {
+              ...item,
+              status: "Upcoming",
+              source: "doctor",
+            }
+          : item
+      )
+    );
+
+    toast.success(
+      isArabic
+        ? `تم قبول طلب ${appt.patient_name}`
+        : `${appt.patient_name}'s request approved`
+    );
+  };
+
+  const handleRejectAppointment = (appt: Appointment) => {
+    setAppointments((prev) =>
+      prev.map((item) =>
+        item.id === appt.id
+          ? {
+              ...item,
+              status: "Cancelled",
+            }
+          : item
+      )
+    );
+
+    toast.success(
+      isArabic
+        ? `تم رفض طلب ${appt.patient_name}`
+        : `${appt.patient_name}'s request rejected`
+    );
+  };
+
   const handleViewProfile = async (appt: Appointment) => {
     const patientId = getPatientNumericId(appt);
 
@@ -298,31 +375,46 @@ export default function AppointmentsPage() {
       const data: any = await apiCall(API_ENDPOINTS.DOCTOR_APPOINTMENTS_TODAY);
 
       if (data?.appointments?.length > 0) {
-        const mapped = data.appointments.map((apt: any) => ({
-          id: apt.id,
-          patient_name:
-            apt.patient_name || apt.patient?.name || "Unknown Patient",
-          patient_id:
-            apt.patient_id ||
-            apt.patient_user ||
-            `PID-${Math.floor(1000 + Math.random() * 9000)}`,
-          patient_user: apt.patient_user || apt.patient?.id || apt.user_id,
-          time: formatAppointmentTime(apt.time || apt.appointment_time),
-          reason: apt.reason || apt.condition || "Medical Consultation",
-          status:
-            apt.status === "completed"
-              ? "Completed"
-              : apt.status === "cancelled"
-              ? "Cancelled"
-              : apt.status === "in_progress"
-              ? "In Progress"
-              : "Upcoming",
-          profile_picture: apt.profile_picture || apt.patient?.profile_picture,
-          meeting_url: apt.meeting_url,
-          call_url: apt.call_url,
-          video_link: apt.video_link,
-          appointment_date: apt.appointment_date || apt.date || apt.created_at,
-        }));
+        const mapped = data.appointments.map((apt: any) => {
+          const rawStatus = String(apt.status || "").toLowerCase();
+
+          return {
+            id: apt.id,
+            patient_name:
+              apt.patient_name ||
+              apt.patient?.name ||
+              apt.patient?.full_name ||
+              "Unknown Patient",
+            patient_id:
+              apt.patient_id ||
+              apt.patient_user ||
+              apt.patient?.id ||
+              `PID-${Math.floor(1000 + Math.random() * 9000)}`,
+            patient_user: apt.patient_user || apt.patient?.id || apt.user_id,
+            time: formatAppointmentTime(apt.time || apt.appointment_time),
+            reason: apt.reason || apt.condition || "Medical Consultation",
+            status:
+              rawStatus === "pending" || rawStatus === "requested"
+                ? "Pending"
+                : rawStatus === "completed"
+                ? "Completed"
+                : rawStatus === "cancelled" || rawStatus === "rejected"
+                ? "Cancelled"
+                : rawStatus === "in_progress"
+                ? "In Progress"
+                : "Upcoming",
+            profile_picture:
+              apt.profile_picture || apt.patient?.profile_picture || "",
+            meeting_url: apt.meeting_url,
+            call_url: apt.call_url,
+            video_link: apt.video_link,
+            appointment_date: apt.appointment_date || apt.date || apt.created_at,
+            source:
+              rawStatus === "pending" || rawStatus === "requested"
+                ? "patient"
+                : "doctor",
+          } as Appointment;
+        });
 
         setAppointments(mapped);
       } else {
@@ -341,56 +433,81 @@ export default function AppointmentsPage() {
   }, [apiCall, isArabic]);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [filter, search]);
-
-  const nextAppointment = appointments.find(
-    (apt) => apt.status === "In Progress" || apt.status === "Upcoming"
-  );
+    setRequestsPage(1);
+    setAppointmentsPage(1);
+    setNextPage(1);
+  }, [search]);
 
   const filteredAppointments = useMemo(() => {
-    let list = [...appointments];
+    const q = search.trim().toLowerCase();
 
-    if (filter === "today") {
-      list = list.filter((apt) => apt.status !== "Cancelled");
-    }
+    if (!q) return appointments;
 
-    if (filter === "upcoming") {
-      list = list.filter((apt) => apt.status === "Upcoming");
-    }
+    return appointments.filter(
+      (apt) =>
+        apt.patient_name.toLowerCase().includes(q) ||
+        String(apt.patient_id).toLowerCase().includes(q) ||
+        apt.reason.toLowerCase().includes(q) ||
+        apt.status.toLowerCase().includes(q)
+    );
+  }, [appointments, search]);
 
-    if (filter === "next") {
-      list = nextAppointment ? [nextAppointment] : [];
-    }
+  const patientRequests = useMemo(() => {
+    return filteredAppointments.filter((apt) => apt.status === "Pending");
+  }, [filteredAppointments]);
 
-    if (search.trim()) {
-      const q = search.toLowerCase();
+  const doctorAppointments = useMemo(() => {
+    return filteredAppointments.filter((apt) => apt.status !== "Pending");
+  }, [filteredAppointments]);
 
-      list = list.filter(
-        (apt) =>
-          apt.patient_name.toLowerCase().includes(q) ||
-          String(apt.patient_id).toLowerCase().includes(q) ||
-          apt.reason.toLowerCase().includes(q) ||
-          apt.status.toLowerCase().includes(q)
-      );
-    }
+  const confirmedAppointments = useMemo(() => {
+    return appointments.filter(
+      (apt) => apt.status === "In Progress" || apt.status === "Upcoming"
+    );
+  }, [appointments]);
 
-    return list;
-  }, [appointments, filter, search, nextAppointment]);
-
-  const totalPages = Math.max(
+  const requestsTotalPages = Math.max(
     1,
-    Math.ceil(filteredAppointments.length / pageSize)
+    Math.ceil(patientRequests.length / requestsPageSize)
   );
 
-  const paginatedAppointments = useMemo(() => {
-    const safePage = Math.min(currentPage, totalPages);
-    const start = (safePage - 1) * pageSize;
-    return filteredAppointments.slice(start, start + pageSize);
-  }, [filteredAppointments, currentPage, totalPages]);
+  const appointmentsTotalPages = Math.max(
+    1,
+    Math.ceil(doctorAppointments.length / appointmentsPageSize)
+  );
+
+  const nextTotalPages = Math.max(
+    1,
+    Math.ceil(confirmedAppointments.length / nextPageSize)
+  );
+
+  const paginatedPatientRequests = useMemo(() => {
+    const safePage = Math.min(requestsPage, requestsTotalPages);
+    const start = (safePage - 1) * requestsPageSize;
+
+    return patientRequests.slice(start, start + requestsPageSize);
+  }, [patientRequests, requestsPage, requestsTotalPages]);
+
+  const paginatedDoctorAppointments = useMemo(() => {
+    const safePage = Math.min(appointmentsPage, appointmentsTotalPages);
+    const start = (safePage - 1) * appointmentsPageSize;
+
+    return doctorAppointments.slice(start, start + appointmentsPageSize);
+  }, [doctorAppointments, appointmentsPage, appointmentsTotalPages]);
+
+  const paginatedNextAppointments = useMemo(() => {
+    const safePage = Math.min(nextPage, nextTotalPages);
+    const start = (safePage - 1) * nextPageSize;
+
+    return confirmedAppointments.slice(start, start + nextPageSize);
+  }, [confirmedAppointments, nextPage, nextTotalPages]);
+
+  const firstNextAppointment = confirmedAppointments[0] || null;
 
   const getStatusStyles = (status: Appointment["status"]) => {
     switch (status) {
+      case "Pending":
+        return "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-slate-300";
       case "In Progress":
         return "border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300";
       case "Completed":
@@ -403,15 +520,20 @@ export default function AppointmentsPage() {
   };
 
   const getStatusText = (status: Appointment["status"]) => {
+    if (status === "Pending") return isArabic ? "في انتظار التأكيد" : "Pending";
     if (status === "In Progress") return isArabic ? "الآن" : "Now";
     if (status === "Completed")
       return t("doctorDashboard.appointments.statusCompleted");
-    if (status === "Cancelled") return isArabic ? "ملغي" : "Cancelled";
+    if (status === "Cancelled") return isArabic ? "مرفوض / ملغي" : "Rejected";
     return t("doctorDashboard.appointments.statusUpcoming");
   };
 
   const closeNewAppointmentModal = () => {
     setShowNewAppointment(false);
+  };
+
+  const handleOpenNewAppointment = () => {
+    setShowNewAppointment(true);
   };
 
   const handleCreateAppointment = () => {
@@ -439,6 +561,7 @@ export default function AppointmentsPage() {
       reason: newAppointment.reason,
       status: "Upcoming",
       appointment_date: date.toISOString(),
+      source: "doctor",
     };
 
     setAppointments((prev) => [createdAppointment, ...prev]);
@@ -452,13 +575,250 @@ export default function AppointmentsPage() {
     setSelectedTime("");
     setDate(new Date());
     setShowNewAppointment(false);
-    setFilter("all");
-    setCurrentPage(1);
+    setAppointmentsPage(1);
+    setNextPage(1);
 
     toast.success(
       isArabic ? "تم إنشاء الحجز بنجاح" : "Appointment created successfully"
     );
   };
+
+  const renderPager = ({
+    page,
+    totalPages,
+    onPrevious,
+    onNext,
+  }: {
+    page: number;
+    totalPages: number;
+    onPrevious: () => void;
+    onNext: () => void;
+  }) => {
+    return (
+      <div className="flex items-center justify-center gap-3">
+        <Button
+          variant="outline"
+          size="icon"
+          disabled={page === 1}
+          onClick={onPrevious}
+          className="h-10 w-10 rounded-full border-primary/30 bg-card text-primary hover:bg-primary/10 disabled:opacity-40"
+        >
+          {isArabic ? (
+            <ChevronRight className="h-4 w-4" />
+          ) : (
+            <ChevronLeft className="h-4 w-4" />
+          )}
+        </Button>
+
+        <div className="flex h-10 min-w-[110px] items-center justify-center rounded-full border border-border bg-card px-4 text-xs font-bold text-muted-foreground shadow-sm">
+          {isArabic ? (
+            <>
+              صفحة <span className="mx-1 text-primary">{page}</span> من{" "}
+              <span className="mx-1 text-foreground">{totalPages}</span>
+            </>
+          ) : (
+            <>
+              Page <span className="mx-1 text-primary">{page}</span> of{" "}
+              <span className="mx-1 text-foreground">{totalPages}</span>
+            </>
+          )}
+        </div>
+
+        <Button
+          variant="outline"
+          size="icon"
+          disabled={page === totalPages}
+          onClick={onNext}
+          className="h-10 w-10 rounded-full border-primary/30 bg-card text-primary hover:bg-primary/10 disabled:opacity-40"
+        >
+          {isArabic ? (
+            <ChevronLeft className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+    );
+  };
+
+  const renderTableHeader = (gridClass: string) => {
+    return (
+      <div
+        className={cn(
+          gridClass,
+          "items-center gap-4 border-b border-border bg-muted/40 px-5 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground"
+        )}
+      >
+        {tableColumns.map((column) => (
+          <div key={column.key} className="truncate text-start">
+            {column.label}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderPatientRequestActions = (apt: Appointment) => {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          onClick={() => handleApproveAppointment(apt)}
+          className="h-9 rounded-full border border-emerald-200 bg-emerald-50 px-4 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
+        >
+          {isArabic ? "قبول" : "Approve"}
+        </Button>
+
+        <Button
+          onClick={() => handleRejectAppointment(apt)}
+          className="h-9 rounded-full border border-red-200 bg-red-50 px-4 text-xs font-semibold text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20"
+        >
+          {isArabic ? "رفض" : "Reject"}
+        </Button>
+
+        <Button
+          variant="outline"
+          onClick={() => handleViewProfile(apt)}
+          className="h-9 rounded-full border-primary/30 bg-transparent px-3 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
+        >
+          <Eye className={cn("h-4 w-4", isArabic ? "ml-1" : "mr-1")} />
+          {t("doctorDashboard.appointments.viewProfile")}
+        </Button>
+      </div>
+    );
+  };
+
+  const renderDoctorAppointmentActions = (apt: Appointment) => {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        {apt.status === "In Progress" && (
+          <Button
+            onClick={() => handleJoinCall(apt)}
+            className="h-9 rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            <Video className={cn("h-4 w-4", isArabic ? "ml-1" : "mr-1")} />
+            {t("doctorDashboard.appointments.joinCall")}
+          </Button>
+        )}
+
+        <Button
+          variant="outline"
+          onClick={() => handleViewProfile(apt)}
+          className="h-9 rounded-full border-primary/30 bg-transparent px-3 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
+        >
+          <Eye className={cn("h-4 w-4", isArabic ? "ml-1" : "mr-1")} />
+          {t("doctorDashboard.appointments.viewProfile")}
+        </Button>
+      </div>
+    );
+  };
+
+  const renderMobileAppointmentCard = (
+    apt: Appointment,
+    type: "request" | "appointment"
+  ) => {
+    return (
+      <Card
+        key={apt.id}
+        className="rounded-3xl border border-border bg-card p-5 text-card-foreground shadow-sm"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-12 w-12 border border-primary/20 bg-primary/5">
+                <AvatarImage src={apt.profile_picture} />
+                <AvatarFallback className="bg-primary/10 text-primary">
+                  <UserIcon className="h-5 w-5" />
+                </AvatarFallback>
+              </Avatar>
+
+              <div>
+                <h3 className="text-sm font-bold text-foreground">
+                  {apt.patient_name}
+                </h3>
+
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                  {apt.patient_id}
+                </p>
+              </div>
+            </div>
+
+            <span
+              className={cn(
+                "w-fit shrink-0 rounded-full border px-3 py-1 text-xs font-bold",
+                getStatusStyles(apt.status)
+              )}
+            >
+              {getStatusText(apt.status)}
+            </span>
+          </div>
+
+          <div className="grid gap-3 rounded-2xl bg-muted/30 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold text-muted-foreground">
+                {isArabic ? "وقت الموعد" : "Appointment Time"}
+              </span>
+
+              <span className="flex items-center gap-1 text-sm font-medium text-foreground">
+                <Clock className="h-3.5 w-3.5 text-primary" />
+                {formatAppointmentTime(apt.time)}
+              </span>
+            </div>
+
+            <div>
+              <p className="mb-1 text-xs font-semibold text-muted-foreground">
+                {isArabic ? "سبب الزيارة" : "Visit Reason"}
+              </p>
+
+              <p className="text-sm font-medium text-foreground">
+                {apt.reason}
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t border-border pt-4">
+            {type === "request"
+              ? renderPatientRequestActions(apt)
+              : renderDoctorAppointmentActions(apt)}
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
+  const statCards = [
+    {
+      title: isArabic ? "طلبات المرضى" : "Patient Requests",
+      value: patientRequests.length,
+      description: isArabic
+        ? "طلبات تحتاج قبول أو رفض"
+        : "Requests waiting for approval",
+      icon: UserCheck,
+    },
+    {
+      title: isArabic ? "مواعيد الدكتور" : "Doctor Appointments",
+      value: doctorAppointments.length,
+      description: isArabic
+        ? "مواعيد مؤكدة أو منشأة من الدكتور"
+        : "Confirmed or doctor-created appointments",
+      icon: CalendarCheck,
+    },
+    {
+      title: isArabic ? "الموعد القادم" : "Next Appointment",
+      value: firstNextAppointment
+        ? firstNextAppointment.patient_name
+        : isArabic
+        ? "لا يوجد"
+        : "None",
+      description: firstNextAppointment
+        ? `${formatAppointmentTime(firstNextAppointment.time)} • ${
+            firstNextAppointment.reason
+          }`
+        : isArabic
+        ? "لا يوجد موعد قادم"
+        : "No upcoming appointment",
+      icon: Clock,
+    },
+  ];
 
   return (
     <div
@@ -474,13 +834,13 @@ export default function AppointmentsPage() {
 
             <p className="mt-1 text-sm font-medium text-muted-foreground">
               {isArabic
-                ? "عرض وإدارة جدول مواعيدك اليومية"
-                : "View and manage your daily appointment schedule"}
+                ? "إدارة طلبات المرضى والمواعيد المؤكدة والموعد القادم"
+                : "Manage patient requests, confirmed appointments, and the next appointment"}
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative w-full sm:w-96">
+          <div className="flex w-full flex-row items-center gap-3 lg:w-auto">
+            <div className="relative min-w-0 flex-1 lg:w-[420px] lg:flex-none">
               <Search
                 className={cn(
                   "absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground",
@@ -493,7 +853,7 @@ export default function AppointmentsPage() {
                   "doctorDashboard.appointments.searchPlaceholder"
                 )}
                 className={cn(
-                  "h-12 rounded-2xl border border-border bg-card text-sm font-semibold text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-4 focus-visible:ring-primary/10",
+                  "h-12 w-full rounded-2xl border border-border bg-card text-sm font-semibold text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-4 focus-visible:ring-primary/10",
                   isArabic ? "pr-11 pl-9" : "pl-11 pr-9"
                 )}
                 value={search}
@@ -515,379 +875,404 @@ export default function AppointmentsPage() {
             </div>
 
             <Button
-              onClick={() => setShowNewAppointment(true)}
-              className="h-12 rounded-2xl bg-primary px-6 font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+              onClick={handleOpenNewAppointment}
+              className="h-12 shrink-0 rounded-2xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:px-6 sm:text-sm"
             >
               {t("doctorDashboard.appointments.newAppointment")}
             </Button>
           </div>
         </div>
 
-        <div className="flex justify-center">
-          <Tabs
-            value={filter}
-            onValueChange={(value) => setFilter(value as FilterType)}
-          >
-            <TabsList className="h-12 rounded-full border border-primary/20 bg-card p-1 shadow-sm">
-              {[
-                {
-                  value: "today",
-                  label: t("doctorDashboard.appointments.filterToday"),
-                },
-                {
-                  value: "upcoming",
-                  label: t("doctorDashboard.appointments.filterUpcoming"),
-                },
-                {
-                  value: "next",
-                  label: isArabic ? "التالي" : "Next",
-                },
-                {
-                  value: "all",
-                  label: t("doctorDashboard.appointments.filterAll"),
-                },
-              ].map((item) => (
-                <TabsTrigger
-                  key={item.value}
-                  value={item.value}
-                  className="rounded-full px-8 text-sm font-medium text-primary transition-all hover:bg-primary/10 hover:text-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-                >
-                  {item.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        </div>
+        {loading ? (
+          <Card className="flex min-h-[360px] items-center justify-center rounded-3xl border border-border bg-card shadow-sm">
+            <LoadingDots />
+          </Card>
+        ) : (
+          <>
+            <div className="grid gap-4 md:grid-cols-3">
+              {statCards.map((item) => {
+                const Icon = item.icon;
 
-        <div>
-          {loading ? (
-            <Card className="flex min-h-[360px] items-center justify-center rounded-3xl border border-border bg-card shadow-sm">
-              <LoadingDots />
-            </Card>
-          ) : filteredAppointments.length > 0 ? (
-            <>
-              <div className="grid gap-4 md:hidden">
-                {paginatedAppointments.map((apt) => (
+                return (
                   <Card
-                    key={apt.id}
-                    className="rounded-3xl border border-border bg-card p-5 text-card-foreground shadow-sm"
+                    key={item.title}
+                    className="rounded-3xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md"
                   >
-                    <div className="flex flex-col gap-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-12 w-12 border border-primary/20 bg-primary/5">
-                            <AvatarImage src={apt.profile_picture} />
-                            <AvatarFallback className="bg-primary/10 text-primary">
-                              <UserIcon className="h-5 w-5" />
-                            </AvatarFallback>
-                          </Avatar>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                          {item.title}
+                        </p>
 
-                          <div>
-                            <h3 className="text-sm font-bold text-foreground">
-                              {apt.patient_name}
-                            </h3>
-                          </div>
-                        </div>
-
-                        <span
+                        <p
                           className={cn(
-                            "w-fit shrink-0 rounded-full border px-3 py-1 text-xs font-bold",
-                            getStatusStyles(apt.status)
+                            "mt-3 font-bold text-foreground",
+                            typeof item.value === "number"
+                              ? "text-3xl"
+                              : "truncate text-lg"
                           )}
                         >
-                          {getStatusText(apt.status)}
-                        </span>
+                          {item.value}
+                        </p>
+
+                        <p className="mt-1 line-clamp-2 text-sm font-medium text-muted-foreground">
+                          {item.description}
+                        </p>
                       </div>
 
-                      <div className="grid gap-3 rounded-2xl bg-muted/30 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-xs font-semibold text-muted-foreground">
-                            {isArabic ? "الوقت" : "Time"}
-                          </span>
-
-                          <span className="flex items-center gap-1 text-sm font-medium text-foreground">
-                            <Clock className="h-3.5 w-3.5 text-primary" />
-                            {formatAppointmentTime(apt.time)}
-                          </span>
-                        </div>
-
-                        <div>
-                          <p className="mb-1 text-xs font-semibold text-muted-foreground">
-                            {isArabic ? "سبب الزيارة" : "Visit Reason"}
-                          </p>
-
-                          <p className="text-sm font-medium text-foreground">
-                            {apt.reason}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-                        {apt.status === "In Progress" && (
-                          <Button
-                            onClick={() => handleJoinCall(apt)}
-                            className="h-10 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-                          >
-                            <Video
-                              className={cn(
-                                "h-4 w-4",
-                                isArabic ? "ml-2" : "mr-2"
-                              )}
-                            />
-                            {t("doctorDashboard.appointments.joinCall")}
-                          </Button>
-                        )}
-
-                        <Button
-                          variant="outline"
-                          onClick={() => handleViewProfile(apt)}
-                          className="h-10 rounded-full border-primary/30 bg-transparent px-4 text-sm font-semibold text-primary hover:bg-primary/10 hover:text-primary"
-                        >
-                          <Eye
-                            className={cn(
-                              "h-4 w-4",
-                              isArabic ? "ml-2" : "mr-2"
-                            )}
-                          />
-                          {t("doctorDashboard.appointments.viewProfile")}
-                        </Button>
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                        <Icon className="h-5 w-5" />
                       </div>
                     </div>
                   </Card>
-                ))}
-              </div>
-
-              <Card className="hidden overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm md:block">
-                <div className="grid grid-cols-[1.4fr_1fr_1.4fr_0.9fr_1.2fr] border-b border-border bg-muted/40 px-5 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  <div>{isArabic ? "المريض" : "Patient"}</div>
-                  <div>{isArabic ? "الوقت" : "Time"}</div>
-                  <div>{isArabic ? "سبب الزيارة" : "Visit Reason"}</div>
-                  <div>{isArabic ? "الحالة" : "Status"}</div>
-                  <div>{isArabic ? "الإجراء" : "Action"}</div>
-                </div>
-
-                <div className="divide-y divide-border">
-                  {paginatedAppointments.map((apt) => (
-                    <div
-                      key={apt.id}
-                      className="grid grid-cols-[1.4fr_1fr_1.4fr_0.9fr_1.2fr] items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/30"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <Avatar className="h-11 w-11 border border-primary/20 bg-primary/5">
-                          <AvatarImage src={apt.profile_picture} />
-                          <AvatarFallback className="bg-primary/10 text-primary">
-                            <UserIcon className="h-5 w-5" />
-                          </AvatarFallback>
-                        </Avatar>
-
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-bold text-foreground">
-                            {apt.patient_name}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5 text-primary" />
-                        {formatAppointmentTime(apt.time)}
-                      </div>
-
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {apt.reason}
-                      </p>
-
-                      <span
-                        className={cn(
-                          "w-fit rounded-full border px-3 py-1 text-xs font-bold",
-                          getStatusStyles(apt.status)
-                        )}
-                      >
-                        {getStatusText(apt.status)}
-                      </span>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        {apt.status === "In Progress" && (
-                          <Button
-                            onClick={() => handleJoinCall(apt)}
-                            className="h-9 rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
-                          >
-                            <Video
-                              className={cn(
-                                "h-4 w-4",
-                                isArabic ? "ml-1" : "mr-1"
-                              )}
-                            />
-                            {t("doctorDashboard.appointments.joinCall")}
-                          </Button>
-                        )}
-
-                        <Button
-                          variant="outline"
-                          onClick={() => handleViewProfile(apt)}
-                          className="h-9 rounded-full border-primary/30 bg-transparent px-3 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
-                        >
-                          <Eye
-                            className={cn(
-                              "h-4 w-4",
-                              isArabic ? "ml-1" : "mr-1"
-                            )}
-                          />
-                          {t("doctorDashboard.appointments.viewProfile")}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </>
-          ) : (
-            <Card className="flex min-h-[360px] flex-col items-center justify-center rounded-3xl border border-dashed border-border bg-card p-8 text-center shadow-sm">
-              <CalendarIcon className="mb-4 h-10 w-10 text-muted-foreground" />
-
-              <h3 className="text-base font-bold text-foreground">
-                {t("doctorDashboard.appointments.empty")}
-              </h3>
-
-              <p className="mt-1 text-sm font-medium text-muted-foreground">
-                {isArabic
-                  ? "لا توجد مواعيد مطابقة للبحث الحالي"
-                  : "No appointments match your current search"}
-              </p>
-            </Card>
-          )}
-        </div>
-
-        {filter !== "next" && (
-          <Card className="rounded-3xl border border-border bg-card p-5 text-card-foreground shadow-sm transition-all duration-300 hover:shadow-md">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h4 className="text-lg font-bold text-foreground">
-                  {isArabic ? "الموعد القادم" : "Next Appointment"}
-                </h4>
-
-                <p className="text-sm font-medium text-muted-foreground">
-                  {isArabic
-                    ? "أقرب موعد نشط أو قادم"
-                    : "Nearest active or upcoming appointment"}
-                </p>
-              </div>
-
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <Clock className="h-5 w-5" />
-              </div>
+                );
+              })}
             </div>
 
-            {nextAppointment ? (
-              <div className="grid gap-4 rounded-2xl bg-muted/30 p-4 md:grid-cols-[1.2fr_0.7fr_1.2fr_0.8fr_1.2fr] md:items-center">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-11 w-11 border border-primary/20 bg-primary/5">
-                    <AvatarImage src={nextAppointment.profile_picture} />
-                    <AvatarFallback className="bg-primary/10 text-primary">
-                      <UserIcon className="h-5 w-5" />
-                    </AvatarFallback>
-                  </Avatar>
+            <Card className="rounded-3xl border border-border bg-card p-5 text-card-foreground shadow-sm">
+              <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">
+                    {isArabic ? "طلبات الحجز من المرضى" : "Patient Requests"}
+                  </h2>
 
-                  <div>
-                    <p className="text-sm font-bold text-foreground">
-                      {nextAppointment.patient_name}
-                    </p>
-                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {isArabic
+                      ? "الطلبات التي أرسلها المرضى وتحتاج تأكيد من الدكتور"
+                      : "Requests sent by patients and waiting for doctor approval"}
+                  </p>
                 </div>
 
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground">
-                    {isArabic ? "الوقت" : "Time"}
-                  </p>
+                <span className="w-fit rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-slate-300">
+                  {patientRequests.length}{" "}
+                  {isArabic ? "طلب معلق" : "Pending"}
+                </span>
+              </div>
+
+              {patientRequests.length > 0 ? (
+                <>
+                  <div className="grid gap-4 md:hidden">
+                    {paginatedPatientRequests.map((apt) =>
+                      renderMobileAppointmentCard(apt, "request")
+                    )}
+                  </div>
+
+                  <div className="hidden overflow-hidden rounded-2xl border border-border md:block">
+                    {renderTableHeader(requestGridClass)}
+
+                    <div className="divide-y divide-border">
+                      {paginatedPatientRequests.map((apt) => (
+                        <div
+                          key={apt.id}
+                          className={cn(
+                            requestGridClass,
+                            "items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/30"
+                          )}
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Avatar className="h-11 w-11 border border-primary/20 bg-primary/5">
+                              <AvatarImage src={apt.profile_picture} />
+                              <AvatarFallback className="bg-primary/10 text-primary">
+                                <UserIcon className="h-5 w-5" />
+                              </AvatarFallback>
+                            </Avatar>
+
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-bold text-foreground">
+                                {apt.patient_name}
+                              </p>
+
+                              <p className="truncate text-xs font-semibold text-muted-foreground">
+                                {apt.patient_id}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5 text-primary" />
+                            {formatAppointmentTime(apt.time)}
+                          </div>
+
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {apt.reason}
+                          </p>
+
+                          <span
+                            className={cn(
+                              "w-fit rounded-full border px-3 py-1 text-xs font-bold",
+                              getStatusStyles(apt.status)
+                            )}
+                          >
+                            {getStatusText(apt.status)}
+                          </span>
+
+                          {renderPatientRequestActions(apt)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    {renderPager({
+                      page: Math.min(requestsPage, requestsTotalPages),
+                      totalPages: requestsTotalPages,
+                      onPrevious: () =>
+                        setRequestsPage((prev) => Math.max(1, prev - 1)),
+                      onNext: () =>
+                        setRequestsPage((prev) =>
+                          Math.min(requestsTotalPages, prev + 1)
+                        ),
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border p-8 text-center">
+                  <CalendarIcon className="mx-auto mb-3 h-9 w-9 text-muted-foreground" />
 
                   <p className="text-sm font-bold text-foreground">
-                    {formatAppointmentTime(nextAppointment.time)}
+                    {isArabic
+                      ? "لا توجد طلبات حجز معلقة"
+                      : "No pending appointment requests"}
+                  </p>
+
+                  <p className="mt-1 text-sm font-medium text-muted-foreground">
+                    {isArabic
+                      ? "أي طلب جديد من المريض سيظهر هنا للموافقة أو الرفض"
+                      : "New patient requests will appear here for approval or rejection"}
                   </p>
                 </div>
+              )}
+            </Card>
 
+            <Card className="rounded-3xl border border-border bg-card p-5 text-card-foreground shadow-sm">
+              <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground">
-                    {isArabic ? "سبب الزيارة" : "Visit Reason"}
-                  </p>
+                  <h2 className="text-lg font-bold text-foreground">
+                    {isArabic ? "مواعيد الدكتور" : "Doctor Appointments"}
+                  </h2>
 
-                  <p className="text-sm font-medium text-foreground">
-                    {nextAppointment.reason}
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {isArabic
+                      ? "المواعيد المؤكدة أو التي تم إنشاؤها من الدكتور"
+                      : "Confirmed appointments or appointments created by the doctor"}
                   </p>
                 </div>
 
-                <span
-                  className={cn(
-                    "w-fit rounded-full border px-3 py-1 text-xs font-bold",
-                    getStatusStyles(nextAppointment.status)
-                  )}
-                >
-                  {getStatusText(nextAppointment.status)}
+                <span className="w-fit rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                  {doctorAppointments.length}{" "}
+                  {isArabic ? "موعد" : "Appointments"}
                 </span>
-
-                <Button
-                  type="button"
-                  onClick={() => setFilter("next")}
-                  className="h-11 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-                >
-                  {isArabic ? "عرض الموعد التالي" : "View Next Appointment"}
-                </Button>
               </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-border p-5 text-center">
-                <Clock className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
 
-                <p className="text-sm font-medium text-muted-foreground">
-                  {isArabic ? "لا يوجد موعد قادم" : "No upcoming appointment"}
-                </p>
+              {doctorAppointments.length > 0 ? (
+                <>
+                  <div className="grid gap-4 md:hidden">
+                    {paginatedDoctorAppointments.map((apt) =>
+                      renderMobileAppointmentCard(apt, "appointment")
+                    )}
+                  </div>
+
+                  <div className="hidden overflow-hidden rounded-2xl border border-border md:block">
+                    {renderTableHeader(appointmentGridClass)}
+
+                    <div className="divide-y divide-border">
+                      {paginatedDoctorAppointments.map((apt) => (
+                        <div
+                          key={apt.id}
+                          className={cn(
+                            appointmentGridClass,
+                            "items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/30"
+                          )}
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Avatar className="h-11 w-11 border border-primary/20 bg-primary/5">
+                              <AvatarImage src={apt.profile_picture} />
+                              <AvatarFallback className="bg-primary/10 text-primary">
+                                <UserIcon className="h-5 w-5" />
+                              </AvatarFallback>
+                            </Avatar>
+
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-bold text-foreground">
+                                {apt.patient_name}
+                              </p>
+
+                              <p className="truncate text-xs font-semibold text-muted-foreground">
+                                {apt.patient_id}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5 text-primary" />
+                            {formatAppointmentTime(apt.time)}
+                          </div>
+
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {apt.reason}
+                          </p>
+
+                          <span
+                            className={cn(
+                              "w-fit rounded-full border px-3 py-1 text-xs font-bold",
+                              getStatusStyles(apt.status)
+                            )}
+                          >
+                            {getStatusText(apt.status)}
+                          </span>
+
+                          {renderDoctorAppointmentActions(apt)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    {renderPager({
+                      page: Math.min(appointmentsPage, appointmentsTotalPages),
+                      totalPages: appointmentsTotalPages,
+                      onPrevious: () =>
+                        setAppointmentsPage((prev) => Math.max(1, prev - 1)),
+                      onNext: () =>
+                        setAppointmentsPage((prev) =>
+                          Math.min(appointmentsTotalPages, prev + 1)
+                        ),
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border p-8 text-center">
+                  <Clock className="mx-auto mb-3 h-9 w-9 text-muted-foreground" />
+
+                  <p className="text-sm font-bold text-foreground">
+                    {isArabic
+                      ? "لا توجد مواعيد مؤكدة"
+                      : "No confirmed appointments"}
+                  </p>
+
+                  <p className="mt-1 text-sm font-medium text-muted-foreground">
+                    {isArabic
+                      ? "أنشئ موعد جديد أو اقبل طلب من المريض ليظهر هنا"
+                      : "Create a new appointment or approve a patient request to show it here"}
+                  </p>
+                </div>
+              )}
+            </Card>
+
+            <Card className="rounded-3xl border border-border bg-card p-5 text-card-foreground shadow-sm transition-all duration-300 hover:shadow-md">
+              <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">
+                    {isArabic ? "المواعيد القادمة" : "Next Appointments"}
+                  </h2>
+
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {isArabic
+                      ? "أقرب المواعيد المؤكدة أو النشطة"
+                      : "Nearest confirmed or active appointments"}
+                  </p>
+                </div>
+
+                <span className="w-fit rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                  {confirmedAppointments.length}{" "}
+                  {isArabic ? "موعد قادم" : "Upcoming"}
+                </span>
               </div>
-            )}
-          </Card>
+
+              {confirmedAppointments.length > 0 ? (
+                <>
+                  <div className="grid gap-4 md:hidden">
+                    {paginatedNextAppointments.map((apt) =>
+                      renderMobileAppointmentCard(apt, "appointment")
+                    )}
+                  </div>
+
+                  <div className="hidden overflow-hidden rounded-2xl border border-border md:block">
+                    {renderTableHeader(appointmentGridClass)}
+
+                    <div className="divide-y divide-border">
+                      {paginatedNextAppointments.map((apt) => (
+                        <div
+                          key={apt.id}
+                          className={cn(
+                            appointmentGridClass,
+                            "items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/30"
+                          )}
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Avatar className="h-11 w-11 border border-primary/20 bg-primary/5">
+                              <AvatarImage src={apt.profile_picture} />
+                              <AvatarFallback className="bg-primary/10 text-primary">
+                                <UserIcon className="h-5 w-5" />
+                              </AvatarFallback>
+                            </Avatar>
+
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-bold text-foreground">
+                                {apt.patient_name}
+                              </p>
+
+                              <p className="truncate text-xs font-semibold text-muted-foreground">
+                                {apt.patient_id}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5 text-primary" />
+                            {formatAppointmentTime(apt.time)}
+                          </div>
+
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {apt.reason}
+                          </p>
+
+                          <span
+                            className={cn(
+                              "w-fit rounded-full border px-3 py-1 text-xs font-bold",
+                              getStatusStyles(apt.status)
+                            )}
+                          >
+                            {getStatusText(apt.status)}
+                          </span>
+
+                          {renderDoctorAppointmentActions(apt)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    {renderPager({
+                      page: Math.min(nextPage, nextTotalPages),
+                      totalPages: nextTotalPages,
+                      onPrevious: () =>
+                        setNextPage((prev) => Math.max(1, prev - 1)),
+                      onNext: () =>
+                        setNextPage((prev) =>
+                          Math.min(nextTotalPages, prev + 1)
+                        ),
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border p-8 text-center">
+                  <Clock className="mx-auto mb-3 h-9 w-9 text-muted-foreground" />
+
+                  <p className="text-sm font-bold text-foreground">
+                    {isArabic ? "لا توجد مواعيد قادمة" : "No next appointments"}
+                  </p>
+
+                  <p className="mt-1 text-sm font-medium text-muted-foreground">
+                    {isArabic
+                      ? "أي موعد مؤكد أو نشط سيظهر هنا"
+                      : "Any confirmed or active appointment will appear here"}
+                  </p>
+                </div>
+              )}
+            </Card>
+          </>
         )}
-
-        <div className="flex items-center justify-center gap-3">
-          <Button
-            variant="outline"
-            size="icon"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-            className="h-10 w-10 rounded-full border-primary/30 bg-card text-primary hover:bg-primary/10 disabled:opacity-40"
-          >
-            {isArabic ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
-          </Button>
-
-          <div className="flex h-10 min-w-[110px] items-center justify-center rounded-full border border-border bg-card px-4 text-xs font-bold text-muted-foreground shadow-sm">
-            {isArabic ? (
-              <>
-                صفحة <span className="mx-1 text-primary">{currentPage}</span>{" "}
-                من <span className="mx-1 text-foreground">{totalPages}</span>
-              </>
-            ) : (
-              <>
-                Page <span className="mx-1 text-primary">{currentPage}</span>{" "}
-                of <span className="mx-1 text-foreground">{totalPages}</span>
-              </>
-            )}
-          </div>
-
-          <Button
-            variant="outline"
-            size="icon"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-            }
-            className="h-10 w-10 rounded-full border-primary/30 bg-card text-primary hover:bg-primary/10 disabled:opacity-40"
-          >
-            {isArabic ? (
-              <ChevronLeft className="h-4 w-4" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
       </div>
 
       {showNewAppointment && (
@@ -895,26 +1280,16 @@ export default function AppointmentsPage() {
           <Card className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-2xl">
             <div className="flex max-h-[92vh] flex-col">
               <div className="shrink-0 border-b border-border px-5 py-4 md:px-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-foreground">
-                      {isArabic ? "إضافة حجز جديد" : "Add New Appointment"}
-                    </h3>
+                <div>
+                  <h3 className="text-xl font-bold text-foreground">
+                    {isArabic ? "إضافة حجز جديد" : "Add New Appointment"}
+                  </h3>
 
-                    <p className="mt-1 text-sm font-medium text-muted-foreground">
-                      {isArabic
-                        ? "أدخل بيانات المريض ثم اختر التاريخ والوقت."
-                        : "Enter patient details, then choose date and time."}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={closeNewAppointmentModal}
-                    className="rounded-full p-1 text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
+                  <p className="mt-1 text-sm font-medium text-muted-foreground">
+                    {isArabic
+                      ? "أدخل بيانات المريض ثم اختر التاريخ والوقت."
+                      : "Enter patient details, then choose date and time."}
+                  </p>
                 </div>
               </div>
 
@@ -977,23 +1352,39 @@ export default function AppointmentsPage() {
                   </div>
                 </div>
 
+                <div className="mb-5 rounded-2xl bg-primary/10 p-4">
+                  <p className="text-xs font-bold uppercase tracking-widest text-primary/70">
+                    {isArabic ? "ملخص الحجز" : "Appointment Summary"}
+                  </p>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-sm font-bold text-foreground">
+                    <span>{formattedSelectedDate || "--"}</span>
+
+                    <span className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground">
+                      {selectedTime
+                        ? formatAppointmentTime(selectedTime)
+                        : isArabic
+                        ? "لم يتم اختيار وقت"
+                        : "No time selected"}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
                   <div className="rounded-3xl border border-border bg-background/50 p-4">
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                          <CalendarIcon className="h-5 w-5" />
-                        </div>
+                    <div className="mb-4 flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                        <CalendarIcon className="h-5 w-5" />
+                      </div>
 
-                        <div>
-                          <h4 className="text-sm font-bold text-foreground">
-                            {isArabic ? "اختيار التاريخ" : "Select Date"}
-                          </h4>
+                      <div>
+                        <h4 className="text-sm font-bold text-foreground">
+                          {isArabic ? "اختيار التاريخ" : "Select Date"}
+                        </h4>
 
-                          <p className="text-xs font-medium text-muted-foreground">
-                            {formattedSelectedDate}
-                          </p>
-                        </div>
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {formattedSelectedDate}
+                        </p>
                       </div>
                     </div>
 
@@ -1080,24 +1471,6 @@ export default function AppointmentsPage() {
                     </div>
                   </div>
                 </div>
-
-                <div className="mt-5 rounded-2xl bg-primary/10 p-4">
-                  <p className="text-xs font-bold uppercase tracking-widest text-primary/70">
-                    {isArabic ? "ملخص الحجز" : "Appointment Summary"}
-                  </p>
-
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-sm font-bold text-foreground">
-                    <span>{formattedSelectedDate || "--"}</span>
-
-                    <span className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground">
-                      {selectedTime
-                        ? formatAppointmentTime(selectedTime)
-                        : isArabic
-                        ? "لم يتم اختيار وقت"
-                        : "No time selected"}
-                    </span>
-                  </div>
-                </div>
               </div>
 
               <div className="flex shrink-0 justify-end gap-3 border-t border-border px-5 py-4 md:px-6">
@@ -1158,6 +1531,7 @@ export default function AppointmentsPage() {
                       selectedAppointment?.profile_picture
                     }
                   />
+
                   <AvatarFallback className="bg-primary/10 text-primary">
                     <UserIcon className="h-6 w-6" />
                   </AvatarFallback>

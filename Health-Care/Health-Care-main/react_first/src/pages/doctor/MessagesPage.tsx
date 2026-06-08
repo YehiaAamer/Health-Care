@@ -5,7 +5,7 @@ import {
   useMemo,
   type ChangeEvent,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { messagesApi } from "@/api/messages";
 import { patientsApi } from "@/api/patients";
@@ -37,8 +37,6 @@ import {
   X,
   Paperclip,
   ChevronDown,
-  PhoneCall,
-  Video,
 } from "lucide-react";
 
 import LoadingDots from "@/components/shared/LoadingDots";
@@ -54,16 +52,24 @@ type SummaryIndicator = {
   color: IndicatorColor;
 };
 
-const ARCHIVE_PREVIEW_LIMIT = 1;
+type MessagesLocationState = {
+  patientId?: number | string;
+  patientName?: string;
+  openPatientId?: number | string;
+  openPatientName?: string;
+  fromReports?: boolean;
+};
 
 export default function MessagesPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const isArabic = i18n.language === "ar";
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedThreadRef = useRef<number | null>(null);
+  const routeSelectionAppliedRef = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -93,6 +99,18 @@ export default function MessagesPage() {
     const numericId = parseInt(String(patientId ?? "").replace(/\D/g, ""), 10);
     return Number.isNaN(numericId) ? 0 : numericId;
   };
+
+  const routeState = (location.state || {}) as MessagesLocationState;
+
+  const routePatientId = getPatientNumericId(
+    routeState.openPatientId || routeState.patientId
+  );
+
+  const routePatientName = String(
+    routeState.openPatientName || routeState.patientName || ""
+  )
+    .trim()
+    .toLowerCase();
 
   const normalizeRisk = (risk?: string) =>
     risk?.toLowerCase().replace(/\s|_/g, "") || "";
@@ -206,32 +224,6 @@ export default function MessagesPage() {
     );
   };
 
-  const openPredictionInReports = (predictionId?: number) => {
-    const patientId = getPatientNumericId(selectedConv?.patient_id);
-
-    if (!predictionId) {
-      toast.info(
-        isArabic
-          ? "لا يوجد تحليل متاح لفتحه"
-          : "No assessment is available to open"
-      );
-      return;
-    }
-
-    navigate(
-      `/doctor-dashboard/reports?patientId=${patientId}&diseaseType=${doctorDiseaseType}&openReportId=${predictionId}`,
-      {
-        state: {
-          openReportId: predictionId,
-          patientId,
-          patientName: selectedConv?.patient_name,
-          diseaseType: doctorDiseaseType,
-          fromPatientArchive: true,
-        },
-      }
-    );
-  };
-
   const fetchDoctorProfile = async () => {
     try {
       const profile = await apiCall<DoctorProfileResponse>(
@@ -252,6 +244,24 @@ export default function MessagesPage() {
     }
   };
 
+  const findRouteConversation = (threads: ChatThread[]) => {
+    if (!routePatientId && !routePatientName) return null;
+
+    return (
+      threads.find((thread) => {
+        const threadPatientId = getPatientNumericId(thread.patient_id);
+        const threadPatientName = String(thread.patient_name || "")
+          .trim()
+          .toLowerCase();
+
+        return (
+          (!!routePatientId && threadPatientId === routePatientId) ||
+          (!!routePatientName && threadPatientName === routePatientName)
+        );
+      }) || null
+    );
+  };
+
   const fetchConversations = async (showToast = false) => {
     try {
       const data = await messagesApi.getThreads();
@@ -259,8 +269,24 @@ export default function MessagesPage() {
 
       setConversations(safeThreads);
 
-      if (safeThreads.length > 0 && !selectedConv) {
+      const routeConversation = findRouteConversation(safeThreads);
+
+      if (routeConversation && !routeSelectionAppliedRef.current) {
+        routeSelectionAppliedRef.current = true;
+        setSelectedConv(routeConversation);
+        selectedThreadRef.current = routeConversation.id;
+        setSearch("");
+      } else if (selectedConv) {
+        const refreshedSelected = safeThreads.find(
+          (thread) => thread.id === selectedConv.id
+        );
+
+        if (refreshedSelected) {
+          setSelectedConv(refreshedSelected);
+        }
+      } else if (safeThreads.length > 0) {
         setSelectedConv(safeThreads[0]);
+        selectedThreadRef.current = safeThreads[0].id;
       }
 
       if (showToast) {
@@ -351,31 +377,9 @@ export default function MessagesPage() {
     event.target.value = "";
   };
 
-  const handleStartVoiceCall = () => {
-    if (!selectedConv) {
-      toast.info(isArabic ? "اختار مريض الأول" : "Select patient first");
-      return;
-    }
-
-    toast.info(
-      isArabic
-        ? "مكالمة الصوت تحتاج ربط WebRTC أو خدمة مكالمات من الباك"
-        : "Voice call needs WebRTC or backend call integration"
-    );
-  };
-
-  const handleStartVideoCall = () => {
-    if (!selectedConv) {
-      toast.info(isArabic ? "اختار مريض الأول" : "Select patient first");
-      return;
-    }
-
-    toast.info(
-      isArabic
-        ? "مكالمة الفيديو تحتاج ربط WebRTC أو خدمة مكالمات من الباك"
-        : "Video call needs WebRTC or backend call integration"
-    );
-  };
+  useEffect(() => {
+    routeSelectionAppliedRef.current = false;
+  }, [routePatientId, routePatientName]);
 
   useEffect(() => {
     fetchDoctorProfile();
@@ -546,6 +550,7 @@ export default function MessagesPage() {
 
   const getIndicatorDotClass = (color: IndicatorColor) => {
     if (color === "red") return "bg-red-500 ring-red-100 dark:ring-red-500/20";
+
     if (color === "green") {
       return "bg-emerald-500 ring-emerald-100 dark:ring-emerald-500/20";
     }
@@ -560,10 +565,6 @@ export default function MessagesPage() {
       (prediction) => prediction.disease_type === doctorDiseaseType
     );
   }, [patientProfile?.predictions, doctorDiseaseType]);
-
-  const archivePreviewPredictions = useMemo(() => {
-    return specialtyPredictions.slice(0, ARCHIVE_PREVIEW_LIMIT);
-  }, [specialtyPredictions]);
 
   const latestPrediction = specialtyPredictions[0];
   const latestExtraFields = latestPrediction?.extra_fields || {};
@@ -976,71 +977,37 @@ export default function MessagesPage() {
       </Card>
 
       <Card className="relative z-20 flex h-[520px] min-h-0 flex-col overflow-visible rounded-3xl border border-border bg-card text-card-foreground shadow-sm md:h-[620px] xl:h-[calc(100vh-100px)]">
-        <div className="flex min-h-[80px] shrink-0 items-center justify-between gap-4 rounded-t-3xl border-b border-border bg-card px-4 sm:px-5">
-          <div className="flex min-w-0 items-center gap-3">
-            {selectedConv && (
-              <Avatar className="h-12 w-12 border border-primary/15 bg-primary/5">
-                <AvatarFallback className="bg-primary/10 text-sm font-bold text-primary">
-                  {getPatientInitials(
-                    selectedConv.patient_name,
-                    selectedConv.patient_id
+        <div className="flex min-h-[80px] shrink-0 items-center gap-4 rounded-t-3xl border-b border-border bg-card px-4 sm:px-5">
+          {selectedConv && (
+            <Avatar className="h-12 w-12 border border-primary/15 bg-primary/5">
+              <AvatarFallback className="bg-primary/10 text-sm font-bold text-primary">
+                {getPatientInitials(
+                  selectedConv.patient_name,
+                  selectedConv.patient_id
+                )}
+              </AvatarFallback>
+            </Avatar>
+          )}
+
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              {selectedConv && (
+                <h3 className="truncate text-base font-bold text-foreground">
+                  {selectedConv.patient_name}
+                </h3>
+              )}
+
+              {selectedConv && (
+                <Badge
+                  className={cn(
+                    "rounded-full border px-2 py-0.5 text-[10px] font-bold shadow-none",
+                    getRiskBadgeStyles(selectedConv.risk_level)
                   )}
-                </AvatarFallback>
-              </Avatar>
-            )}
-
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                {selectedConv && (
-                  <h3 className="truncate text-base font-bold text-foreground">
-                    {selectedConv.patient_name}
-                  </h3>
-                )}
-
-                {selectedConv && (
-                  <Badge
-                    className={cn(
-                      "rounded-full border px-2 py-0.5 text-[10px] font-bold shadow-none",
-                      getRiskBadgeStyles(selectedConv.risk_level)
-                    )}
-                  >
-                    {getRiskLabel(selectedConv.risk_level)}
-                  </Badge>
-                )}
-              </div>
+                >
+                  {getRiskLabel(selectedConv.risk_level)}
+                </Badge>
+              )}
             </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              disabled={!selectedConv}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleStartVoiceCall();
-              }}
-              className="h-12 w-12 rounded-2xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground disabled:bg-primary/5 disabled:text-primary/40 disabled:opacity-60"
-              title={isArabic ? "مكالمة صوتية" : "Voice call"}
-            >
-              <PhoneCall className="h-6 w-6" />
-            </Button>
-
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              disabled={!selectedConv}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleStartVideoCall();
-              }}
-              className="h-12 w-12 rounded-2xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground disabled:bg-primary/5 disabled:text-primary/40 disabled:opacity-60"
-              title={isArabic ? "مكالمة فيديو" : "Video call"}
-            >
-              <Video className="h-6 w-6" />
-            </Button>
           </div>
         </div>
 
@@ -1183,6 +1150,7 @@ export default function MessagesPage() {
                       isArabic ? "rotate-180 sm:ml-2" : "sm:mr-2"
                     )}
                   />
+
                   <span className="hidden sm:inline">
                     {t("doctorDashboard.sidebar.messages.send")}
                   </span>
@@ -1294,73 +1262,31 @@ export default function MessagesPage() {
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                      {isArabic ? "أرشيف التحاليل" : "Assessment Archive"}
-                    </p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between rounded-2xl border border-border bg-background/60 px-4 py-3">
+                    <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                      {isArabic ? "عدد التحاليل" : "Assessments Count"}
+                    </span>
 
-                    <span className="text-[10px] font-bold text-primary">
+                    <span className="rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
                       {specialtyPredictions.length}
                     </span>
                   </div>
 
-                  <div className="space-y-3">
-                    {specialtyPredictions.length > 0 ? (
-                      archivePreviewPredictions.map((prediction) => (
-                        <button
-                          key={prediction.id}
-                          type="button"
-                          onClick={() => openPredictionInReports(prediction.id)}
-                          className="w-full rounded-2xl border border-border bg-background/60 p-4 text-start shadow-sm transition hover:!border-primary/20 hover:!bg-primary/[0.04] hover:!text-foreground"
-                        >
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <p className="truncate text-xs font-bold text-foreground">
-                              {getDiseaseLabel(prediction.disease_type)}
-                            </p>
-
-                            <Badge
-                              className={cn(
-                                "rounded-full border px-2 py-0.5 text-[10px] font-bold shadow-none",
-                                getRiskBadgeStyles(prediction.risk_level)
-                              )}
-                            >
-                              {getRiskLabel(prediction.risk_level)}
-                            </Badge>
-                          </div>
-
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-[10px] font-semibold text-muted-foreground">
-                              {getDateLabel(prediction.created_at)}
-                            </p>
-
-                            <p className="text-xs font-bold text-primary">
-                              {Math.round(Number(prediction.probability))}%
-                            </p>
-                          </div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="rounded-2xl border border-border bg-background/60 p-4 text-center text-xs font-bold text-muted-foreground">
-                        {isArabic
-                          ? "لا توجد تحاليل محفوظة لهذا التخصص"
-                          : "No saved assessments for this specialty"}
-                      </div>
-                    )}
-                  </div>
+                  <Button
+                    type="button"
+                    disabled={!selectedConv}
+                    className="h-12 w-full rounded-2xl bg-primary text-sm font-bold text-primary-foreground hover:!bg-primary/90 hover:!text-primary-foreground disabled:opacity-50"
+                    onClick={openPatientReportsArchive}
+                  >
+                    <FileText
+                      className={cn("h-4 w-4", isArabic ? "ml-2" : "mr-2")}
+                    />
+                    {isArabic
+                      ? "عرض أرشيف التحاليل"
+                      : "View Assessment Archive"}
+                  </Button>
                 </div>
-
-                <Button
-                  type="button"
-                  disabled={!selectedConv}
-                  className="h-12 w-full rounded-2xl bg-primary text-sm font-bold text-primary-foreground hover:!bg-primary/90 hover:!text-primary-foreground disabled:opacity-50"
-                  onClick={openPatientReportsArchive}
-                >
-                  <FileText
-                    className={cn("h-4 w-4", isArabic ? "ml-2" : "mr-2")}
-                  />
-                  {isArabic ? "عرض أرشيف التحاليل" : "View Assessment Archive"}
-                </Button>
               </>
             ) : (
               <div className="flex min-h-[320px] flex-col items-center justify-center text-center">
