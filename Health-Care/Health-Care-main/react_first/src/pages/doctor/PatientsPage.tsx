@@ -67,6 +67,11 @@ type PatientWithExtras = User & {
 
 type PatientDetails = User & {
   phone?: string;
+  risk_level?: string;
+  latest_risk_level?: string;
+  review_status?: string;
+  latest_review_status?: string;
+  status?: string;
   profile?: {
     phone?: string;
   };
@@ -100,6 +105,8 @@ const emptyPatientForm = {
   last_name: "",
   email: "",
   phone: "",
+  password: "",
+  confirmPassword: "",
 };
 
 const PAGE_SIZE = 8;
@@ -222,7 +229,17 @@ export default function PatientsPage() {
     if ("data" in response && response.data) return response.data;
     if ("patient" in response && response.patient) return response.patient;
     if ("user" in response && response.user) return response.user;
-    if ("profile" in response && response.profile) return response.profile;
+    if ("profile" in response && response.profile) {
+      const p = response.profile as any;
+      if (p.user) {
+        return {
+          ...p.user,
+          phone: p.phone,
+          profile: p,
+        } as PatientDetails;
+      }
+      return p as PatientDetails;
+    }
 
     return response as PatientDetails;
   };
@@ -480,6 +497,8 @@ export default function PatientsPage() {
     const lastName = newPatient.last_name.trim();
     const email = newPatient.email.trim();
     const phone = newPatient.phone.trim();
+    const password = newPatient.password;
+    const confirmPassword = newPatient.confirmPassword;
 
     if (!firstName || !lastName || !email) {
       toast.error(
@@ -490,14 +509,36 @@ export default function PatientsPage() {
       return;
     }
 
+    if (!password) {
+      toast.error(
+        isArabic ? "كلمة المرور مطلوبة" : "Password is required"
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error(
+        isArabic ? "كلمة المرور يجب أن تكون 6 أحرف على الأقل" : "Password must be at least 6 characters"
+      );
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast.error(
+        isArabic ? "كلمتا المرور غير متطابقتين" : "Passwords do not match"
+      );
+      return;
+    }
+
     try {
       setCreating(true);
 
-      await patientsApi.createPatient({
+      const res = await patientsApi.createPatient({
         first_name: firstName,
         last_name: lastName,
         email,
         phone,
+        password,
       });
 
       toast.success(
@@ -507,9 +548,15 @@ export default function PatientsPage() {
       setOpenCreate(false);
       setNewPatient(emptyPatientForm);
       await fetchPatients();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create patient", error);
-      toast.error(isArabic ? "فشل إضافة المريض" : "Failed to create patient");
+      let errMsg = isArabic ? "فشل إضافة المريض" : "Failed to create patient";
+      if (error?.response?.data?.error) {
+        errMsg = error.response.data.error;
+      } else if (error?.message) {
+        errMsg = error.message;
+      }
+      toast.error(errMsg);
     } finally {
       setCreating(false);
     }
@@ -978,6 +1025,40 @@ export default function PatientsPage() {
               dir="ltr"
               className="h-12 rounded-xl border-border bg-background text-left text-foreground placeholder:text-muted-foreground"
             />
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input
+                type="password"
+                placeholder={isArabic ? "كلمة المرور" : "Password"}
+                value={newPatient.password || ""}
+                onChange={(e) =>
+                  setNewPatient((prev) => ({
+                    ...prev,
+                    password: e.target.value,
+                  }))
+                }
+                className={cn(
+                  "h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground",
+                  isArabic ? "text-right" : "text-left"
+                )}
+              />
+
+              <Input
+                type="password"
+                placeholder={isArabic ? "تأكيد كلمة المرور" : "Confirm password"}
+                value={newPatient.confirmPassword || ""}
+                onChange={(e) =>
+                  setNewPatient((prev) => ({
+                    ...prev,
+                    confirmPassword: e.target.value,
+                  }))
+                }
+                className={cn(
+                  "h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground",
+                  isArabic ? "text-right" : "text-left"
+                )}
+              />
+            </div>
           </div>
 
           <DialogFooter className="gap-3 sm:justify-end">

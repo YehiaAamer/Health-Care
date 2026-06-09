@@ -44,5 +44,24 @@ export const dashboardApi = {
       API_ENDPOINTS.DOCTOR_ACTIVITY
     );
     return response?.activities || [];
+  },
+
+  /**
+   * Create a new appointment on the backend database
+   */
+  createAppointment: async (appointmentData: {
+    patient_id: number;
+    date: string;
+    time: string;
+    type?: string;
+    notes?: string;
+  }): Promise<{ message: string; appointment: any }> => {
+    return apiCall<{ message: string; appointment: any }>(
+      `/api/doctor/appointments/create/`,
+      {
+        method: "POST",
+        body: JSON.stringify(appointmentData),
+      }
+    );
   }
 };

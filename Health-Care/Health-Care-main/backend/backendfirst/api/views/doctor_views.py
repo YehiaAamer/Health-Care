@@ -1005,3 +1005,233 @@ def doctor_notifications(request):
     ]
 
     return Response({"count": len(data), "notifications": data})
+
+
+# ═══════════════════════════════════════════════════════════════
+# Create Patient & Create Appointment
+# ═══════════════════════════════════════════════════════════════
+
+import secrets
+import string
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsApprovedDoctor])
+def create_patient(request):
+    """
+    POST /api/doctor/patients/create/
+    {
+        "first_name": "John",
+        "last_name": "Doe",
+        "email": "john.doe@example.com",
+        "phone": "1234567890",
+        "password": "securepassword"
+    }
+    """
+    doctor = request.user
+    first_name = request.data.get("first_name", "").strip()
+    last_name = request.data.get("last_name", "").strip()
+    email = request.data.get("email", "").strip().lower()
+    phone = request.data.get("phone", "").strip()
+    password = request.data.get("password", "")
+
+    errors = {}
+    if not first_name:
+        errors["first_name"] = "الاسم الأول مطلوب"
+    if not last_name:
+        errors["last_name"] = "اسم العائلة مطلوب"
+    if not email:
+        errors["email"] = "البريد الإلكتروني مطلوب"
+    if not password:
+        errors["password"] = "كلمة المرور مطلوبة"
+    elif len(password) < 6:
+        errors["password"] = "كلمة المرور يجب أن تكون 6 أحرف على الأقل"
+
+    import logging
+    logger = logging.getLogger(__name__)
+
+    if errors:
+        logger.error(f"[create_patient Validation Errors]: {errors}")
+        return Response(
+            {
+                "error": "فشل التحقق من البيانات", 
+                "details": errors,
+                "submitted_email": request.data.get("email"),
+                "normalized_email": email
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Duplicate email check debug details
+    duplicate_query = User.objects.filter(username=email)
+    query_str = str(duplicate_query.query)
+    match_count = duplicate_query.count()
+
+    logger.info(f"Duplicate check - Submitted: {request.data.get('email')}, Normalized: {email}, Query: {query_str}, Match Count: {match_count}")
+
+    if match_count > 0:
+        return Response(
+            {
+                "error": "هذا البريد الإلكتروني مسجل بالفعل",
+                "submitted_email": request.data.get("email"),
+                "normalized_email": email,
+                "query_executed": query_str,
+                "matching_user_count": match_count
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Create User
+    user = User(
+        username=email,
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+    )
+    user.set_password(password)
+    user.save()
+
+    # Get or create profiles (guarantee profile fields are set)
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    profile.role = UserProfile.ROLE_PATIENT
+    if phone:
+        profile.phone = phone
+    profile.save()
+
+    # Get or create DoctorProfile for the user to be safe
+    DoctorProfile.objects.get_or_create(user=user)
+
+    # Assign patient to this doctor
+    assignment, _ = DoctorPatientAssignment.objects.get_or_create(
+        doctor_user=doctor,
+        patient_user=user,
+        defaults={"status": DoctorPatientAssignment.STATUS_ACTIVE}
+    )
+    if assignment.status != DoctorPatientAssignment.STATUS_ACTIVE:
+        assignment.status = DoctorPatientAssignment.STATUS_ACTIVE
+        assignment.save()
+
+    return Response({
+        "message": "تم إضافة المريض بنجاح",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "phone": profile.phone,
+            "role": profile.role,
+        }
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsApprovedDoctor])
+def create_appointment(request):
+    """
+    POST /api/doctor/appointments/create/
+    {
+        "patient_id": 12,
+        "date": "2026-06-10",
+        "time": "10:00 AM",
+        "type": "follow_up",
+        "notes": "some notes"
+    }
+    """
+    doctor = request.user
+    patient_id = request.data.get("patient_id")
+    date_str = request.data.get("date")
+    time_str = request.data.get("time")
+    appt_type = request.data.get("type", Appointment.TYPE_FOLLOW_UP)
+    notes = request.data.get("notes", "")
+
+    if not patient_id or not date_str or not time_str:
+        return Response(
+            {"error": "المريض والتاريخ والوقت مطلوبة"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        patient = User.objects.get(id=patient_id)
+    except User.DoesNotExist:
+        return Response(
+            {"error": "المريض غير موجود"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Check assignment
+    is_assigned = DoctorPatientAssignment.objects.filter(
+        doctor_user=doctor,
+        patient_user=patient,
+        status=DoctorPatientAssignment.STATUS_ACTIVE,
+    ).exists()
+
+    if not is_assigned:
+        return Response(
+            {"error": "ليس لديك صلاحية لحجز موعد مع هذا المريض"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    # Clean / parse date & time
+    from datetime import datetime
+    try:
+        # Expected formats: YYYY-MM-DD or ISO string
+        if "T" in date_str:
+            parsed_date = datetime.fromisoformat(date_str.replace("Z", "+00:00")).date()
+        else:
+            parsed_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except Exception:
+        return Response(
+            {"error": "صيغة التاريخ غير صحيحة (YYYY-MM-DD)"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Try parsing time: e.g. "10:00 AM" or "14:30"
+    parsed_time = None
+    time_formats = ["%I:%M %p", "%I:%M%p", "%H:%M", "%H:%M:%S"]
+    for fmt in time_formats:
+        try:
+            parsed_time = datetime.strptime(time_str.strip(), fmt).time()
+            break
+        except Exception:
+            continue
+
+    if not parsed_time:
+        return Response(
+            {"error": "صيغة الوقت غير صحيحة (مثال: 10:00 AM)"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Create appointment
+    appointment = Appointment.objects.create(
+        doctor_user=doctor,
+        patient_user=patient,
+        appointment_date=parsed_date,
+        appointment_time=parsed_time,
+        appointment_type=appt_type,
+        status=Appointment.STATUS_SCHEDULED,
+        notes=notes,
+    )
+
+    # Notify patient
+    Notification.objects.create(
+        user=patient,
+        type="appointment_scheduled",
+        title="موعد جديد محجوز",
+        body=f"قام الطبيب بحجز موعد لك بتاريخ {parsed_date} الساعة {parsed_time.strftime('%I:%M %p')}.",
+        related_object_id=appointment.id,
+        related_object_type="appointment",
+    )
+
+    return Response({
+        "message": "تم إنشاء الحجز بنجاح",
+        "appointment": {
+            "id": appointment.id,
+            "patient_id": patient.id,
+            "patient_name": f"{patient.first_name} {patient.last_name}".strip(),
+            "date": appointment.appointment_date.isoformat(),
+            "time": appointment.appointment_time.strftime("%H:%M"),
+            "type": appointment.appointment_type,
+            "status": appointment.status,
+            "notes": appointment.notes,
+        }
+    }, status=status.HTTP_201_CREATED)
+

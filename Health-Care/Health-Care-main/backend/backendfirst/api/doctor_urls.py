@@ -17,7 +17,8 @@ from .views.doctor_views import (
     doctor_profile,
     doctor_notifications,
     all_patient_predictions,
-    send_message,          # من تعديلاتك
+    create_patient,
+    create_appointment,
 )
 
 urlpatterns = [
@@ -48,6 +49,7 @@ urlpatterns = [
     # Patients
     # ────────────────────────────────────────────────
     path("patients/", doctor_patients, name="doctor_patients"),
+    path("patients/create/", create_patient, name="create_patient"),
     path(
         "patients/<int:patient_id>/profile/",
         doctor_patient_profile,
@@ -58,6 +60,7 @@ urlpatterns = [
     # Appointments
     # ────────────────────────────────────────────────
     path("appointments/today/", today_appointments, name="today_appointments"),
+    path("appointments/create/", create_appointment, name="create_appointment"),
 
     # ────────────────────────────────────────────────
     # Messages
@@ -76,7 +79,7 @@ urlpatterns = [
         name="send_thread_message",
     ),
     # تعديلك الإضافي
-    path('messages/recent/<int:thread_id>/send/', send_message, name='send_message'),
+
 
     # ────────────────────────────────────────────────
     # Activity

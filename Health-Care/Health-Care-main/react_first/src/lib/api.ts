@@ -380,7 +380,9 @@ async function handleErrorResponse(
     );
   }
 
-  const arabicMessage = getArabicErrorMessage(response.status, errorMessage);
+  const arabicMessage = response.status === 400 && errorMessage !== `Server Error: ${response.status}`
+    ? errorMessage
+    : getArabicErrorMessage(response.status, errorMessage);
 
   throw new APIError(errorCode, response.status, undefined, arabicMessage);
 }

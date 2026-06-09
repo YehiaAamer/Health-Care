@@ -23,4 +23,23 @@ export const patientsApi = {
       `${API_ENDPOINTS.DOCTOR_PATIENTS}${id}/profile/`
     );
   },
+
+  /**
+   * Create a new patient profile and assign to current doctor
+   */
+  createPatient: async (patientData: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone?: string;
+    password?: string;
+  }): Promise<{ message: string; user: User; temporary_password?: string }> => {
+    return apiCall<{ message: string; user: User; temporary_password?: string }>(
+      `${API_ENDPOINTS.DOCTOR_PATIENTS}create/`,
+      {
+        method: "POST",
+        body: JSON.stringify(patientData),
+      }
+    );
+  },
 };
