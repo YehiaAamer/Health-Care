@@ -19,6 +19,7 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import {
   Search,
   Send,
+  Check,
   CheckCheck,
   X,
   Paperclip,
@@ -29,7 +30,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-import LoadingDots from "../../components/shared/LoadingDots";
 import { toast } from "sonner";
 import { cn } from "../../lib/utils";
 
@@ -52,6 +52,14 @@ type PatientChatMessage = {
   sender_user?: number | string;
   content: string;
   created_at: string;
+  is_read?: boolean;
+  read?: boolean;
+  seen?: boolean;
+  is_seen?: boolean;
+  read_at?: string | null;
+  seen_at?: string | null;
+  status?: string;
+  delivery_status?: string;
 };
 
 type DoctorSummary = {
@@ -71,7 +79,6 @@ export default function PatientMessagesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedThreadRef = useRef<number | null>(null);
 
-  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
 
   const [search, setSearch] = useState("");
@@ -86,7 +93,13 @@ export default function PatientMessagesPage() {
 
   const [conversations, setConversations] = useState<DoctorThread[]>([]);
   const [messages, setMessages] = useState<PatientChatMessage[]>([]);
-  const [messagesLoaded, setMessagesLoaded] = useState(false);
+
+  const [messagesByThread, setMessagesByThread] = useState<
+    Record<number, PatientChatMessage[]>
+  >({
+    1: [],
+    2: [],
+  });
 
   const mockDoctors = useMemo<DoctorThread[]>(
     () => [
@@ -112,14 +125,6 @@ export default function PatientMessagesPage() {
     [isArabic]
   );
 
-  const mockMessages = useMemo<Record<number, PatientChatMessage[]>>(
-    () => ({
-      1: [],
-      2: [],
-    }),
-    []
-  );
-
   const mockDoctorSummaries = useMemo<Record<number, DoctorSummary>>(
     () => ({
       1: {
@@ -143,6 +148,25 @@ export default function PatientMessagesPage() {
     }),
     [isArabic]
   );
+
+  const isMessageReadByDoctor = (message: PatientChatMessage) => {
+    const normalizedStatus = String(
+      message.status || message.delivery_status || ""
+    )
+      .trim()
+      .toLowerCase();
+
+    return (
+      message.is_read === true ||
+      message.read === true ||
+      message.seen === true ||
+      message.is_seen === true ||
+      Boolean(message.read_at) ||
+      Boolean(message.seen_at) ||
+      normalizedStatus === "read" ||
+      normalizedStatus === "seen"
+    );
+  };
 
   const getDoctorInitials = (name?: string, fallbackId?: string | number) => {
     const cleanName = String(name || "").trim();
@@ -196,18 +220,43 @@ export default function PatientMessagesPage() {
     setSpecialtyDropdownOpen(false);
   };
 
-  const fetchDoctorsAndThreads = async (showToast = false) => {
+  const syncThreadsWithSavedMessages = (threads: DoctorThread[]) => {
+    return threads.map((thread) => {
+      const threadMessages = messagesByThread[thread.id] || [];
+      const lastMessage = threadMessages[threadMessages.length - 1];
+
+      if (!lastMessage) return thread;
+
+      return {
+        ...thread,
+        last_message: lastMessage.content,
+        time: lastMessage.created_at,
+      };
+    });
+  };
+
+  const fetchDoctorsAndThreads = (showToast = false) => {
     try {
-      if (conversations.length === 0) {
-        setLoading(true);
-      }
+      const safeThreads = syncThreadsWithSavedMessages(mockDoctors);
 
-      const safeThreads = mockDoctors;
+      setConversations((current) => {
+        if (current.length === 0) return safeThreads;
 
-      setConversations(safeThreads);
+        return safeThreads.map((thread) => {
+          const oldThread = current.find((item) => item.id === thread.id);
+          return {
+            ...thread,
+            unread_count: oldThread?.unread_count ?? thread.unread_count ?? 0,
+          };
+        });
+      });
 
       setSelectedConv((current) => {
-        if (current) return current;
+        if (current) {
+          const refreshed = safeThreads.find((thread) => thread.id === current.id);
+          return refreshed || current;
+        }
+
         return safeThreads.length > 0 ? safeThreads[0] : null;
       });
 
@@ -221,20 +270,15 @@ export default function PatientMessagesPage() {
       toast.error(
         isArabic ? "فشل تحميل المحادثات" : "Failed to load conversations"
       );
-    } finally {
-      setLoading(false);
     }
   };
 
-  const fetchMessages = async (threadId: number, showToast = false) => {
+  const fetchMessages = (threadId: number, showToast = false) => {
     try {
-      setMessagesLoaded(false);
-
-      const safeMessages = mockMessages[threadId] || [];
+      const savedMessages = messagesByThread[threadId] || [];
 
       if (selectedThreadRef.current === threadId) {
-        setMessages(safeMessages);
-        setMessagesLoaded(true);
+        setMessages(savedMessages);
       }
 
       if (showToast) {
@@ -243,17 +287,13 @@ export default function PatientMessagesPage() {
     } catch (error) {
       console.error("Failed to fetch patient messages", error);
 
-      if (selectedThreadRef.current === threadId) {
-        setMessagesLoaded(true);
-      }
-
       if (showToast) {
         toast.error(isArabic ? "فشل تحميل الرسائل" : "Failed to load messages");
       }
     }
   };
 
-  const fetchDoctorSummary = async (threadId: number) => {
+  const fetchDoctorSummary = (threadId: number) => {
     try {
       setSelectedDoctorSummary(mockDoctorSummaries[threadId] || null);
     } catch (error) {
@@ -265,8 +305,9 @@ export default function PatientMessagesPage() {
   const handleSelectConversation = (conv: DoctorThread) => {
     closeMenus();
     selectedThreadRef.current = conv.id;
-    setMessagesLoaded(false);
     setSelectedConv(conv);
+    setMessages(messagesByThread[conv.id] || []);
+    fetchDoctorSummary(conv.id);
 
     setConversations((prev) =>
       prev.map((item) =>
@@ -301,35 +342,30 @@ export default function PatientMessagesPage() {
 
   useEffect(() => {
     fetchDoctorsAndThreads();
+  }, [isArabic, mockDoctors, messagesByThread]);
 
-    const interval = setInterval(() => fetchDoctorsAndThreads(), 30000);
-
-    return () => clearInterval(interval);
-  }, [isArabic, mockDoctors]);
+  useEffect(() => {
+    if (!selectedConv && conversations.length > 0) {
+      const firstConversation = conversations[0];
+      selectedThreadRef.current = firstConversation.id;
+      setSelectedConv(firstConversation);
+      setMessages(messagesByThread[firstConversation.id] || []);
+      fetchDoctorSummary(firstConversation.id);
+    }
+  }, [conversations, selectedConv, messagesByThread]);
 
   useEffect(() => {
     if (!selectedConv) {
       selectedThreadRef.current = null;
       setMessages([]);
-      setMessagesLoaded(false);
       setSelectedDoctorSummary(null);
       return;
     }
 
     selectedThreadRef.current = selectedConv.id;
-    setMessagesLoaded(false);
-
     fetchMessages(selectedConv.id);
     fetchDoctorSummary(selectedConv.id);
-
-    const interval = setInterval(() => {
-      if (selectedThreadRef.current === selectedConv.id) {
-        fetchMessages(selectedConv.id);
-      }
-    }, 15000);
-
-    return () => clearInterval(interval);
-  }, [selectedConv?.id, mockMessages, mockDoctorSummaries]);
+  }, [selectedConv?.id, messagesByThread, mockDoctorSummaries]);
 
   useEffect(() => {
     if (!scrollRef.current) return;
@@ -358,10 +394,26 @@ export default function PatientMessagesPage() {
         sender_type: "patient",
         content: messageText,
         created_at: new Date().toISOString(),
+        is_read: false,
+        read: false,
+        seen: false,
+        is_seen: false,
+        read_at: null,
+        seen_at: null,
+        status: "sent",
+        delivery_status: "sent",
       };
 
+      setMessagesByThread((prev) => {
+        const currentThreadMessages = prev[activeThreadId] || [];
+
+        return {
+          ...prev,
+          [activeThreadId]: [...currentThreadMessages, sentMsg],
+        };
+      });
+
       if (selectedThreadRef.current === activeThreadId) {
-        setMessagesLoaded(true);
         setMessages((prev) => [...prev, sentMsg]);
       }
 
@@ -373,11 +425,22 @@ export default function PatientMessagesPage() {
             ? {
                 ...conv,
                 last_message: messageText,
-                time: new Date().toISOString(),
+                time: sentMsg.created_at,
                 unread_count: 0,
               }
             : conv
         )
+      );
+
+      setSelectedConv((current) =>
+        current?.id === activeThreadId
+          ? {
+              ...current,
+              last_message: messageText,
+              time: sentMsg.created_at,
+              unread_count: 0,
+            }
+          : current
       );
 
       toast.success(isArabic ? "تم إرسال الرسالة" : "Message sent");
@@ -410,22 +473,6 @@ export default function PatientMessagesPage() {
       return matchesSearch && matchesMainFilter && matchesSpecialtyFilter;
     });
   }, [conversations, search, activeFilter, specialtyFilter, isArabic]);
-
-  if (loading) {
-    return (
-      <>
-        <Header />
-
-        <div className="flex min-h-screen flex-col items-center justify-center bg-background pt-24">
-          <LoadingDots />
-
-          <p className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            {isArabic ? "جاري تحميل الرسائل" : "Loading messages"}
-          </p>
-        </div>
-      </>
-    );
-  }
 
   return (
     <>
@@ -733,15 +780,28 @@ export default function PatientMessagesPage() {
                 <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-end space-y-5 py-7">
                   {!selectedConv ? (
                     <div className="flex flex-1" />
-                  ) : !messagesLoaded ? (
-                    <div className="flex flex-1 items-center justify-center">
-                      <LoadingDots />
-                    </div>
                   ) : messages.length === 0 ? (
-                    <div className="flex flex-1" />
+                    <div className="flex flex-1 flex-col justify-end">
+                      <div className="mx-auto mb-8 max-w-md rounded-3xl border border-border bg-card p-6 text-center shadow-sm">
+                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                          <Stethoscope className="h-6 w-6" />
+                        </div>
+
+                        <h3 className="text-base font-bold text-foreground">
+                          {isArabic ? "لا توجد رسائل" : "No messages"}
+                        </h3>
+
+                        <p className="mt-2 text-sm font-medium leading-6 text-muted-foreground">
+                          {isArabic
+                            ? "ابدأ المحادثة بإرسال رسالة للطبيب."
+                            : "Start the conversation by sending a message to the doctor."}
+                        </p>
+                      </div>
+                    </div>
                   ) : (
                     messages.map((msg) => {
                       const isPatientMessage = msg.sender_type === "patient";
+                      const isReadByDoctor = isMessageReadByDoctor(msg);
 
                       return (
                         <div
@@ -783,9 +843,22 @@ export default function PatientMessagesPage() {
                                   : "--:--"}
                               </span>
 
-                              {isPatientMessage && (
-                                <CheckCheck className="h-3.5 w-3.5 text-primary" />
-                              )}
+                              {isPatientMessage &&
+                                (isReadByDoctor ? (
+                                  <CheckCheck
+                                    className="h-3.5 w-3.5 text-primary"
+                                    aria-label={
+                                      isArabic ? "تمت القراءة" : "Read by doctor"
+                                    }
+                                  />
+                                ) : (
+                                  <Check
+                                    className="h-3.5 w-3.5 text-muted-foreground"
+                                    aria-label={
+                                      isArabic ? "تم الإرسال" : "Sent"
+                                    }
+                                  />
+                                ))}
                             </div>
                           </div>
                         </div>
@@ -844,22 +917,22 @@ export default function PatientMessagesPage() {
                     disabled={!selectedConv || !newMessage.trim() || sending}
                     className="h-11 shrink-0 rounded-2xl bg-primary px-3 text-sm font-bold text-primary-foreground hover:!bg-primary/90 hover:!text-primary-foreground disabled:opacity-50 sm:px-4"
                   >
-                    {sending ? (
-                      <LoadingDots color="white" />
-                    ) : (
-                      <>
-                        <Send
-                          className={cn(
-                            "h-4 w-4",
-                            isArabic ? "rotate-180 sm:ml-2" : "sm:mr-2"
-                          )}
-                        />
+                    <Send
+                      className={cn(
+                        "h-4 w-4",
+                        isArabic ? "rotate-180 sm:ml-2" : "sm:mr-2"
+                      )}
+                    />
 
-                        <span className="hidden sm:inline">
-                          {isArabic ? "إرسال" : "Send"}
-                        </span>
-                      </>
-                    )}
+                    <span className="hidden sm:inline">
+                      {sending
+                        ? isArabic
+                          ? "جاري الإرسال"
+                          : "Sending"
+                        : isArabic
+                        ? "إرسال"
+                        : "Send"}
+                    </span>
                   </Button>
                 </div>
               </div>
@@ -952,8 +1025,8 @@ export default function PatientMessagesPage() {
                       <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                         {selectedConv
                           ? isArabic
-                            ? "جاري تحميل بيانات الطبيب أو لا توجد بيانات متاحة"
-                            : "Loading doctor data or no data available"
+                            ? "لا توجد بيانات متاحة للطبيب"
+                            : "No doctor data available"
                           : isArabic
                           ? "اختار دكتور لعرض البيانات"
                           : "Select a doctor to view summary"}

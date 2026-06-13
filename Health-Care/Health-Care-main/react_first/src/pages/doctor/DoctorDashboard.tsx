@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 import { useApiCall } from "@/hooks/useApiCall";
@@ -31,7 +31,6 @@ import {
   RefreshCw,
   Save,
   Search,
-  Bell,
   Globe,
 } from "lucide-react";
 
@@ -68,6 +67,207 @@ export default function DoctorDashboard() {
     activities: true,
   });
 
+  const normalizeText = (value: unknown) => {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/_/g, " ")
+      .replace(/-/g, " ")
+      .trim();
+  };
+
+  const getActivityRelatedId = (activity: any) => {
+    const possibleId =
+      activity?.related_id ||
+      activity?.prediction_id ||
+      activity?.report_id ||
+      activity?.analysis_id ||
+      activity?.id;
+
+    const numericId = Number(possibleId);
+
+    return Number.isNaN(numericId) ? null : numericId;
+  };
+
+  const isFinalReviewActivity = (activity: any) => {
+    const activityType = normalizeText(activity?.type);
+    const title = normalizeText(activity?.title);
+    const description = normalizeText(activity?.description);
+    const status = normalizeText(activity?.status);
+    const reviewStatus = normalizeText(activity?.review_status);
+    const decisionValue = normalizeText(activity?.decision);
+    const action = normalizeText(activity?.action);
+
+    const combinedText = `${activityType} ${title} ${description} ${status} ${reviewStatus} ${decisionValue} ${action}`;
+
+    return (
+      activityType === "review" ||
+      activityType === "approved" ||
+      activityType === "rejected" ||
+      combinedText.includes("approved") ||
+      combinedText.includes("rejected") ||
+      combinedText.includes("reviewed") ||
+      combinedText.includes("needs followup") ||
+      combinedText.includes("needs follow up") ||
+      combinedText.includes("completed") ||
+      combinedText.includes("done") ||
+      combinedText.includes("تمت المراجعة") ||
+      combinedText.includes("تمت مراجعة") ||
+      combinedText.includes("تمت الموافقة") ||
+      combinedText.includes("مقبول") ||
+      combinedText.includes("مرفوض") ||
+      combinedText.includes("يحتاج متابعة")
+    );
+  };
+
+  const isPredictionRelatedActivity = (activity: any) => {
+    const activityType = normalizeText(activity?.type);
+    const title = normalizeText(activity?.title);
+    const description = normalizeText(activity?.description);
+
+    const combinedText = `${activityType} ${title} ${description}`;
+
+    return (
+      activityType === "prediction" ||
+      activityType.includes("prediction") ||
+      activityType.includes("analysis") ||
+      combinedText.includes("prediction") ||
+      combinedText.includes("analysis") ||
+      combinedText.includes("report") ||
+      combinedText.includes("تحليل") ||
+      combinedText.includes("تقرير")
+    );
+  };
+
+  const extractAppointmentsArray = (response: any) => {
+    if (Array.isArray(response)) return response;
+
+    const possibleArrays = [
+      response?.appointments,
+      response?.today_appointments,
+      response?.doctor_appointments,
+      response?.appointment_requests,
+      response?.upcoming_appointments,
+      response?.confirmed_appointments,
+      response?.items,
+      response?.results,
+      response?.data,
+      response?.data?.appointments,
+      response?.data?.today_appointments,
+      response?.data?.doctor_appointments,
+      response?.data?.appointment_requests,
+      response?.data?.upcoming_appointments,
+      response?.data?.confirmed_appointments,
+      response?.data?.results,
+      response?.data?.items,
+      response?.payload,
+      response?.payload?.appointments,
+      response?.payload?.today_appointments,
+      response?.payload?.doctor_appointments,
+      response?.payload?.appointment_requests,
+      response?.payload?.results,
+      response?.payload?.items,
+    ];
+
+    const matchedArray = possibleArrays.find((item) => Array.isArray(item));
+
+    return matchedArray || [];
+  };
+
+  const normalizeAppointmentForDashboard = (appointment: any) => {
+    const patient =
+      appointment?.patient ||
+      appointment?.patient_details ||
+      appointment?.patient_data ||
+      appointment?.patient_profile ||
+      appointment?.user ||
+      {};
+
+    const patientFullName = [patient?.first_name, patient?.last_name]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    const appointmentDateTime =
+      appointment?.appointment_datetime ||
+      appointment?.datetime ||
+      appointment?.scheduled_at ||
+      appointment?.start_time ||
+      appointment?.appointment_date ||
+      appointment?.date ||
+      appointment?.created_at;
+
+    const appointmentTime =
+      appointment?.time ||
+      appointment?.appointment_time ||
+      appointment?.start_time ||
+      appointment?.appointment_datetime ||
+      appointment?.datetime ||
+      appointmentDateTime;
+
+    return {
+      ...appointment,
+      id:
+        appointment?.id ||
+        appointment?.appointment_id ||
+        `${appointmentDateTime || "appointment"}-${
+          patient?.id || appointment?.patient_id || Math.random()
+        }`,
+
+      patient_name:
+        appointment?.patient_name ||
+        appointment?.patient_full_name ||
+        patient?.name ||
+        patient?.full_name ||
+        patientFullName ||
+        "Unknown Patient",
+
+      patient_id:
+        appointment?.patient_id ||
+        appointment?.patient_user ||
+        appointment?.patient_user_id ||
+        patient?.id ||
+        patient?.user_id,
+
+      patient_user:
+        appointment?.patient_user ||
+        appointment?.patient_user_id ||
+        appointment?.patient_id ||
+        patient?.id ||
+        patient?.user_id,
+
+      profile_picture:
+        appointment?.profile_picture ||
+        appointment?.patient_profile_picture ||
+        patient?.profile_picture ||
+        patient?.profile?.profile_picture ||
+        "",
+
+      time: appointmentTime,
+      appointment_time: appointmentTime,
+      appointment_datetime: appointmentDateTime,
+
+      appointment_date:
+        appointment?.appointment_date ||
+        appointment?.date ||
+        appointmentDateTime,
+
+      type:
+        appointment?.type ||
+        appointment?.appointment_type ||
+        appointment?.consultation_type ||
+        "appointment",
+
+      status: appointment?.status || "upcoming",
+
+      reason:
+        appointment?.reason ||
+        appointment?.condition ||
+        appointment?.notes ||
+        appointment?.description ||
+        "Medical Consultation",
+    };
+  };
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentDateTime(new Date());
@@ -94,7 +294,7 @@ export default function DoctorDashboard() {
     const fetchDashboardData = async () => {
       try {
         const statsRes: any = await apiCall(API_ENDPOINTS.DOCTOR_DASHBOARD);
-        const resolvedSpecialty = statsRes?.specialties?.[0] || 'diabetes';
+        const resolvedSpecialty = statsRes?.specialties?.[0] || "diabetes";
 
         if (isMounted) {
           setStats(statsRes?.stats || statsRes?.dashboard || statsRes || null);
@@ -129,15 +329,25 @@ export default function DoctorDashboard() {
 
         if (!isMounted) return;
 
-        setPredictions(
-          Array.isArray(predsRes)
-            ? predsRes
-            : predsRes?.predictions ||
-                predsRes?.pending_predictions ||
-                predsRes?.results ||
-                predsRes?.data ||
-                []
-        );
+        const extractedPredictions = Array.isArray(predsRes)
+          ? predsRes
+          : predsRes?.predictions ||
+            predsRes?.pending_predictions ||
+            predsRes?.results ||
+            predsRes?.data ||
+            [];
+
+        const pendingPredictions = Array.isArray(extractedPredictions)
+          ? extractedPredictions.filter((prediction: Prediction) => {
+              const status = normalizeText(
+                prediction?.review_status || "pending"
+              );
+
+              return status === "pending";
+            })
+          : [];
+
+        setPredictions(pendingPredictions);
       } catch (error) {
         console.error("Failed to load pending reviews", error);
         toast.error("Failed to load pending reviews");
@@ -154,15 +364,15 @@ export default function DoctorDashboard() {
 
         if (!isMounted) return;
 
-        setAppointments(
-          Array.isArray(appointmentsRes)
-            ? appointmentsRes
-            : appointmentsRes?.appointments ||
-                appointmentsRes?.today_appointments ||
-                appointmentsRes?.results ||
-                appointmentsRes?.data ||
-                []
+        console.log("Dashboard appointments response:", appointmentsRes);
+
+        const extractedAppointments = extractAppointmentsArray(appointmentsRes);
+
+        const normalizedAppointments = extractedAppointments.map(
+          normalizeAppointmentForDashboard
         );
+
+        setAppointments(normalizedAppointments);
       } catch (error) {
         console.error("Failed to load today's appointments", error);
         setAppointments([]);
@@ -177,14 +387,16 @@ export default function DoctorDashboard() {
 
         if (!isMounted) return;
 
+        const extractedActivities = Array.isArray(activityRes)
+          ? activityRes
+          : activityRes?.activities ||
+            activityRes?.recent_activity ||
+            activityRes?.results ||
+            activityRes?.data ||
+            [];
+
         setActivities(
-          Array.isArray(activityRes)
-            ? activityRes
-            : activityRes?.activities ||
-                activityRes?.recent_activity ||
-                activityRes?.results ||
-                activityRes?.data ||
-                []
+          Array.isArray(extractedActivities) ? extractedActivities : []
         );
       } catch (error) {
         console.error("Failed to load recent activity", error);
@@ -203,6 +415,86 @@ export default function DoctorDashboard() {
     };
   }, [apiCall]);
 
+  const dashboardActivities = useMemo(() => {
+    const pendingPredictionsOnly = predictions.filter((prediction) => {
+      const status = normalizeText(prediction.review_status || "pending");
+
+      return status === "pending";
+    });
+
+    const pendingPredictionIds = new Set(
+      pendingPredictionsOnly.map((prediction) => Number(prediction.id))
+    );
+
+    const pendingPredictionActivities = pendingPredictionsOnly.map(
+      (prediction) => {
+        const patientName =
+          prediction.patient_name ||
+          (isArabic ? "مريض غير معروف" : "Anonymous Patient");
+
+        return {
+          type: "prediction",
+          icon: "activity",
+          title: isArabic ? "تحليل جديد" : "New Analysis",
+          description: isArabic
+            ? `تحليل جديد من ${patientName}`
+            : `New analysis from ${patientName}`,
+          related_id: prediction.id,
+          created_at: prediction.created_at,
+        };
+      }
+    );
+
+    const normalizedApiActivities = Array.isArray(activities) ? activities : [];
+
+    const filteredApiActivities = normalizedApiActivities.filter((activity) => {
+      if (isFinalReviewActivity(activity)) {
+        return false;
+      }
+
+      const relatedId = getActivityRelatedId(activity);
+
+      if (isPredictionRelatedActivity(activity)) {
+        if (!relatedId) return false;
+
+        return pendingPredictionIds.has(relatedId);
+      }
+
+      return true;
+    });
+
+    const mergedActivities = [
+      ...pendingPredictionActivities,
+      ...filteredApiActivities,
+    ];
+
+    const uniqueActivitiesMap = new Map<string, any>();
+
+    mergedActivities.forEach((activity) => {
+      const activityType = String(activity?.type || "").toLowerCase();
+      const relatedId =
+        activity?.related_id ||
+        activity?.prediction_id ||
+        activity?.report_id ||
+        activity?.analysis_id ||
+        activity?.id ||
+        "no-id";
+      const createdAt = activity?.created_at || "no-date";
+      const title = activity?.title || "";
+
+      const key =
+        activityType === "prediction" && relatedId !== "no-id"
+          ? `prediction-${relatedId}`
+          : `${activityType}-${relatedId}-${createdAt}-${title}`;
+
+      if (!uniqueActivitiesMap.has(key)) {
+        uniqueActivitiesMap.set(key, activity);
+      }
+    });
+
+    return Array.from(uniqueActivitiesMap.values());
+  }, [activities, predictions, isArabic]);
+
   const handleChangeLanguage = () => {
     const nextLanguage = isArabic ? "en" : "ar";
     i18n.changeLanguage(nextLanguage);
@@ -210,8 +502,15 @@ export default function DoctorDashboard() {
 
   const getRiskClasses = (level: string) => {
     const normalized = level?.toLowerCase()?.trim();
-    // Match English or Arabic risk level strings
-    const isHigh = ["high", "very high", "مرتفع", "مرتفع جدًا", "مرتفع جداً"].includes(normalized);
+
+    const isHigh = [
+      "high",
+      "very high",
+      "مرتفع",
+      "مرتفع جدًا",
+      "مرتفع جداً",
+    ].includes(normalized);
+
     const isMedium = ["medium", "متوسط"].includes(normalized);
     const isLow = ["low", "منخفض"].includes(normalized);
 
@@ -254,7 +553,7 @@ export default function DoctorDashboard() {
   };
 
   const handleReviewPrediction = (id: number) => {
-    const report = predictions.find((item) => item.id === id);
+    const report = predictions.find((item) => Number(item.id) === Number(id));
 
     if (!report) {
       toast.error(isArabic ? "لم يتم العثور على التقرير" : "Report not found");
@@ -292,11 +591,44 @@ export default function DoctorDashboard() {
         isArabic ? "تم حفظ المراجعة بنجاح" : "Review saved successfully"
       );
 
+      const reviewedReportId = Number(selectedReport.id);
+
       setIsReviewOpen(false);
       setSelectedReport(null);
+      setDoctorNotes("");
+      setDecision("pending");
 
       setPredictions((prev) =>
-        prev.filter((prediction) => prediction.id !== selectedReport.id)
+        prev.filter(
+          (prediction) => Number(prediction.id) !== reviewedReportId
+        )
+      );
+
+      setActivities((prev) =>
+        prev.filter((activity) => {
+          const activityRelatedId = getActivityRelatedId(activity);
+
+          if (activityRelatedId === reviewedReportId) {
+            return false;
+          }
+
+          if (isFinalReviewActivity(activity)) {
+            return false;
+          }
+
+          const title = normalizeText(activity?.title);
+          const description = normalizeText(activity?.description);
+          const combinedText = `${title} ${description}`;
+
+          if (
+            isPredictionRelatedActivity(activity) &&
+            combinedText.includes(String(reviewedReportId))
+          ) {
+            return false;
+          }
+
+          return true;
+        })
       );
     } catch (error) {
       console.error("Failed to save review", error);
@@ -341,20 +673,46 @@ export default function DoctorDashboard() {
           },
           {
             label: isArabic ? "التدخين" : "Smoking",
-            value: selectedReport.extra_fields?.smoke !== undefined
-              ? (selectedReport.extra_fields?.smoke ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
-              : (selectedReport.extra_fields?.smoking !== undefined
-                ? (selectedReport.extra_fields?.smoking ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
-                : "N/A"),
+            value:
+              selectedReport.extra_fields?.smoke !== undefined
+                ? selectedReport.extra_fields?.smoke
+                  ? isArabic
+                    ? "نعم"
+                    : "Yes"
+                  : isArabic
+                    ? "لا"
+                    : "No"
+                : selectedReport.extra_fields?.smoking !== undefined
+                  ? selectedReport.extra_fields?.smoking
+                    ? isArabic
+                      ? "نعم"
+                      : "Yes"
+                    : isArabic
+                      ? "لا"
+                      : "No"
+                  : "N/A",
             unit: "",
           },
           {
             label: isArabic ? "النشاط البدني" : "Physical Activity",
-            value: selectedReport.extra_fields?.physical_activity !== undefined
-              ? (selectedReport.extra_fields?.physical_activity ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
-              : (selectedReport.extra_fields?.active !== undefined
-                ? (selectedReport.extra_fields?.active ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
-                : "N/A"),
+            value:
+              selectedReport.extra_fields?.physical_activity !== undefined
+                ? selectedReport.extra_fields?.physical_activity
+                  ? isArabic
+                    ? "نشط"
+                    : "Active"
+                  : isArabic
+                    ? "غير نشط"
+                    : "Inactive"
+                : selectedReport.extra_fields?.active !== undefined
+                  ? selectedReport.extra_fields?.active
+                    ? isArabic
+                      ? "نشط"
+                      : "Active"
+                    : isArabic
+                      ? "غير نشط"
+                      : "Inactive"
+                  : "N/A",
             unit: "",
           },
         ]
@@ -399,7 +757,6 @@ export default function DoctorDashboard() {
             value: selectedReport.pregnancies,
             unit: "Count",
           },
-          // Shared fields from extra_fields if available on Diabetes prediction
           ...(selectedReport.extra_fields
             ? [
                 {
@@ -424,20 +781,46 @@ export default function DoctorDashboard() {
                 },
                 {
                   label: isArabic ? "التدخين" : "Smoking",
-                  value: selectedReport.extra_fields.smoke !== undefined
-                    ? (selectedReport.extra_fields.smoke ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
-                    : (selectedReport.extra_fields.smoking !== undefined
-                      ? (selectedReport.extra_fields.smoking ? (isArabic ? "نعم" : "Yes") : (isArabic ? "لا" : "No"))
-                      : "N/A"),
+                  value:
+                    selectedReport.extra_fields.smoke !== undefined
+                      ? selectedReport.extra_fields.smoke
+                        ? isArabic
+                          ? "نعم"
+                          : "Yes"
+                        : isArabic
+                          ? "لا"
+                          : "No"
+                      : selectedReport.extra_fields.smoking !== undefined
+                        ? selectedReport.extra_fields.smoking
+                          ? isArabic
+                            ? "نعم"
+                            : "Yes"
+                          : isArabic
+                            ? "لا"
+                            : "No"
+                        : "N/A",
                   unit: "",
                 },
                 {
                   label: isArabic ? "النشاط البدني" : "Physical Activity",
-                  value: selectedReport.extra_fields.physical_activity !== undefined
-                    ? (selectedReport.extra_fields.physical_activity ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
-                    : (selectedReport.extra_fields.active !== undefined
-                      ? (selectedReport.extra_fields.active ? (isArabic ? "نشط" : "Active") : (isArabic ? "غير نشط" : "Inactive"))
-                      : "N/A"),
+                  value:
+                    selectedReport.extra_fields.physical_activity !== undefined
+                      ? selectedReport.extra_fields.physical_activity
+                        ? isArabic
+                          ? "نشط"
+                          : "Active"
+                        : isArabic
+                          ? "غير نشط"
+                          : "Inactive"
+                      : selectedReport.extra_fields.active !== undefined
+                        ? selectedReport.extra_fields.active
+                          ? isArabic
+                            ? "نشط"
+                            : "Active"
+                          : isArabic
+                            ? "غير نشط"
+                            : "Inactive"
+                        : "N/A",
                   unit: "",
                 },
               ]
@@ -480,7 +863,7 @@ export default function DoctorDashboard() {
   return (
     <div
       dir={isArabic ? "rtl" : "ltr"}
-      className="min-h-full w-full max-w-none animate-in fade-in pb-8 pt-8 text-foreground duration-700 md:pt-0"
+      className="min-h-full w-full max-w-none animate-in pb-8 pt-8 text-foreground fade-in duration-700 md:pt-0"
     >
       <div className="w-full space-y-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -534,15 +917,15 @@ export default function DoctorDashboard() {
               )}
             </div>
 
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={handleChangeLanguage}
-              className="h-12 w-12 shrink-0 rounded-2xl border border-border bg-card text-primary shadow-sm transition-colors hover:bg-primary/10 hover:text-primary"
-            >
-              <Globe className="h-5 w-5" />
-            </Button>
+       <Button
+  type="button"
+  variant="ghost"
+  size="icon"
+  onClick={handleChangeLanguage}
+  className="h-12 w-12 shrink-0 rounded-full bg-card text-primary shadow-sm transition-colors hover:rounded-full hover:bg-primary/10 hover:text-primary"
+>
+  <Globe className="h-5 w-5" />
+</Button>
 
             <NotificationBell isArabic={isArabic} />
           </div>
@@ -551,25 +934,29 @@ export default function DoctorDashboard() {
         <StatsCards stats={stats} isLoading={loading.stats} />
 
         <div className="grid w-full grid-cols-1 items-stretch gap-5 xl:grid-cols-12">
-          <div className="flex min-w-0 flex-col gap-5 xl:col-span-8">
+          <div className="min-w-0 xl:col-span-8">
             <PendingPredictions
               predictions={predictions}
               isLoading={loading.predictions}
               onReview={handleReviewPrediction}
             />
-
-            <RecentActivity
-              activities={activities}
-              isLoading={loading.activities}
-            />
           </div>
 
-          <div className="flex h-full min-w-0 flex-col gap-5 xl:col-span-4">
+          <div className="min-w-0 xl:col-span-4">
             <RiskDistributionChart
               data={riskData}
               isLoading={loading.riskData || loading.predictions}
             />
+          </div>
 
+          <div className="min-w-0 xl:col-span-8">
+            <RecentActivity
+              activities={dashboardActivities}
+              isLoading={loading.activities || loading.predictions}
+            />
+          </div>
+
+          <div className="min-w-0 xl:col-span-4">
             <AppointmentsToday
               appointments={appointments}
               isLoading={loading.appointments}
@@ -720,26 +1107,28 @@ export default function DoctorDashboard() {
                       <div className="overflow-hidden rounded-2xl border border-border bg-card">
                         <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
                           <div className="divide-y divide-border">
-                            {clinicalIndicators.slice(0, 4).map((item, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/30"
-                              >
-                                <p className="truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                                  {item.label}
-                                </p>
+                            {clinicalIndicators
+                              .slice(0, 4)
+                              .map((item, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/30"
+                                >
+                                  <p className="truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                    {item.label}
+                                  </p>
 
-                                <div className="shrink-0 text-right">
-                                  <span className="text-sm font-bold text-foreground">
-                                    {item.value}
-                                  </span>
+                                  <div className="shrink-0 text-right">
+                                    <span className="text-sm font-bold text-foreground">
+                                      {item.value}
+                                    </span>
 
-                                  <span className="ml-1 text-[10px] font-semibold text-muted-foreground">
-                                    {item.unit}
-                                  </span>
+                                    <span className="ml-1 text-[10px] font-semibold text-muted-foreground">
+                                      {item.unit}
+                                    </span>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              ))}
                           </div>
 
                           <div className="divide-y divide-border">
@@ -823,7 +1212,9 @@ export default function DoctorDashboard() {
 
                     <textarea
                       className="h-32 w-full resize-none rounded-2xl border border-border bg-background p-4 text-sm font-medium leading-6 text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/20 focus:bg-background focus:ring-4 focus:ring-primary/10"
-                      placeholder={t("doctorDashboard.reports.notesPlaceholder")}
+                      placeholder={t(
+                        "doctorDashboard.reports.notesPlaceholder"
+                      )}
                       value={doctorNotes}
                       onChange={(e) => setDoctorNotes(e.target.value)}
                     />

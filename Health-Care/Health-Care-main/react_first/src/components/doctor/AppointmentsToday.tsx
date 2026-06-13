@@ -13,6 +13,8 @@ interface AppointmentsTodayProps {
   isLoading: boolean;
 }
 
+const MAX_DASHBOARD_APPOINTMENTS = 5;
+
 export default function AppointmentsToday({
   appointments = [],
   isLoading,
@@ -29,6 +31,8 @@ export default function AppointmentsToday({
       appt?.updated_at ||
       appt?.appointment_datetime ||
       appt?.datetime ||
+      appt?.scheduled_at ||
+      appt?.start_time ||
       appt?.date ||
       appt?.appointment_date ||
       appt?.time ||
@@ -55,8 +59,13 @@ export default function AppointmentsToday({
 
         return bTime - aTime;
       })
-      .slice(0, 5);
+      .slice(0, MAX_DASHBOARD_APPOINTMENTS);
   }, [safeAppointments]);
+
+  const emptyRowsCount = Math.max(
+    MAX_DASHBOARD_APPOINTMENTS - visibleAppointments.length,
+    0
+  );
 
   const getStatusColor = () => {
     return "bg-primary";
@@ -71,16 +80,37 @@ export default function AppointmentsToday({
   };
 
   const getPatientName = (appt: any) => {
+    const patient =
+      appt?.patient ||
+      appt?.patient_details ||
+      appt?.patient_data ||
+      appt?.user ||
+      {};
+
+    const fullName = [patient?.first_name, patient?.last_name]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
     return (
       appt?.patient?.name ||
       appt?.patient_name ||
+      appt?.patient_full_name ||
+      patient?.name ||
+      patient?.full_name ||
+      fullName ||
       appt?.doctor_name ||
-      `Patient #${appt?.patient_user || "Unknown"}`
+      `Patient #${appt?.patient_user || appt?.patient_id || "Unknown"}`
     );
   };
 
   const getPatientImage = (appt: any) => {
-    return appt?.patient?.profile_picture || appt?.profile_picture || undefined;
+    return (
+      appt?.patient?.profile_picture ||
+      appt?.patient_profile_picture ||
+      appt?.profile_picture ||
+      undefined
+    );
   };
 
   const formatTime = (value?: string) => {
@@ -88,8 +118,8 @@ export default function AppointmentsToday({
 
     const cleanValue = String(value).trim();
 
-    if (cleanValue.includes("AM") || cleanValue.includes("PM")) {
-      return cleanValue;
+    if (/am|pm/i.test(cleanValue)) {
+      return cleanValue.toUpperCase();
     }
 
     const dateValue = new Date(cleanValue);
@@ -109,6 +139,7 @@ export default function AppointmentsToday({
 
       date.setHours(Number(hour));
       date.setMinutes(Number(minute));
+      date.setSeconds(0);
 
       return date.toLocaleTimeString(isArabic ? "ar-EG" : "en-US", {
         hour: "2-digit",
@@ -120,15 +151,48 @@ export default function AppointmentsToday({
   };
 
   const getTime = (appt: any) => {
-    return formatTime(appt?.time || appt?.appointment_time);
+    return formatTime(
+      appt?.time ||
+        appt?.appointment_time ||
+        appt?.appointment_datetime ||
+        appt?.datetime ||
+        appt?.scheduled_at ||
+        appt?.start_time ||
+        appt?.appointment_date ||
+        appt?.date ||
+        appt?.created_at
+    );
   };
 
   const getType = (appt: any) => {
     return appt?.type || appt?.appointment_type || "appointment";
   };
 
+  const cardClassName =
+    "flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-md";
+
+  const RowShell = ({ children }: { children?: React.ReactNode }) => {
+    return (
+      <div className="flex min-h-[42px] items-center gap-2 sm:min-h-[46px]">
+        {children}
+      </div>
+    );
+  };
+
+  const PlaceholderRow = ({ index }: { index: number }) => {
+    return (
+      <RowShell key={`placeholder-appointment-row-${index}`}>
+        <div className="h-2 w-2 shrink-0 rounded-full border-2 border-card bg-transparent sm:h-2.5 sm:w-2.5" />
+
+        <div className="w-[56px] shrink-0 sm:w-[68px]" />
+
+        <div className="min-h-[40px] min-w-0 flex-1 rounded-xl border border-transparent px-2 py-1.5 sm:min-h-[46px] sm:px-2.5 sm:py-2" />
+      </RowShell>
+    );
+  };
+
   return (
-    <Card className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-md">
+    <Card className={cardClassName}>
       <CardHeader className="flex shrink-0 flex-row items-center justify-between gap-3 px-4 pb-2 pt-4 sm:px-5 sm:pb-3 sm:pt-5">
         <CardTitle className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold tracking-tight text-foreground sm:text-base">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:h-8 sm:w-8">
@@ -153,46 +217,82 @@ export default function AppointmentsToday({
         )}
       </CardHeader>
 
-      <CardContent className="flex min-h-0 flex-1 flex-col px-4 pb-3 pt-1 sm:px-5 sm:pb-4">
+      <CardContent className="flex flex-col px-4 pb-3 pt-1 sm:px-5 sm:pb-4">
         {isLoading ? (
-          <div className="flex flex-1 flex-col justify-between gap-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className="flex w-[58px] shrink-0 flex-col items-start">
+          <div className="flex flex-col gap-1.5 sm:gap-2">
+            {Array.from({ length: MAX_DASHBOARD_APPOINTMENTS }).map((_, i) => (
+              <RowShell key={i}>
+                <div className="h-2 w-2 shrink-0 rounded-full border-2 border-card bg-transparent sm:h-2.5 sm:w-2.5" />
+
+                <div className="flex w-[56px] shrink-0 flex-col items-start sm:w-[68px]">
                   <Skeleton className="mb-1 h-3.5 w-10" />
                   <Skeleton className="h-2.5 w-8" />
                 </div>
 
-                <div className="flex min-h-[40px] flex-1 items-center gap-2 rounded-xl border border-border bg-background px-2 py-1.5">
-                  <Skeleton className="h-7 w-7 rounded-full" />
+                <div className="flex min-h-[40px] min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-background px-2 py-1.5 sm:min-h-[46px] sm:gap-2.5 sm:px-2.5 sm:py-2">
+                  <Skeleton className="h-7 w-7 shrink-0 rounded-full sm:h-8 sm:w-8" />
 
-                  <div className="space-y-1.5">
+                  <div className="min-w-0 flex-1 space-y-1.5">
                     <Skeleton className="h-3 w-[110px]" />
                     <Skeleton className="h-2.5 w-[75px]" />
                   </div>
                 </div>
-              </div>
+              </RowShell>
             ))}
           </div>
-        ) : safeAppointments.length === 0 ? (
-          <div className="flex min-h-[110px] flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-4 text-center text-muted-foreground">
-            <Calendar className="mb-2 h-7 w-7 opacity-40" />
+        ) : visibleAppointments.length === 0 ? (
+          <div className="flex flex-col gap-1.5 sm:gap-2">
+            <RowShell>
+              <div
+                className={cn(
+                  "h-2 w-2 shrink-0 rounded-full border-2 border-card sm:h-2.5 sm:w-2.5",
+                  getStatusColor()
+                )}
+              />
 
-            <p className="max-w-[240px] text-sm">
-              {t("doctorDashboard.appointments.empty")}
-            </p>
+              <div className="w-[56px] shrink-0 text-[11px] font-semibold leading-none text-muted-foreground sm:w-[68px] sm:text-sm">
+                --:--
+              </div>
+
+              <div className="flex min-h-[40px] min-w-0 flex-1 items-center gap-2 rounded-xl border border-dashed border-border bg-muted/20 px-2 py-1.5 sm:min-h-[46px] sm:gap-2.5 sm:px-2.5 sm:py-2">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary sm:h-8 sm:w-8">
+                  <Calendar
+                    className="h-3.5 w-3.5 opacity-80 sm:h-4 sm:w-4"
+                    strokeWidth={2.2}
+                  />
+                </div>
+
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <p className="truncate text-xs font-semibold leading-4 text-foreground sm:text-sm">
+                    {t("doctorDashboard.appointments.empty")}
+                  </p>
+
+                  <p className="mt-0.5 truncate text-[10px] leading-3 text-muted-foreground sm:text-[11px]">
+                    {isArabic
+                      ? "ستظهر حجوزات اليوم هنا"
+                      : "Today's appointments will appear here"}
+                  </p>
+                </div>
+              </div>
+            </RowShell>
+
+            {Array.from({ length: MAX_DASHBOARD_APPOINTMENTS - 1 }).map(
+              (_, index) => (
+                <PlaceholderRow
+                  key={`empty-appointment-row-${index}`}
+                  index={index}
+                />
+              )
+            )}
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col justify-between gap-1.5 sm:gap-2">
+          <div className="flex flex-col gap-1.5 sm:gap-2">
             {visibleAppointments.map((appt, index) => {
               const patientName = getPatientName(appt);
               const appointmentType = getType(appt);
 
               return (
-                <div
-                  key={appt?.id || `${patientName}-${index}`}
-                  className="flex min-h-0 items-center gap-2"
-                >
+                <RowShell key={appt?.id || `${patientName}-${index}`}>
                   <div
                     className={cn(
                       "h-2 w-2 shrink-0 rounded-full border-2 border-card sm:h-2.5 sm:w-2.5",
@@ -222,14 +322,21 @@ export default function AppointmentsToday({
                         {getTypeIcon(appointmentType)}
 
                         <p className="truncate text-[10px] capitalize leading-3 text-muted-foreground sm:text-[11px]">
-                          {appointmentType.replaceAll("_", " ")}
+                          {String(appointmentType).replaceAll("_", " ")}
                         </p>
                       </div>
                     </div>
                   </div>
-                </div>
+                </RowShell>
               );
             })}
+
+            {Array.from({ length: emptyRowsCount }).map((_, index) => (
+              <PlaceholderRow
+                key={`placeholder-appointment-row-${index}`}
+                index={index}
+              />
+            ))}
           </div>
         )}
       </CardContent>

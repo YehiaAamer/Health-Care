@@ -26,7 +26,6 @@ import PatientsPage from "./pages/doctor/PatientsPage";
 import AppointmentsPage from "./pages/doctor/AppointmentsPage";
 import ReportsPage from "./pages/doctor/ReportsPage";
 import ActivityPage from "./pages/doctor/ActivityPage";
-import DoctorPrivacyPage from "./pages/doctor/DoctorPrivacyPage";
 import MessagesPage from "./pages/doctor/MessagesPage";
 import SettingsPage from "./pages/doctor/SettingsPage";
 import HelpPage from "./pages/doctor/HelpPage";
@@ -232,7 +231,9 @@ export default function App() {
             <Route path="messages" element={<MessagesPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="help" element={<HelpPage />} />
-            <Route path="privacy" element={<DoctorPrivacyPage />} />
+
+            {/* Old Data Privacy route redirected to Help after merging privacy content into HelpPage */}
+            <Route path="privacy" element={<Navigate to="help" replace />} />
 
             {/* Temporary profile page until DoctorProfile is ready */}
             <Route path="profile" element={<SettingsPage />} />

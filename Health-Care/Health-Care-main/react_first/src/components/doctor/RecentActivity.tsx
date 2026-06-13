@@ -23,6 +23,11 @@ interface ActivityItem {
   description: string;
   related_id?: number;
   created_at: string;
+
+  status?: string;
+  review_status?: string;
+  decision?: string;
+  action?: string;
 }
 
 interface RecentActivityProps {
@@ -60,8 +65,68 @@ export default function RecentActivity({
       .trim();
   };
 
+  const normalizeValue = (value?: string | null) => {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/_/g, " ")
+      .replace(/-/g, " ")
+      .trim();
+  };
+
+  const isApprovedOrReviewedActivity = (activity: ActivityItem) => {
+    const type = normalizeValue(activity?.type);
+    const title = normalizeValue(activity?.title);
+    const description = normalizeValue(activity?.description);
+    const status = normalizeValue(activity?.status);
+    const reviewStatus = normalizeValue(activity?.review_status);
+    const decision = normalizeValue(activity?.decision);
+    const action = normalizeValue(activity?.action);
+
+    const combinedText = `${title} ${description} ${status} ${reviewStatus} ${decision} ${action}`;
+
+    const finalStatuses = [
+      "approved",
+      "rejected",
+      "needs followup",
+      "needs follow up",
+      "reviewed",
+      "completed",
+      "done",
+      "تمت الموافقة",
+      "مقبول",
+      "مرفوض",
+      "تمت المراجعة",
+      "تمت مراجعة",
+      "يحتاج متابعة",
+    ];
+
+    const isFinalStatus = finalStatuses.some((item) =>
+      combinedText.includes(item)
+    );
+
+    return (
+      type === "review" ||
+      type === "approved" ||
+      type === "rejected" ||
+      isFinalStatus ||
+      combinedText.includes("مراجعة تحليل") ||
+      combinedText.includes("تمت مراجعة") ||
+      combinedText.includes("reviewed") ||
+      combinedText.includes("approved") ||
+      combinedText.includes("rejected") ||
+      combinedText.includes("needs followup") ||
+      combinedText.includes("needs follow up")
+    );
+  };
+
+  const pendingActivities = useMemo(() => {
+    return safeActivities.filter(
+      (activity) => !isApprovedOrReviewedActivity(activity)
+    );
+  }, [safeActivities]);
+
   const visibleActivities = useMemo(() => {
-    return [...safeActivities]
+    return [...pendingActivities]
       .sort((a, b) => {
         const aTime = a?.created_at ? new Date(a.created_at).getTime() : 0;
         const bTime = b?.created_at ? new Date(b.created_at).getTime() : 0;
@@ -73,7 +138,12 @@ export default function RecentActivity({
         return bTime - aTime;
       })
       .slice(0, MAX_DASHBOARD_ACTIVITIES);
-  }, [safeActivities]);
+  }, [pendingActivities]);
+
+  const emptyRowsCount = Math.max(
+    MAX_DASHBOARD_ACTIVITIES - visibleActivities.length,
+    0
+  );
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -164,12 +234,12 @@ export default function RecentActivity({
           <History className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.3} />
         </span>
 
-        <span className="min-w-0 truncate">
+        <span className="min-w-0 whitespace-normal break-words">
           {t("doctorDashboard.activity.title")}
         </span>
       </CardTitle>
 
-      {!isLoading && safeActivities.length > 0 && (
+      {!isLoading && visibleActivities.length > 0 && (
         <Button
           type="button"
           variant="ghost"
@@ -188,19 +258,30 @@ export default function RecentActivity({
   const cardClassName =
     "flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-md";
 
+  const PlaceholderRow = ({ index }: { index: number }) => (
+    <div
+      key={`placeholder-activity-row-${index}`}
+      aria-hidden="true"
+      className="min-h-[42px] sm:min-h-[46px]"
+    />
+  );
+
   if (isLoading) {
     return (
       <Card className={cardClassName}>
         <CardTitleBlock />
 
-        <CardContent className="flex min-h-0 flex-1 flex-col px-4 pb-3 pt-1 sm:px-5 sm:pb-4">
-          <div className="flex min-h-0 flex-1 flex-col justify-between gap-1.5 sm:gap-2">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex min-h-[40px] items-start gap-2.5">
+        <CardContent className="flex flex-col px-4 pb-3 pt-1 sm:px-5 sm:pb-4">
+          <div className="flex flex-col gap-1.5">
+            {Array.from({ length: MAX_DASHBOARD_ACTIVITIES }).map((_, i) => (
+              <div
+                key={i}
+                className="flex min-h-[42px] items-start gap-2.5 rounded-2xl px-1 py-1 sm:min-h-[46px]"
+              >
                 <Skeleton className="h-7 w-7 shrink-0 rounded-2xl sm:h-8 sm:w-8" />
 
-                <div className="min-w-0 flex-1 space-y-1.5">
-                  <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex items-start justify-between gap-3">
                     <Skeleton className="h-3 w-[130px] rounded-md sm:h-3.5 sm:w-[160px]" />
                     <Skeleton className="h-2.5 w-[60px] rounded-md sm:h-3 sm:w-[80px]" />
                   </div>
@@ -219,98 +300,130 @@ export default function RecentActivity({
     <Card className={cardClassName}>
       <CardTitleBlock />
 
-      <CardContent className="flex min-h-0 flex-1 flex-col px-4 pb-3 pt-1 sm:px-5 sm:pb-4">
-        {safeActivities.length === 0 ? (
-          <div className="flex min-h-[150px] flex-1 flex-col items-center justify-center py-8 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-3xl bg-primary/10 text-primary">
-              <History className="h-6 w-6 opacity-80" strokeWidth={2.2} />
-            </div>
+      <CardContent className="flex flex-col px-4 pb-3 pt-1 sm:px-5 sm:pb-4">
+        <div
+          className={cn(
+            "relative flex flex-col gap-1.5",
+            "before:absolute before:top-1 before:h-[calc(100%-8px)] before:w-0.5 before:bg-border",
+            isRTL
+              ? "before:right-3.5 before:translate-x-px sm:before:right-4"
+              : "before:left-3.5 before:-translate-x-px sm:before:left-4"
+          )}
+        >
+          {visibleActivities.length === 0 ? (
+            <>
+              <div className="relative flex min-h-[42px] items-start gap-2.5 rounded-2xl px-1 py-1 sm:min-h-[46px] sm:gap-3">
+                <div className="z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm sm:h-8 sm:w-8">
+                  <History
+                    className="h-3 w-3 opacity-80 sm:h-3.5 sm:w-3.5"
+                    strokeWidth={2.4}
+                  />
+                </div>
 
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
-              {t("doctorDashboard.activity.empty")}
-            </p>
-          </div>
-        ) : (
-          <div
-            className={cn(
-              "relative flex min-h-0 flex-1 flex-col justify-between gap-1.5 sm:gap-2",
-              "before:absolute before:top-1 before:h-[calc(100%-8px)] before:w-0.5 before:bg-border",
-              isRTL
-                ? "before:right-3.5 before:translate-x-px sm:before:right-4"
-                : "before:left-3.5 before:-translate-x-px sm:before:left-4"
-            )}
-          >
-            {visibleActivities.map((activity, index) => {
-              const title = cleanActivityText(activity.title);
-              const description = cleanActivityText(activity.description);
-              const canOpenReportFilter = Boolean(activity.related_id);
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <h4 className="min-w-0 text-xs font-bold leading-4 tracking-tight text-foreground sm:text-sm sm:leading-5">
+                    {t("doctorDashboard.activity.empty", {
+                      defaultValue: "No pending activity",
+                    })}
+                  </h4>
 
-              return (
-                <div
-                  key={`${activity.type}-${activity.created_at}-${index}`}
-                  role={canOpenReportFilter ? "button" : undefined}
-                  tabIndex={canOpenReportFilter ? 0 : undefined}
-                  onClick={() => openActivityReportFilter(activity)}
-                  onKeyDown={(event) => {
-                    if (
-                      canOpenReportFilter &&
-                      (event.key === "Enter" || event.key === " ")
-                    ) {
-                      event.preventDefault();
-                      openActivityReportFilter(activity);
-                    }
-                  }}
-                  className={cn(
-                    "group relative flex min-h-[40px] items-start gap-2.5 rounded-2xl px-1 py-1 sm:min-h-[46px] sm:gap-3",
-                    "transition-colors duration-200",
-                    canOpenReportFilter
-                      ? "cursor-pointer hover:bg-muted/30"
-                      : "cursor-default"
-                  )}
-                  title={
-                    canOpenReportFilter
-                      ? isRTL
-                        ? "عرض التحليل في التقارير"
-                        : "View report filter"
-                      : undefined
-                  }
-                >
+                  <p className="whitespace-normal break-words text-[11px] font-medium leading-4 text-muted-foreground sm:text-xs sm:leading-5">
+                    {isRTL
+                      ? "سيتم عرض الأنشطة الجديدة التي تحتاج متابعة هنا."
+                      : "New activities that need follow-up will appear here."}
+                  </p>
+                </div>
+              </div>
+
+              {Array.from({ length: MAX_DASHBOARD_ACTIVITIES - 1 }).map(
+                (_, index) => (
+                  <PlaceholderRow key={`empty-activity-row-${index}`} index={index} />
+                )
+              )}
+            </>
+          ) : (
+            <>
+              {visibleActivities.map((activity, index) => {
+                const title = cleanActivityText(activity.title);
+                const description = cleanActivityText(activity.description);
+                const canOpenReportFilter = Boolean(activity.related_id);
+
+                return (
                   <div
+                    key={`${activity.type}-${activity.related_id || "no-id"}-${
+                      activity.created_at
+                    }-${index}`}
+                    role={canOpenReportFilter ? "button" : undefined}
+                    tabIndex={canOpenReportFilter ? 0 : undefined}
+                    onClick={() => openActivityReportFilter(activity)}
+                    onKeyDown={(event) => {
+                      if (
+                        canOpenReportFilter &&
+                        (event.key === "Enter" || event.key === " ")
+                      ) {
+                        event.preventDefault();
+                        openActivityReportFilter(activity);
+                      }
+                    }}
                     className={cn(
-                      "z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-2xl border bg-card shadow-sm sm:h-8 sm:w-8",
-                      "transition-all duration-300 group-hover:scale-105",
-                      getActivityStyle(activity.type)
+                      "group relative flex min-h-[42px] items-start gap-2.5 rounded-2xl px-1 py-1 sm:min-h-[46px] sm:gap-3",
+                      "transition-colors duration-200",
+                      canOpenReportFilter
+                        ? "cursor-pointer hover:bg-muted/30"
+                        : "cursor-default"
                     )}
+                    title={
+                      canOpenReportFilter
+                        ? isRTL
+                          ? "عرض التحليل في التقارير"
+                          : "View report filter"
+                        : undefined
+                    }
                   >
-                    {getActivityIcon(activity.type)}
-                  </div>
-
-                  <div className="min-w-0 flex-1 pt-0.5">
-                    <div className="mb-0.5 flex items-start justify-between gap-2 sm:mb-1 sm:gap-3">
-                      <h4 className="min-w-0 truncate text-xs font-bold leading-4 tracking-tight text-foreground sm:text-sm">
-                        {title}
-                      </h4>
-
-                      <span
-                        className={cn(
-                          "shrink-0 whitespace-nowrap rounded-lg bg-muted px-1.5 py-0.5",
-                          "text-[8px] font-bold uppercase tracking-tight text-muted-foreground sm:px-2 sm:py-1 sm:text-[10px]",
-                          isRTL ? "mr-1 sm:mr-2" : "ml-1 sm:ml-2"
-                        )}
-                      >
-                        {formatActivityDate(activity.created_at)}
-                      </span>
+                    <div
+                      className={cn(
+                        "z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-2xl border bg-card shadow-sm sm:h-8 sm:w-8",
+                        "transition-all duration-300 group-hover:scale-105",
+                        getActivityStyle(activity.type)
+                      )}
+                    >
+                      {getActivityIcon(activity.type)}
                     </div>
 
-                    <p className="line-clamp-1 text-[11px] font-medium leading-4 text-muted-foreground sm:line-clamp-2 sm:text-xs sm:leading-5">
-                      {description}
-                    </p>
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <div className="mb-0.5 flex items-start justify-between gap-2 sm:gap-3">
+                        <h4 className="min-w-0 flex-1 whitespace-normal break-words text-xs font-bold leading-4 tracking-tight text-foreground sm:text-sm sm:leading-5">
+                          {title || t("doctorDashboard.activity.title")}
+                        </h4>
+
+                        <span
+                          className={cn(
+                            "shrink-0 whitespace-nowrap rounded-lg bg-muted px-1.5 py-0.5",
+                            "text-[8px] font-bold uppercase tracking-tight text-muted-foreground sm:px-2 sm:py-1 sm:text-[10px]",
+                            isRTL ? "mr-1 sm:mr-2" : "ml-1 sm:ml-2"
+                          )}
+                        >
+                          {formatActivityDate(activity.created_at)}
+                        </span>
+                      </div>
+
+                      <p className="whitespace-normal break-words text-[11px] font-medium leading-4 text-muted-foreground sm:text-xs sm:leading-5">
+                        {description}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+
+              {Array.from({ length: emptyRowsCount }).map((_, index) => (
+                <PlaceholderRow
+                  key={`placeholder-activity-row-${index}`}
+                  index={index}
+                />
+              ))}
+            </>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

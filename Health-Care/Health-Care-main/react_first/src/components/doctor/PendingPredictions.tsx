@@ -1,4 +1,9 @@
-import { useMemo, useState, type MouseEvent } from "react";
+import {
+  useMemo,
+  useState,
+  type MouseEvent,
+  type KeyboardEvent,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -18,7 +23,6 @@ import { ar, enUS } from "date-fns/locale";
 import {
   Calendar,
   Check,
-  CheckCircle2,
   ClipboardList,
   FileText,
   Pill,
@@ -34,7 +38,7 @@ import type { Prediction, ReviewStatus } from "@/types/api";
 interface PendingPredictionsProps {
   predictions: Prediction[];
   isLoading: boolean;
-  onReview: (id: number, event?: MouseEvent<HTMLElement>) => void;
+  onReview?: (id: number, event?: MouseEvent<HTMLElement>) => void;
 }
 
 type KeyIndicator = {
@@ -44,10 +48,11 @@ type KeyIndicator = {
   severity: number;
 };
 
+const MAX_VISIBLE_ROWS = 5;
+
 export default function PendingPredictions({
   predictions = [],
   isLoading,
-  onReview: _onReview,
 }: PendingPredictionsProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -76,8 +81,13 @@ export default function PendingPredictions({
 
         return bTime - aTime;
       })
-      .slice(0, 5);
+      .slice(0, MAX_VISIBLE_ROWS);
   }, [safePredictions]);
+
+  const emptyRowsCount = Math.max(
+    MAX_VISIBLE_ROWS - displayedPredictions.length,
+    0
+  );
 
   const getText = (
     key: string,
@@ -200,7 +210,9 @@ export default function PendingPredictions({
 
   const toNumber = (value: unknown) => {
     if (value === null || value === undefined || value === "") return 0;
+
     const numericValue = Number(value);
+
     return Number.isNaN(numericValue) ? 0 : numericValue;
   };
 
@@ -457,7 +469,7 @@ export default function PendingPredictions({
 
     const diabetesIndicators: KeyIndicator[] = [
       {
-        label: isRTL ? "Dia BP" : "Dia BP",
+        label: "Dia BP",
         value:
           getExtraValue(report, [
             "diastolic_bp",
@@ -477,7 +489,7 @@ export default function PendingPredictions({
         ),
       },
       {
-        label: isRTL ? "Glu" : "Glu",
+        label: "Glu",
         value: report.glucose || "N/A",
         unit: "mg/dL",
         severity: getIndicatorSeverity(
@@ -486,7 +498,7 @@ export default function PendingPredictions({
         ),
       },
       {
-        label: isRTL ? "Insulin" : "Insulin",
+        label: "Insulin",
         value: report.insulin || "N/A",
         unit: "",
         severity: getIndicatorSeverity(
@@ -495,7 +507,7 @@ export default function PendingPredictions({
         ),
       },
       {
-        label: isRTL ? "Skin" : "Skin",
+        label: "Skin",
         value: report.skin_thickness || "N/A",
         unit: "",
         severity: getIndicatorSeverity(
@@ -504,7 +516,7 @@ export default function PendingPredictions({
         ),
       },
       {
-        label: isRTL ? "Pedigree" : "Pedigree",
+        label: "Pedigree",
         value: report.diabetes_pedigree_function || "N/A",
         unit: "",
         severity: getIndicatorSeverity(
@@ -513,7 +525,7 @@ export default function PendingPredictions({
         ),
       },
       {
-        label: isRTL ? "Age" : "Age",
+        label: "Age",
         value: report.age || "N/A",
         unit: "",
         severity: getIndicatorSeverity(isRTL ? "العمر" : "Age", report.age),
@@ -521,7 +533,7 @@ export default function PendingPredictions({
       ...(showPregnancies
         ? [
             {
-              label: isRTL ? "Preg" : "Preg",
+              label: "Preg",
               value: getPregnanciesValue(report),
               unit: "",
               severity: getIndicatorSeverity(
@@ -535,7 +547,7 @@ export default function PendingPredictions({
 
     const cardiovascularIndicators: KeyIndicator[] = [
       {
-        label: isRTL ? "Sys BP" : "Sys BP",
+        label: "Sys BP",
         value: getExtraValue(report, [
           "systolic_bp",
           "systolicBloodPressure",
@@ -552,7 +564,7 @@ export default function PendingPredictions({
         ),
       },
       {
-        label: isRTL ? "Dia BP" : "Dia BP",
+        label: "Dia BP",
         value: getExtraValue(report, [
           "diastolic_bp",
           "diastolicBloodPressure",
@@ -569,7 +581,7 @@ export default function PendingPredictions({
         ),
       },
       {
-        label: isRTL ? "Chol" : "Chol",
+        label: "Chol",
         value: getExtraValue(report, ["cholesterol"]),
         unit: "mg/dL",
         severity: getIndicatorSeverity(
@@ -578,7 +590,7 @@ export default function PendingPredictions({
         ),
       },
       {
-        label: isRTL ? "Glu" : "Glu",
+        label: "Glu",
         value: report.glucose || "N/A",
         unit: "mg/dL",
         severity: getIndicatorSeverity(
@@ -587,13 +599,13 @@ export default function PendingPredictions({
         ),
       },
       {
-        label: isRTL ? "Age" : "Age",
+        label: "Age",
         value: report.age || "N/A",
         unit: "",
         severity: getIndicatorSeverity(isRTL ? "العمر" : "Age", report.age),
       },
       {
-        label: isRTL ? "Weight" : "Weight",
+        label: "Weight",
         value: getExtraValue(report, ["weight"]),
         unit: "kg",
         severity: getIndicatorSeverity(
@@ -768,47 +780,6 @@ export default function PendingPredictions({
       })()
     : [];
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "pending":
-        return (
-          <Badge className="rounded-xl border border-border bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground shadow-none transition-none hover:bg-muted hover:text-muted-foreground">
-            {getStatusLabel(status)}
-          </Badge>
-        );
-      case "reviewed":
-        return (
-          <Badge className="rounded-xl border border-primary/15 bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-primary">
-            {getStatusLabel(status)}
-          </Badge>
-        );
-      case "needs_followup":
-        return (
-          <Badge className="rounded-xl border border-amber-100 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-            {getStatusLabel(status)}
-          </Badge>
-        );
-      case "approved":
-        return (
-          <Badge className="rounded-xl border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
-            {getStatusLabel(status)}
-          </Badge>
-        );
-      case "rejected":
-        return (
-          <Badge className="rounded-xl border border-red-100 bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-            {getStatusLabel(status)}
-          </Badge>
-        );
-      default:
-        return (
-          <Badge className="rounded-xl border border-border bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            {getStatusLabel(status)}
-          </Badge>
-        );
-    }
-  };
-
   const reviewActions = [
     {
       id: "approved" as ReviewStatus,
@@ -841,18 +812,37 @@ export default function PendingPredictions({
     ? getRiskClasses(selectedReport.risk_level)
     : getRiskClasses("");
 
-  const handleReviewClick = (
+  const openPendingReportsPage = () => {
+    navigate("/doctor-dashboard/reports?status=pending", {
+      state: {
+        status: "pending",
+        fromPendingReviews: true,
+      },
+    });
+  };
+
+  const openReviewDrawer = (
     report: Prediction,
-    event: MouseEvent<HTMLButtonElement>
+    event?: MouseEvent<HTMLElement>
   ) => {
-    event.preventDefault();
-    event.stopPropagation();
+    event?.preventDefault();
+    event?.stopPropagation();
 
     setSelectedReport(report);
     setDecision((report.review_status as ReviewStatus) || "pending");
     setDoctorNotes(report.message || "");
     setMedication(getMedicationValue(report));
     setIsDrawerOpen(true);
+  };
+
+  const handleRowKeyDown = (
+    event: KeyboardEvent<HTMLDivElement>,
+    report: Prediction
+  ) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openReviewDrawer(report);
+    }
   };
 
   const handleSaveReview = async () => {
@@ -894,7 +884,7 @@ export default function PendingPredictions({
   };
 
   const cardClassName =
-    "flex h-full w-full flex-col rounded-2xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-md";
+    "flex h-full min-h-[335px] w-full flex-col rounded-2xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-md";
 
   if (isLoading) {
     return (
@@ -912,12 +902,12 @@ export default function PendingPredictions({
           </CardTitle>
         </CardHeader>
 
-        <CardContent className="flex min-h-0 flex-1 flex-col px-4 pb-3 pt-1 sm:px-5 sm:pb-4">
-          <div className="flex min-h-0 flex-1 flex-col justify-between gap-1.5 sm:gap-2">
-            {[1, 2, 3, 4, 5].map((i) => (
+        <CardContent className="flex flex-1 flex-col px-4 pb-3 pt-1 sm:px-5 sm:pb-4">
+          <div className="flex flex-1 flex-col gap-1.5 sm:gap-2">
+            {Array.from({ length: MAX_VISIBLE_ROWS }).map((_, i) => (
               <div
                 key={i}
-                className="flex min-h-[40px] items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-2.5 py-1.5 sm:min-h-[46px] sm:px-3 sm:py-2"
+                className="flex min-h-[42px] items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-2.5 py-1.5 sm:min-h-[48px] sm:px-3 sm:py-2"
               >
                 <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
                   <Skeleton className="h-7 w-7 shrink-0 rounded-2xl sm:h-8 sm:w-8" />
@@ -952,12 +942,12 @@ export default function PendingPredictions({
             <span className="min-w-0 truncate">{labels.title}</span>
           </CardTitle>
 
-          {safePredictions.length > 5 && (
+          {safePredictions.length > 0 && (
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => navigate("/doctor-dashboard/reports")}
+              onClick={openPendingReportsPage}
               className="h-7 shrink-0 rounded-xl px-2 text-[9px] font-bold uppercase tracking-widest text-primary hover:bg-primary/10 hover:text-primary sm:h-8 sm:px-2.5 sm:text-[10px]"
             >
               {labels.viewAll}
@@ -965,105 +955,124 @@ export default function PendingPredictions({
           )}
         </CardHeader>
 
-        <CardContent className="flex min-h-0 flex-1 flex-col px-0 pb-3 pt-1">
-          {safePredictions.length === 0 ? (
-            <div className="flex min-h-[150px] flex-1 flex-col items-center justify-center px-6 py-8 text-center">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-3xl bg-primary/10 text-primary">
-                <ClipboardList
-                  className="h-6 w-6 opacity-80"
-                  strokeWidth={2.2}
-                />
-              </div>
+        <CardContent className="flex flex-1 flex-col px-0 pb-3 pt-1">
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <div className="shrink-0 border-y border-border bg-muted/30">
+              <div className="grid grid-cols-[36%_28%_20%_16%] px-2 py-2 sm:grid-cols-[40%_26%_20%_14%] sm:px-6">
+                <div className="text-start text-[8px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px]">
+                  {labels.patient}
+                </div>
 
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                {labels.empty}
-              </p>
-            </div>
-          ) : (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-              <div className="shrink-0 border-y border-border bg-muted/30">
-                <div className="grid grid-cols-[36%_28%_20%_16%] px-2 py-2 sm:grid-cols-[40%_26%_20%_14%] sm:px-6">
-                  <div className="text-start text-[8px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px]">
-                    {labels.patient}
-                  </div>
+                <div className="text-start text-[8px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px]">
+                  {labels.riskLevel}
+                </div>
 
-                  <div className="text-start text-[8px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px]">
-                    {labels.riskLevel}
-                  </div>
+                <div className="text-start text-[8px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px]">
+                  {labels.date}
+                </div>
 
-                  <div className="text-start text-[8px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px]">
-                    {labels.date}
-                  </div>
-
-                  <div className="text-end text-[8px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px]">
-                    {labels.action}
-                  </div>
+                <div className="text-end text-[8px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px]">
+                  {labels.action}
                 </div>
               </div>
+            </div>
 
-              <div className="flex min-h-0 flex-1 flex-col justify-between divide-y divide-border">
-                {displayedPredictions.map((pred) => {
-                  const riskClasses = getRiskClasses(pred.risk_level);
+            <div className="flex flex-1 flex-col divide-y divide-border">
+              {safePredictions.length === 0 ? (
+                <>
+                  <div className="flex min-h-[48px] items-center justify-center px-6 py-2 text-center sm:min-h-[54px]">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      {labels.empty}
+                    </p>
+                  </div>
 
-                  return (
-                    <div
-                      key={pred.id}
-                      className="grid min-h-[42px] grid-cols-[36%_28%_20%_16%] items-center px-2 py-1.5 transition-colors duration-200 hover:bg-muted/30 sm:min-h-[48px] sm:grid-cols-[40%_26%_20%_14%] sm:px-6 sm:py-2"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                          <Avatar className="h-7 w-7 shrink-0 rounded-2xl border border-border shadow-sm sm:h-8 sm:w-8">
-                            <AvatarFallback className="rounded-2xl bg-primary/10 text-[11px] font-bold text-primary sm:text-xs">
-                              {pred.patient_name?.charAt(0)?.toUpperCase() ||
-                                "P"}
-                            </AvatarFallback>
-                          </Avatar>
+                  {Array.from({ length: MAX_VISIBLE_ROWS - 1 }).map(
+                    (_, index) => (
+                      <div
+                        key={`empty-row-${index}`}
+                        aria-hidden="true"
+                        className="min-h-[42px] sm:min-h-[48px]"
+                      />
+                    )
+                  )}
+                </>
+              ) : (
+                <>
+                  {displayedPredictions.map((pred) => {
+                    const riskClasses = getRiskClasses(pred.risk_level);
 
-                          <div className="min-w-0">
-                            <p className="truncate text-[11px] font-bold leading-4 tracking-tight text-foreground sm:text-sm">
-                              {pred.patient_name || labels.anonymous}
-                            </p>
+                    return (
+                      <div
+                        key={pred.id}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => handleRowKeyDown(event, pred)}
+                        className="grid min-h-[42px] grid-cols-[36%_28%_20%_16%] items-center px-2 py-1.5 transition-colors duration-200 hover:bg-muted/30 focus:bg-muted/30 focus:outline-none sm:min-h-[48px] sm:grid-cols-[40%_26%_20%_14%] sm:px-6 sm:py-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                            <Avatar className="h-7 w-7 shrink-0 rounded-2xl border border-border shadow-sm sm:h-8 sm:w-8">
+                              <AvatarFallback className="rounded-2xl bg-primary/10 text-[11px] font-bold text-primary sm:text-xs">
+                                {pred.patient_name?.charAt(0)?.toUpperCase() ||
+                                  "P"}
+                              </AvatarFallback>
+                            </Avatar>
+
+                            <div className="min-w-0">
+                              <p className="truncate text-[11px] font-bold leading-4 tracking-tight text-foreground sm:text-sm">
+                                {pred.patient_name || labels.anonymous}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="min-w-0 px-1">
-                        <span
-                          className={cn(
-                            "inline-flex max-w-full items-center rounded-xl border px-2 py-0.5 text-[7px] font-bold uppercase tracking-tight sm:px-2.5 sm:py-1 sm:text-[9px]",
-                            riskClasses.badge
-                          )}
-                        >
-                          <span className="truncate">
-                            {formatRiskLabel(pred.risk_level)} (
-                            {Math.round(pred.probability || 0)}%)
+                        <div className="min-w-0 px-1">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "inline-flex max-w-full items-center rounded-xl border px-2 py-0.5 text-[7px] font-bold uppercase tracking-tight sm:px-2.5 sm:py-1 sm:text-[9px]",
+                              riskClasses.badge
+                            )}
+                          >
+                            <span className="truncate">
+                              {formatRiskLabel(pred.risk_level)} (
+                              {Math.round(pred.probability || 0)}%)
+                            </span>
+                          </Badge>
+                        </div>
+
+                        <div className="min-w-0 px-1">
+                          <span className="block truncate text-[8px] font-semibold leading-4 text-muted-foreground sm:text-[10px]">
+                            {formatPredictionDate(pred.created_at)}
                           </span>
-                        </span>
-                      </div>
+                        </div>
 
-                      <div className="min-w-0 px-1">
-                        <span className="block truncate text-[8px] font-semibold leading-4 text-muted-foreground sm:text-[10px]">
-                          {formatPredictionDate(pred.created_at)}
-                        </span>
+                        <div className="min-w-0 text-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={(event) => openReviewDrawer(pred, event)}
+                            className="h-7 max-w-full rounded-xl px-1.5 text-[7px] font-bold uppercase tracking-wider text-primary hover:bg-primary/10 hover:text-primary sm:h-8 sm:px-3 sm:text-[10px] sm:tracking-widest"
+                          >
+                            <span className="truncate">{labels.reviewBtn}</span>
+                          </Button>
+                        </div>
                       </div>
+                    );
+                  })}
 
-                      <div className="min-w-0 text-end">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => handleReviewClick(pred, e)}
-                          className="h-7 max-w-full rounded-xl px-1.5 text-[7px] font-bold uppercase tracking-wider text-primary hover:bg-primary/10 hover:text-primary sm:h-8 sm:px-3 sm:text-[10px] sm:tracking-widest"
-                        >
-                          <span className="truncate">{labels.reviewBtn}</span>
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                  {Array.from({ length: emptyRowsCount }).map((_, index) => (
+                    <div
+                      key={`placeholder-row-${index}`}
+                      aria-hidden="true"
+                      className="min-h-[42px] sm:min-h-[48px]"
+                    />
+                  ))}
+                </>
+              )}
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
 
@@ -1347,7 +1356,6 @@ export default function PendingPredictions({
                         ) : (
                           <div className="flex items-center gap-2">
                             <Save className="h-4 w-4" />
-
                             {labels.saveReview}
                           </div>
                         )}

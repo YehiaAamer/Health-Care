@@ -36,11 +36,6 @@ import {
   Calendar,
   Activity,
   Users,
-  ShieldAlert,
-  Gauge,
-  ShieldCheck,
-  Flame,
-  SlidersHorizontal,
 } from "lucide-react";
 
 import LoadingDots from "@/components/shared/LoadingDots";
@@ -369,6 +364,28 @@ export default function PatientsPage() {
     return "border-border bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground";
   };
 
+  const getRiskDotClass = (risk: string) => {
+    const normalizedRisk = normalizeRisk(risk);
+
+    if (normalizedRisk === "veryhigh") {
+      return "bg-red-500 shadow-red-500/25";
+    }
+
+    if (normalizedRisk === "high") {
+      return "bg-orange-500 shadow-orange-500/25";
+    }
+
+    if (normalizedRisk === "medium") {
+      return "bg-amber-500 shadow-amber-500/25";
+    }
+
+    if (normalizedRisk === "low") {
+      return "bg-emerald-500 shadow-emerald-500/25";
+    }
+
+    return "bg-primary shadow-primary/25";
+  };
+
   const getRiskLabel = (risk: string) => {
     const normalizedRisk = normalizeRisk(risk);
 
@@ -545,39 +562,24 @@ export default function PatientsPage() {
 
   const statsCards = [
     {
-      title: isArabic ? "إجمالي المرضى" : "Total Patients",
-      value: patientStats.total,
-      icon: Users,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-    },
-    {
       title: isArabic ? "حالات عالية جدًا" : "Very High Risk",
       value: patientStats.veryHigh,
-      icon: Flame,
-      color: "text-red-600 dark:text-red-300",
-      bgColor: "bg-red-50 dark:bg-red-500/10",
+      risk: "veryhigh",
     },
     {
       title: isArabic ? "حالات عالية الخطورة" : "High Risk",
       value: patientStats.high,
-      icon: ShieldAlert,
-      color: "text-orange-600 dark:text-orange-300",
-      bgColor: "bg-orange-50 dark:bg-orange-500/10",
+      risk: "high",
     },
     {
       title: isArabic ? "حالات متوسطة" : "Medium Risk",
       value: patientStats.medium,
-      icon: Gauge,
-      color: "text-amber-600 dark:text-amber-300",
-      bgColor: "bg-amber-50 dark:bg-amber-500/10",
+      risk: "medium",
     },
     {
       title: isArabic ? "حالات منخفضة" : "Low Risk",
       value: patientStats.low,
-      icon: ShieldCheck,
-      color: "text-emerald-600 dark:text-emerald-300",
-      bgColor: "bg-emerald-50 dark:bg-emerald-500/10",
+      risk: "low",
     },
   ];
 
@@ -610,39 +612,95 @@ export default function PatientsPage() {
       className="min-h-full w-full max-w-none animate-in fade-in px-0 pb-8 pt-8 text-foreground duration-700 md:pt-0"
     >
       <div className="flex w-full max-w-none flex-col gap-6 sm:gap-7">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            {t("doctorDashboard.patients.title")}
-          </h1>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              {t("doctorDashboard.patients.title")}
+            </h1>
 
-          <p className="mt-1 text-sm font-medium leading-6 text-muted-foreground">
-            {isArabic
-              ? "إدارة ومتابعة سجلات المرضى الخاصة بك."
-              : "Manage and monitor your patient records."}
-          </p>
+            <p className="mt-1 text-sm font-medium leading-6 text-muted-foreground">
+              {isArabic
+                ? "إدارة ومتابعة سجلات المرضى الخاصة بك."
+                : "Manage and monitor your patient records."}
+            </p>
+          </div>
+
+          <div className="flex w-full flex-row items-center gap-3 lg:w-auto">
+            <div className="relative min-w-0 flex-1 lg:w-[420px] lg:flex-none">
+              <Search
+                className={cn(
+                  "absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground",
+                  isArabic ? "right-4" : "left-4"
+                )}
+              />
+
+              <Input
+                placeholder={
+                  isArabic
+                    ? "ابحث بالاسم أو الإيميل..."
+                    : "Search by name or email..."
+                }
+                className={cn(
+                  "h-12 w-full rounded-2xl border border-border bg-card text-sm font-semibold text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-4 focus-visible:ring-primary/10 focus-visible:ring-offset-0",
+                  isArabic ? "pr-11 pl-9 text-right" : "pl-11 pr-9"
+                )}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className={cn(
+                    "absolute top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary",
+                    isArabic ? "left-3" : "right-3"
+                  )}
+                  aria-label={isArabic ? "مسح البحث" : "Clear search"}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            <Button
+              onClick={() => setOpenCreate(true)}
+              className="h-12 shrink-0 rounded-2xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:px-6 sm:text-sm"
+            >
+              <Plus className={cn("h-4 w-4", isArabic ? "ml-2" : "mr-2")} />
+              {isArabic ? "مريض جديد" : "New Patient"}
+            </Button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="flex items-center justify-between gap-3">
+          <Badge className="rounded-2xl border border-primary/15 bg-primary/10 px-4 py-2 text-xs font-bold text-primary shadow-none hover:bg-primary/10 hover:text-primary">
+            <Users className={cn("h-4 w-4", isArabic ? "ml-2" : "mr-2")} />
+            {isArabic ? "إجمالي المرضى" : "Total Patients"}
+            <span className={isArabic ? "mr-2" : "ml-2"}>
+              {patientStats.total}
+            </span>
+          </Badge>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {statsCards.map((card, index) => (
             <Card
               key={index}
               className="group overflow-hidden rounded-[1.75rem] border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md"
             >
-              <CardContent className="relative flex min-h-[160px] flex-col justify-between p-5 sm:min-h-[170px]">
+              <CardContent className="relative flex min-h-[145px] flex-col justify-between p-5 sm:min-h-[155px]">
                 <div className="flex items-start justify-between gap-4">
                   <h3 className="max-w-[150px] text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                     {card.title}
                   </h3>
 
-                  <div
+                  <span
                     className={cn(
-                      "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all duration-300 group-hover:scale-105",
-                      card.bgColor,
-                      card.color
+                      "mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full shadow-[0_0_0_4px]",
+                      getRiskDotClass(card.risk)
                     )}
-                  >
-                    <card.icon className="h-5 w-5" strokeWidth={2.3} />
-                  </div>
+                  />
                 </div>
 
                 <div>
@@ -657,102 +715,42 @@ export default function PatientsPage() {
 
         <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
           <div className="border-b border-border bg-muted/30 p-4 sm:p-5">
-            <div className="flex flex-col gap-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <SlidersHorizontal className="h-4 w-4" strokeWidth={2.3} />
-                </div>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-bold tracking-tight text-foreground">
+                  {isArabic ? "قائمة المرضى" : "Patient Directory"}
+                </h2>
 
-                <div className="min-w-0">
-                  <h2 className="truncate text-base font-bold tracking-tight text-foreground">
-                    {isArabic ? "قائمة المرضى" : "Patient Directory"}
-                  </h2>
-
-                  <p className="mt-1 text-xs font-semibold text-muted-foreground">
-                    {isArabic
-                      ? `${filteredPatients.length} نتيجة`
-                      : `${filteredPatients.length} result${
-                          filteredPatients.length === 1 ? "" : "s"
-                        } found`}
-                  </p>
-                </div>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                  {isArabic
+                    ? `${filteredPatients.length} نتيجة`
+                    : `${filteredPatients.length} result${
+                        filteredPatients.length === 1 ? "" : "s"
+                      } found`}
+                </p>
               </div>
 
-              <div className="flex w-full flex-col items-center justify-center gap-3 lg:flex-row">
-                <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-full border border-border bg-background shadow-sm transition-all focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/10 md:h-12 md:flex-row md:items-center">
-                  <div className="group relative min-h-12 flex-1">
-                    <Search
-                      className={cn(
-                        "absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary",
-                        isArabic ? "right-4" : "left-4"
-                      )}
-                    />
+              <Select
+                value={statusFilter}
+                onValueChange={setStatusFilter}
+                dir={isArabic ? "rtl" : "ltr"}
+              >
+                <SelectTrigger className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm font-bold text-primary shadow-sm transition-colors hover:bg-primary/5 hover:text-primary focus:ring-0 focus:ring-offset-0 sm:w-[220px]">
+                  <SelectValue placeholder={isArabic ? "الخطورة" : "Risk"} />
+                </SelectTrigger>
 
-                    <Input
-                      placeholder={
-                        isArabic
-                          ? "ابحث بالاسم أو الإيميل..."
-                          : "Search by name or email..."
-                      }
-                      className={cn(
-                        "h-12 rounded-none border-0 bg-transparent text-sm font-semibold text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0",
-                        isArabic ? "pr-10 pl-10 text-right" : "pl-10 pr-10"
-                      )}
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-
-                    {search && (
-                      <button
-                        type="button"
-                        onClick={() => setSearch("")}
-                        className={cn(
-                          "absolute top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary",
-                          isArabic ? "left-4" : "right-4"
-                        )}
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="h-px w-full bg-border md:h-7 md:w-px" />
-
-                  <Select
-                    value={statusFilter}
-                    onValueChange={setStatusFilter}
-                    dir={isArabic ? "rtl" : "ltr"}
-                  >
-                    <SelectTrigger className="h-12 w-full rounded-none border-0 bg-transparent px-4 text-sm font-bold text-primary shadow-none transition-none hover:bg-primary/5 hover:text-primary focus:ring-0 focus:ring-offset-0 md:w-[210px]">
-                      <SelectValue
-                        placeholder={isArabic ? "الخطورة" : "Risk"}
-                      />
-                    </SelectTrigger>
-
-                    <SelectContent className="rounded-2xl border-border bg-popover p-1 text-popover-foreground shadow-xl">
-                      {riskFilterOptions.map((option) => (
-                        <SelectItem
-                          key={option.value}
-                          value={option.value}
-                          className="cursor-pointer rounded-xl text-sm font-semibold focus:bg-primary/10 focus:text-primary"
-                        >
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Button
-                  onClick={() => setOpenCreate(true)}
-                  className="h-12 w-full rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:w-auto"
-                >
-                  <Plus
-                    className={cn("h-4 w-4", isArabic ? "ml-2" : "mr-2")}
-                  />
-                  {isArabic ? "مريض جديد" : "New Patient"}
-                </Button>
-              </div>
+                <SelectContent className="rounded-2xl border-border bg-popover p-1 text-popover-foreground shadow-xl">
+                  {riskFilterOptions.map((option) => (
+                    <SelectItem
+                      key={option.value}
+                      value={option.value}
+                      className="cursor-pointer rounded-xl text-sm font-semibold focus:bg-primary/10 focus:text-primary"
+                    >
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

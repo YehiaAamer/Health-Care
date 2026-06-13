@@ -7,73 +7,111 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
-import {
-  HelpCircle,
   MessageCircle,
   Mail,
   Phone,
   BookOpen,
   ShieldCheck,
-  Cpu,
   LifeBuoy,
   ChevronRight,
-  ExternalLink,
   Bell,
-  CheckCircle2,
+  ClipboardCheck,
+  FileSearch,
+  Stethoscope,
+  Lock,
+  FileText,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function HelpPage() {
   const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === "ar";
-
-  const faqs = [
-    {
-      question: isArabic
-        ? "كيف يتم حساب درجة خطورة السكري؟"
-        : "How is the diabetes risk score calculated?",
-      answer: isArabic
-        ? "يعتمد النظام على نموذج ذكاء اصطناعي يحلل مجموعة من المؤشرات السريرية مثل الجلوكوز، مؤشر كتلة الجسم، ضغط الدم، العمر، والتاريخ الوراثي لإنتاج نسبة احتمالية تساعد الطبيب في مراجعة الحالة."
-        : "The system uses an AI model that analyzes clinical indicators such as glucose, BMI, blood pressure, age, and pedigree history to generate a probability score that supports the doctor’s review.",
-    },
-    {
-      question: isArabic
-        ? "هل توقعات الذكاء الاصطناعي تغني عن التشخيص الطبي؟"
-        : "Do AI predictions replace medical diagnosis?",
-      answer: isArabic
-        ? "لا. النتائج مخصصة لدعم القرار السريري فقط، ويجب مراجعتها بواسطة الطبيب قبل اتخاذ أي قرار علاجي أو تشخيصي."
-        : "No. The results are intended for clinical decision support only and should be reviewed by a doctor before any diagnostic or treatment decision.",
-    },
-    {
-      question: isArabic
-        ? "كيف يمكنني إضافة مريض جديد للمتابعة؟"
-        : "How do I add a new patient for monitoring?",
-      answer: isArabic
-        ? "يمكن إدارة المرضى من صفحة المرضى داخل بوابة الطبيب. عند تفعيل إضافة المرضى من الباك إند، سيتم ربط المريض بحساب الطبيب مباشرة."
-        : "Patients can be managed from the Patients page inside the doctor portal. Once backend patient creation is enabled, the patient will be linked directly to the doctor account.",
-    },
-  ];
+  const isArabic = i18n.language === "ar" || i18n.language?.startsWith("ar");
 
   const guides = [
     {
-      title: isArabic ? "بدء المراجعة السريرية" : "Starting a Clinical Review",
+      title: isArabic ? "مراجعة التقارير" : "Review Reports",
+      description: isArabic
+        ? "راجع بيانات التقرير وسجّل القرار المناسب."
+        : "Review report data and record the proper decision.",
+      icon: FileSearch,
+    },
+    {
+      title: isArabic ? "إدارة المرضى" : "Manage Patients",
+      description: isArabic
+        ? "تابع بيانات المرضى والحالات المسجلة."
+        : "Track patient records and registered cases.",
+      icon: Stethoscope,
+    },
+    {
+      title: isArabic ? "متابعة الحالات" : "Follow Cases",
+      description: isArabic
+        ? "تابع الحالات التي تحتاج مراجعة أو إجراء."
+        : "Follow cases that require review or action.",
       icon: ShieldCheck,
     },
     {
-      title: isArabic ? "قراءة تقارير التوقعات" : "Reading Prediction Reports",
-      icon: BookOpen,
-    },
-    {
-      title: isArabic ? "إدارة تنبيهات الحالات" : "Managing Case Alerts",
+      title: isArabic ? "التنبيهات" : "Alerts",
+      description: isArabic
+        ? "راجع التنبيهات والمهام الجديدة."
+        : "Check alerts and new tasks.",
       icon: Bell,
     },
   ];
+
+  const supportChannels = [
+    {
+      label: isArabic ? "محادثة الدعم" : "Support Chat",
+      description: isArabic ? "مساعدة مباشرة داخل النظام" : "Quick in-system support",
+      icon: MessageCircle,
+    },
+    {
+      label: isArabic ? "البريد الإلكتروني" : "Email Support",
+      description: isArabic ? "للمشاكل الفنية والحسابات" : "For technical and account issues",
+      icon: Mail,
+    },
+    {
+      label: isArabic ? "الدعم الهاتفي" : "Phone Support",
+      description: isArabic ? "للمشاكل العاجلة" : "For urgent issues",
+      icon: Phone,
+    },
+  ];
+
+  const privacySections = [
+    {
+      icon: Lock,
+      title: isArabic ? "سرية البيانات" : "Data Confidentiality",
+      text: isArabic
+        ? "حافظ على سرية بيانات المرضى داخل النظام."
+        : "Keep patient data confidential inside the system.",
+    },
+    {
+      icon: FileText,
+      title: isArabic ? "صلاحيات الوصول" : "Access Permissions",
+      text: isArabic
+        ? "استخدم البيانات المتاحة حسب صلاحيات حسابك."
+        : "Use available data according to your account permissions.",
+    },
+    {
+      icon: ShieldCheck,
+      title: isArabic ? "الاستخدام المهني" : "Professional Use",
+      text: isArabic
+        ? "استخدم المعلومات لدعم جودة الخدمة الطبية."
+        : "Use information to support quality medical service.",
+    },
+  ];
+
+  const privacyNotes = isArabic
+    ? [
+        "لا تشارك بيانات المرضى خارج النظام.",
+        "التزم بصلاحيات الحساب وسياسات الحماية.",
+        "راجع البيانات قبل اتخاذ أي إجراء.",
+      ]
+    : [
+        "Do not share patient data outside the system.",
+        "Follow account permissions and protection policies.",
+        "Review data before taking any action.",
+      ];
 
   return (
     <div
@@ -88,183 +126,128 @@ export default function HelpPage() {
 
           <p className="mt-1 text-sm font-semibold text-muted-foreground">
             {isArabic
-              ? "مركز الدعم والإرشادات الخاصة ببوابة الطبيب"
-              : "Doctor portal support center and guidance resources"}
+              ? "دليل مختصر لاستخدام النظام الطبي وإدارة الحالات."
+              : "A concise guide for using the medical system and managing cases."}
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-6">
+        <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
+          <CardHeader className="border-b border-border bg-gradient-to-br from-primary/5 via-background to-primary/10 p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Users className="h-5 w-5" />
+              </div>
+
+              <div className="min-w-0">
+                <CardTitle className="text-lg font-bold tracking-tight text-foreground">
+                  {isArabic ? "استخدام النظام" : "System Usage"}
+                </CardTitle>
+
+                <CardDescription className="mt-1 text-xs font-semibold text-muted-foreground">
+                  {isArabic
+                    ? "إرشادات أساسية للتعامل مع الحالات والتقارير."
+                    : "Basic guidance for handling cases and reports."}
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-5 p-5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="min-h-[135px] rounded-2xl border border-primary/15 bg-primary/5 p-4">
+                <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <FileSearch className="h-4 w-4" />
+                </div>
+
+                <h4 className="text-sm font-bold text-foreground">
+                  {isArabic ? "مراجعة البيانات" : "Review Data"}
+                </h4>
+
+                <p className="mt-2 text-sm font-medium leading-6 text-muted-foreground">
+                  {isArabic
+                    ? "راجع بيانات الحالة قبل اتخاذ أي إجراء."
+                    : "Review case data before taking action."}
+                </p>
+              </div>
+
+              <div className="min-h-[135px] rounded-2xl border border-primary/15 bg-primary/5 p-4">
+                <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <ClipboardCheck className="h-4 w-4" />
+                </div>
+
+                <h4 className="text-sm font-bold text-foreground">
+                  {isArabic ? "تسجيل الإجراء" : "Record Action"}
+                </h4>
+
+                <p className="mt-2 text-sm font-medium leading-6 text-muted-foreground">
+                  {isArabic
+                    ? "سجّل القرار أو الملاحظات بشكل واضح."
+                    : "Record decisions or notes clearly."}
+                </p>
+              </div>
+
+              <div className="min-h-[135px] rounded-2xl border border-primary/15 bg-primary/5 p-4">
+                <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <ShieldCheck className="h-4 w-4" />
+                </div>
+
+                <h4 className="text-sm font-bold text-foreground">
+                  {isArabic ? "متابعة الحالة" : "Case Follow-up"}
+                </h4>
+
+                <p className="mt-2 text-sm font-medium leading-6 text-muted-foreground">
+                  {isArabic
+                    ? "تابع الحالات حسب الأولوية والاحتياج."
+                    : "Follow cases based on priority and need."}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
             <CardHeader className="border-b border-border bg-muted/30 p-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <HelpCircle className="h-5 w-5" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <LifeBuoy className="h-5 w-5" />
                 </div>
 
                 <div>
                   <CardTitle className="text-lg font-bold tracking-tight text-foreground">
-                    {t("doctorDashboard.help.faqs")}
+                    {isArabic ? "قنوات الدعم" : "Support Channels"}
                   </CardTitle>
 
                   <CardDescription className="mt-1 text-xs font-semibold text-muted-foreground">
-                    {t("doctorDashboard.help.faqsDesc")}
+                    {isArabic ? "اختر طريقة التواصل المناسبة." : "Choose the suitable contact channel."}
                   </CardDescription>
                 </div>
               </div>
-            </CardHeader>
-
-            <CardContent className="p-5">
-              <Accordion type="single" collapsible className="space-y-3">
-                {faqs.map((faq, index) => (
-                  <AccordionItem
-                    key={index}
-                    value={`item-${index}`}
-                    className="rounded-2xl border border-border bg-background px-4 shadow-sm"
-                  >
-                    <AccordionTrigger className="py-4 text-start text-sm font-bold text-foreground hover:no-underline">
-                      {faq.question}
-                    </AccordionTrigger>
-
-                    <AccordionContent className="pb-4 text-sm font-medium leading-7 text-muted-foreground">
-                      {faq.answer}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
-            <CardHeader className="border-b border-border bg-gradient-to-br from-primary/5 via-background to-primary/10 p-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <Cpu className="h-5 w-5" />
-                </div>
-
-                <div>
-                  <CardTitle className="text-lg font-bold tracking-tight text-foreground">
-                    {t("doctorDashboard.help.aiExplanation")}
-                  </CardTitle>
-
-                  <CardDescription className="mt-1 text-xs font-semibold text-muted-foreground">
-                    {t("doctorDashboard.help.aiExplanationDesc")}
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-
-            <CardContent className="space-y-5 p-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="min-h-[150px] rounded-2xl border border-primary/15 bg-primary/5 p-4">
-                  <h4 className="text-sm font-bold text-foreground">
-                    {isArabic ? "وضوح النتائج" : "Clear Results"}
-                  </h4>
-
-                  <p className="mt-2 text-sm font-medium leading-6 text-muted-foreground">
-                    {isArabic
-                      ? "كل تقرير يعرض نسبة الخطورة والمؤشرات السريرية الأساسية لمساعدة الطبيب على فهم الحالة بسرعة."
-                      : "Each report shows the risk probability and core clinical indicators to help the doctor understand the case quickly."}
-                  </p>
-                </div>
-
-                <div className="min-h-[150px] rounded-2xl border border-primary/15 bg-primary/5 p-4">
-                  <h4 className="text-sm font-bold text-foreground">
-                    {isArabic ? "دعم القرار الطبي" : "Clinical Decision Support"}
-                  </h4>
-
-                  <p className="mt-2 text-sm font-medium leading-6 text-muted-foreground">
-                    {isArabic
-                      ? "النظام يساعد في ترتيب الأولويات ومراجعة الحالات، لكنه لا يستبدل تقييم الطبيب."
-                      : "The system helps prioritize and review cases, but it does not replace the doctor’s assessment."}
-                  </p>
-                </div>
-              </div>
-
-              <Button
-                variant="outline"
-                className="h-11 rounded-2xl border-primary/20 bg-background px-5 text-xs font-bold text-primary shadow-sm transition-none hover:bg-primary/10 hover:text-primary"
-              >
-                {isArabic ? "قراءة التوثيق التقني" : "Read Technical Documentation"}
-
-                <ExternalLink
-                  className={cn("h-4 w-4", isArabic ? "mr-2" : "ml-2")}
-                />
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 content-start gap-6">
-          <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
-            <CardHeader className="p-5 text-center">
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-3xl bg-primary/10 text-primary">
-                <LifeBuoy className="h-7 w-7" />
-              </div>
-
-              <CardTitle className="text-lg font-bold tracking-tight text-foreground">
-                {t("doctorDashboard.help.contact")}
-              </CardTitle>
-
-              <CardDescription className="mt-1 text-xs font-semibold text-muted-foreground">
-                {isArabic
-                  ? "اختر قناة التواصل المناسبة لك"
-                  : "Choose the support channel that suits you"}
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="space-y-3 p-5 pt-0">
-              <Button className="h-11 w-full rounded-2xl bg-primary px-5 text-xs font-bold text-primary-foreground shadow-sm shadow-primary/20 transition-none hover:bg-primary/90">
-                <MessageCircle
-                  className={cn("h-4 w-4", isArabic ? "ml-2" : "mr-2")}
-                />
-                {isArabic ? "محادثة فورية" : "Live Chat"}
-              </Button>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  variant="outline"
-                  className="h-11 rounded-2xl border-primary/15 bg-primary/5 text-primary transition-none hover:bg-primary/10 hover:text-primary"
-                >
-                  <Mail className="h-4 w-4" />
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-11 rounded-2xl border-primary/15 bg-primary/5 text-primary transition-none hover:bg-primary/10 hover:text-primary"
-                >
-                  <Phone className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
-            <CardHeader className="border-b border-border bg-muted/30 p-5">
-              <CardTitle className="text-lg font-bold tracking-tight text-foreground">
-                {t("doctorDashboard.help.guides")}
-              </CardTitle>
-
-              <CardDescription className="mt-1 text-xs font-semibold text-muted-foreground">
-                {isArabic ? "إرشادات سريعة للاستخدام" : "Quick usage guides"}
-              </CardDescription>
             </CardHeader>
 
             <CardContent className="space-y-3 p-5">
-              {guides.map((guide, index) => (
+              {supportChannels.map((channel, index) => (
                 <button
                   key={index}
+                  type="button"
                   className="flex w-full items-center justify-between rounded-2xl border border-border bg-background p-4 text-start shadow-sm transition-none hover:bg-primary/5"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <guide.icon className="h-4 w-4" />
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <channel.icon className="h-4 w-4" />
                     </div>
 
-                    <span className="text-sm font-bold text-foreground">
-                      {guide.title}
-                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-foreground">
+                        {channel.label}
+                      </p>
+
+                      <p className="mt-1 line-clamp-1 text-xs font-semibold text-muted-foreground">
+                        {channel.description}
+                      </p>
+                    </div>
                   </div>
 
                   <ChevronRight
@@ -278,26 +261,116 @@ export default function HelpPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-3xl border border-primary/15 bg-primary/5 p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-primary">
-                  {t("doctorDashboard.help.systemStatus")}
-                </p>
+          <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
+            <CardHeader className="border-b border-border bg-muted/30 p-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <BookOpen className="h-5 w-5" />
+                </div>
 
-                <p className="mt-1 text-sm font-semibold text-muted-foreground">
-                  {isArabic
-                    ? "كل خدمات بوابة الطبيب متاحة حالياً"
-                    : "All doctor portal services are currently available"}
-                </p>
-              </div>
+                <div>
+                  <CardTitle className="text-lg font-bold tracking-tight text-foreground">
+                    {isArabic ? "إرشادات النظام" : "System Guides"}
+                  </CardTitle>
 
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <CheckCircle2 className="h-5 w-5" />
+                  <CardDescription className="mt-1 text-xs font-semibold text-muted-foreground">
+                    {isArabic ? "خطوات مختصرة للوظائف الأساسية." : "Short steps for core functions."}
+                  </CardDescription>
+                </div>
               </div>
-            </div>
+            </CardHeader>
+
+            <CardContent className="space-y-3 p-5">
+              {guides.map((guide, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-2xl border border-border bg-background p-4 text-start shadow-sm transition-none hover:bg-primary/5"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <guide.icon className="h-4 w-4" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-foreground">
+                        {guide.title}
+                      </p>
+
+                      <p className="mt-1 line-clamp-1 text-xs font-semibold text-muted-foreground">
+                        {guide.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  <ChevronRight
+                    className={cn(
+                      "h-4 w-4 shrink-0 text-muted-foreground",
+                      isArabic && "rotate-180"
+                    )}
+                  />
+                </button>
+              ))}
+            </CardContent>
           </Card>
         </div>
+
+        <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
+          <CardHeader className="border-b border-border bg-gradient-to-br from-primary/5 via-background to-primary/10 p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Lock className="h-5 w-5" />
+              </div>
+
+              <div className="min-w-0">
+                <CardTitle className="text-lg font-bold tracking-tight text-foreground">
+                  {isArabic ? "خصوصية البيانات" : "Data Privacy"}
+                </CardTitle>
+
+                <CardDescription className="mt-1 text-xs font-semibold text-muted-foreground">
+                  {isArabic
+                    ? "قواعد مختصرة للتعامل مع بيانات المرضى."
+                    : "Brief rules for handling patient data."}
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-5 p-5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              {privacySections.map((section, index) => (
+                <div
+                  key={index}
+                  className="min-h-[135px] rounded-2xl border border-primary/15 bg-primary/5 p-4"
+                >
+                  <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <section.icon className="h-4 w-4" />
+                  </div>
+
+                  <h4 className="text-sm font-bold text-foreground">
+                    {section.title}
+                  </h4>
+
+                  <p className="mt-2 text-sm font-medium leading-6 text-muted-foreground">
+                    {section.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-border bg-background p-4">
+              {privacyNotes.map((note, index) => (
+                <div key={index} className="flex items-start gap-3">
+                  <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />
+
+                  <p className="text-sm font-medium leading-7 text-muted-foreground">
+                    {note}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

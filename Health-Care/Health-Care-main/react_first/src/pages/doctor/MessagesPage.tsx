@@ -31,6 +31,7 @@ import {
   Search,
   Send,
   FileText,
+  Check,
   CheckCheck,
   TrendingUp,
   User as UserIcon,
@@ -39,7 +40,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-import LoadingDots from "@/components/shared/LoadingDots";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -60,6 +60,17 @@ type MessagesLocationState = {
   fromReports?: boolean;
 };
 
+type ChatMessageWithReadStatus = ChatMessage & {
+  is_read?: boolean;
+  read?: boolean;
+  seen?: boolean;
+  is_seen?: boolean;
+  read_at?: string | null;
+  seen_at?: string | null;
+  status?: string;
+  delivery_status?: string;
+};
+
 export default function MessagesPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -71,7 +82,6 @@ export default function MessagesPage() {
   const selectedThreadRef = useRef<number | null>(null);
   const routeSelectionAppliedRef = useRef(false);
 
-  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
 
   const [search, setSearch] = useState("");
@@ -114,6 +124,25 @@ export default function MessagesPage() {
 
   const normalizeRisk = (risk?: string) =>
     risk?.toLowerCase().replace(/\s|_/g, "") || "";
+
+  const isMessageReadByPatient = (message: ChatMessage) => {
+    const msg = message as ChatMessageWithReadStatus;
+
+    const normalizedStatus = String(msg.status || msg.delivery_status || "")
+      .trim()
+      .toLowerCase();
+
+    return (
+      msg.is_read === true ||
+      msg.read === true ||
+      msg.seen === true ||
+      msg.is_seen === true ||
+      Boolean(msg.read_at) ||
+      Boolean(msg.seen_at) ||
+      normalizedStatus === "read" ||
+      normalizedStatus === "seen"
+    );
+  };
 
   const isFemaleGender = (gender?: string | number | null) => {
     const normalizedGender = String(gender || "").trim().toLowerCase();
@@ -296,11 +325,12 @@ export default function MessagesPage() {
       }
     } catch (error) {
       console.error("Failed to fetch conversations", error);
-      toast.error(
-        isArabic ? "فشل تحميل المحادثات" : "Failed to load conversations"
-      );
-    } finally {
-      setLoading(false);
+
+      if (showToast) {
+        toast.error(
+          isArabic ? "فشل تحميل المحادثات" : "Failed to load conversations"
+        );
+      }
     }
   };
 
@@ -436,9 +466,16 @@ export default function MessagesPage() {
 
       const sentMsg = await messagesApi.sendMessage(activeThreadId, messageText);
 
+      const safeSentMessage = {
+        ...sentMsg,
+        is_read: (sentMsg as ChatMessageWithReadStatus).is_read ?? false,
+        read: (sentMsg as ChatMessageWithReadStatus).read ?? false,
+        seen: (sentMsg as ChatMessageWithReadStatus).seen ?? false,
+      } as ChatMessage;
+
       if (selectedThreadRef.current === activeThreadId) {
         setMessagesLoaded(true);
-        setMessages((prev) => [...prev, sentMsg]);
+        setMessages((prev) => [...prev, safeSentMessage]);
       }
 
       setNewMessage("");
@@ -719,18 +756,6 @@ export default function MessagesPage() {
       },
     ];
   }, [doctorDiseaseType, latestExtraFields, latestPrediction, isArabic, t]);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center">
-        <LoadingDots />
-
-        <p className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-          {t("doctorDashboard.sidebar.messages.loading")}
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div
@@ -1043,6 +1068,8 @@ export default function MessagesPage() {
                 const isDoctorMessage =
                   getPatientNumericId(msg.sender_user) !== selectedPatientId;
 
+                const isReadByPatient = isMessageReadByPatient(msg);
+
                 return (
                   <div
                     key={msg.id}
@@ -1081,9 +1108,20 @@ export default function MessagesPage() {
                             : "--:--"}
                         </span>
 
-                        {isDoctorMessage && (
-                          <CheckCheck className="h-3.5 w-3.5 text-primary" />
-                        )}
+                        {isDoctorMessage &&
+                          (isReadByPatient ? (
+                            <CheckCheck
+                              className="h-3.5 w-3.5 text-primary"
+                              aria-label={
+                                isArabic ? "تمت القراءة" : "Read by patient"
+                              }
+                            />
+                          ) : (
+                            <Check
+                              className="h-3.5 w-3.5 text-muted-foreground"
+                              aria-label={isArabic ? "تم الإرسال" : "Sent"}
+                            />
+                          ))}
                       </div>
                     </div>
                   </div>
@@ -1140,22 +1178,20 @@ export default function MessagesPage() {
               disabled={!selectedConv || !newMessage.trim() || sending}
               className="h-11 shrink-0 rounded-2xl bg-primary px-3 text-sm font-bold text-primary-foreground hover:!bg-primary/90 hover:!text-primary-foreground disabled:opacity-50 sm:px-4"
             >
-              {sending ? (
-                <LoadingDots color="white" />
-              ) : (
-                <>
-                  <Send
-                    className={cn(
-                      "h-4 w-4",
-                      isArabic ? "rotate-180 sm:ml-2" : "sm:mr-2"
-                    )}
-                  />
+              <Send
+                className={cn(
+                  "h-4 w-4",
+                  isArabic ? "rotate-180 sm:ml-2" : "sm:mr-2"
+                )}
+              />
 
-                  <span className="hidden sm:inline">
-                    {t("doctorDashboard.sidebar.messages.send")}
-                  </span>
-                </>
-              )}
+              <span className="hidden sm:inline">
+                {sending
+                  ? isArabic
+                    ? "جاري الإرسال"
+                    : "Sending"
+                  : t("doctorDashboard.sidebar.messages.send")}
+              </span>
             </Button>
           </div>
         </div>
@@ -1297,8 +1333,8 @@ export default function MessagesPage() {
                 <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                   {selectedConv
                     ? isArabic
-                      ? "جاري تحميل بيانات المريض أو لا توجد بيانات متاحة"
-                      : "Loading patient data or no data available"
+                      ? "لا توجد بيانات متاحة لهذا المريض"
+                      : "No patient data available"
                     : isArabic
                     ? "اختار مريض لعرض الملخص"
                     : "Select a patient to view summary"}

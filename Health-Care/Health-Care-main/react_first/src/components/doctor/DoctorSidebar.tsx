@@ -22,7 +22,6 @@ import {
   Home,
   Clock3,
   Globe,
-  ShieldCheck,
   Moon,
   Sun,
 } from "lucide-react";
@@ -203,11 +202,6 @@ export default function DoctorSidebar({ className }: DoctorSidebarProps) {
       icon: HelpCircle,
       label: t("doctorDashboard.sidebar.help", "Help"),
       path: "/doctor-dashboard/help",
-    },
-    {
-      icon: ShieldCheck,
-      label: t("doctorDashboard.sidebar.dataPrivacy", "Data Privacy"),
-      path: "/doctor-dashboard/privacy",
     },
   ];
 

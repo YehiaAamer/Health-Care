@@ -94,22 +94,22 @@ export default function RiskDistributionChart({
   };
 
   const cardClassName =
-    "flex h-full min-h-[390px] w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-md sm:min-h-[420px] sm:rounded-3xl";
+    "flex h-full min-h-[345px] w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-md sm:min-h-[360px] sm:rounded-3xl";
 
   if (isLoading) {
     return (
       <Card className={cardClassName}>
-        <CardHeader className="flex flex-row items-center gap-3 px-5 pb-3 pt-5 sm:px-6">
+        <CardHeader className="flex shrink-0 flex-row items-center gap-3 px-5 pb-2 pt-4 sm:px-6 sm:pb-2 sm:pt-5">
           <Skeleton className="h-9 w-9 rounded-2xl" />
           <Skeleton className="h-5 w-[150px] rounded-md" />
         </CardHeader>
 
-        <CardContent className="flex flex-1 flex-col px-5 pb-5 pt-2 sm:px-6 sm:pb-6">
-          <Skeleton className="mx-auto h-[190px] w-[190px] rounded-full sm:h-[220px] sm:w-[220px]" />
+        <CardContent className="flex flex-1 flex-col px-5 pb-4 pt-1 sm:px-6 sm:pb-5">
+          <Skeleton className="mx-auto h-[145px] w-[145px] rounded-full sm:h-[155px] sm:w-[155px]" />
 
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[1, 2, 3, 4].map((item) => (
-              <Skeleton key={item} className="h-[72px] rounded-2xl" />
+              <Skeleton key={item} className="h-[58px] rounded-2xl" />
             ))}
           </div>
         </CardContent>
@@ -119,7 +119,7 @@ export default function RiskDistributionChart({
 
   return (
     <Card className={cardClassName}>
-      <CardHeader className="flex flex-row items-center gap-3 px-5 pb-3 pt-5 sm:px-6">
+      <CardHeader className="flex shrink-0 flex-row items-center gap-3 px-5 pb-2 pt-4 sm:px-6 sm:pb-2 sm:pt-5">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
           <PieIcon className="h-4 w-4" strokeWidth={2.3} />
         </div>
@@ -129,11 +129,11 @@ export default function RiskDistributionChart({
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="flex flex-1 flex-col px-5 pb-5 pt-1 sm:px-6 sm:pb-6">
+      <CardContent className="flex flex-1 flex-col px-5 pb-4 pt-1 sm:px-6 sm:pb-5">
         {data?.total === 0 || !data ? (
           <div className="flex flex-1 flex-col items-center justify-center text-center text-muted-foreground">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-primary/10 text-primary">
-              <PieIcon className="h-7 w-7 opacity-80" strokeWidth={2.2} />
+            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-3xl bg-primary/10 text-primary">
+              <PieIcon className="h-6 w-6 opacity-80" strokeWidth={2.2} />
             </div>
 
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
@@ -144,17 +144,17 @@ export default function RiskDistributionChart({
           <>
             <div
               className={cn(
-                "mb-2 flex flex-wrap items-center gap-x-4 gap-y-2",
+                "mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5",
                 isRTL ? "justify-end" : "justify-start"
               )}
             >
               {normalizedDistribution.map((item) => (
                 <div
                   key={item.key}
-                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+                  className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
                 >
                   <span
-                    className="h-3 w-3 shrink-0 rounded-sm"
+                    className="h-2.5 w-2.5 shrink-0 rounded-sm"
                     style={{ backgroundColor: item.color }}
                   />
 
@@ -165,19 +165,19 @@ export default function RiskDistributionChart({
               ))}
             </div>
 
-            <div className="h-[190px] w-full sm:h-[220px]">
+            <div className="h-[145px] w-full sm:h-[155px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={chartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={58}
-                    outerRadius={84}
+                    innerRadius={46}
+                    outerRadius={68}
                     paddingAngle={3}
                     dataKey="value"
                     animationBegin={0}
-                    animationDuration={1500}
+                    animationDuration={1200}
                   >
                     {chartData.map((entry, index) => (
                       <Cell
@@ -213,22 +213,22 @@ export default function RiskDistributionChart({
               </ResponsiveContainer>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {normalizedDistribution.map((item) => (
                 <div
                   key={item.key}
-                  className="rounded-2xl border border-border bg-muted/30 px-3 py-3 text-center transition-colors hover:bg-primary/5"
+                  className="rounded-2xl border border-border bg-muted/30 px-2 py-2 text-center transition-colors hover:bg-primary/5"
                 >
                   <p
                     className={cn(
-                      "text-2xl font-bold leading-none tracking-tight",
+                      "text-xl font-bold leading-none tracking-tight",
                       getRiskTextColor(item.key)
                     )}
                   >
                     {item.value}
                   </p>
 
-                  <p className="mt-1.5 truncate text-xs font-semibold text-muted-foreground">
+                  <p className="mt-1 truncate text-[10px] font-semibold text-muted-foreground">
                     {item.name}
                   </p>
                 </div>

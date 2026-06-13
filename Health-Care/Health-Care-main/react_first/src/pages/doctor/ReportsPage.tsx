@@ -80,7 +80,9 @@ export default function ReportsPage() {
 
   const [selectedReport, setSelectedReport] = useState<Prediction | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
   const [reports, setReports] = useState<Prediction[]>([]);
+  const [allReports, setAllReports] = useState<Prediction[]>([]);
 
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
@@ -469,7 +471,11 @@ export default function ReportsPage() {
         status: statusFilter || undefined,
       });
 
-      const filteredData = data.filter((report: Prediction) => {
+      const normalizedData = Array.isArray(data) ? data : [];
+
+      setAllReports(normalizedData);
+
+      const filteredData = normalizedData.filter((report: Prediction) => {
         const item = report as any;
 
         const reportId = normalizeId(item.id);
@@ -482,8 +488,10 @@ export default function ReportsPage() {
           !selectedPatientId ||
           reportPatientId === selectedPatientId ||
           (!!selectedPatientName && reportPatientName === selectedPatientName) ||
-          (!!selectedPatientName && reportPatientName.includes(selectedPatientName)) ||
-          (!!selectedPatientName && selectedPatientName.includes(reportPatientName));
+          (!!selectedPatientName &&
+            reportPatientName.includes(selectedPatientName)) ||
+          (!!selectedPatientName &&
+            selectedPatientName.includes(reportPatientName));
 
         const matchesDisease =
           !selectedDiseaseType || item.disease_type === selectedDiseaseType;
@@ -555,14 +563,19 @@ export default function ReportsPage() {
   }, [currentPage, totalPages]);
 
   const stats = useMemo(() => {
+    const sourceReports = allReports.length > 0 ? allReports : reports;
+
     return {
-      total: reports.length,
-      pending: reports.filter((r) => r.review_status === "pending").length,
-      followUp: reports.filter((r) => r.review_status === "needs_followup")
+      total: sourceReports.length,
+      pending: sourceReports.filter((r) => r.review_status === "pending").length,
+      followUp: sourceReports.filter((r) => r.review_status === "needs_followup")
         .length,
-      approved: reports.filter((r) => r.review_status === "approved").length,
+      approved: sourceReports.filter((r) => r.review_status === "approved")
+        .length,
+      rejected: sourceReports.filter((r) => r.review_status === "rejected")
+        .length,
     };
-  }, [reports]);
+  }, [allReports, reports]);
 
   const handleViewReport = (report: Prediction) => {
     setSelectedReport(report);
@@ -963,16 +976,6 @@ export default function ReportsPage() {
   const statCards = [
     {
       label: getText(
-        "doctorDashboard.reports.stats.total",
-        "إجمالي التقارير",
-        "Total Reports"
-      ),
-      value: stats.total,
-      icon: FileText,
-      className: "bg-primary/10 text-primary border-primary/15",
-    },
-    {
-      label: getText(
         "doctorDashboard.reports.stats.pending",
         "قيد المراجعة",
         "Pending"
@@ -1003,6 +1006,17 @@ export default function ReportsPage() {
       className:
         "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30",
     },
+    {
+      label: getText(
+        "doctorDashboard.reports.stats.rejected",
+        "مرفوض",
+        "Rejected"
+      ),
+      value: stats.rejected,
+      icon: X,
+      className:
+        "bg-red-50 text-red-600 border-red-100 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30",
+    },
   ];
 
   const statusSelectOptions = [
@@ -1010,6 +1024,7 @@ export default function ReportsPage() {
     { value: "pending", label: getStatusLabel("pending") },
     { value: "approved", label: getStatusLabel("approved") },
     { value: "needs_followup", label: getStatusLabel("needs_followup") },
+    { value: "rejected", label: getStatusLabel("rejected") },
   ];
 
   const clinicalIndicators = selectedReport
@@ -1185,6 +1200,17 @@ export default function ReportsPage() {
         </p>
       </div>
 
+      <div className="flex items-center justify-between gap-3">
+        <Badge className="rounded-2xl border border-primary/15 bg-primary/10 px-4 py-2 text-xs font-bold text-primary shadow-none hover:bg-primary/10 hover:text-primary">
+          {getText(
+            "doctorDashboard.reports.stats.total",
+            "إجمالي التقارير",
+            "Total Reports"
+          )}
+          <span className={isArabic ? "mr-2" : "ml-2"}>{stats.total}</span>
+        </Badge>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat, index) => (
           <Card
@@ -1237,8 +1263,8 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            <div className="mx-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-full border border-border bg-background shadow-sm transition-all focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/10 md:h-12 md:flex-row md:items-center">
-              <div className="group relative min-h-12 flex-1">
+            <div className="mx-auto grid w-full max-w-2xl grid-cols-1 gap-3 rounded-3xl border border-border bg-background p-3 shadow-sm transition-all focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/10 md:flex md:h-12 md:flex-row md:items-center md:gap-0 md:rounded-full md:p-0">
+              <div className="group relative h-12 min-w-0 flex-1 rounded-2xl bg-muted/30 md:h-full md:rounded-none md:bg-transparent">
                 <Search
                   className={cn(
                     "absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary",
@@ -1249,7 +1275,7 @@ export default function ReportsPage() {
                 <Input
                   placeholder={labels.searchPlaceholder}
                   className={cn(
-                    "h-12 rounded-none border-0 bg-transparent text-sm font-semibold text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0",
+                    "h-12 rounded-2xl border-0 bg-transparent text-sm font-semibold text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 md:rounded-none",
                     isArabic ? "pr-10 pl-10 text-right" : "pl-10 pr-10"
                   )}
                   value={search}
@@ -1261,16 +1287,17 @@ export default function ReportsPage() {
                     type="button"
                     onClick={() => setSearch("")}
                     className={cn(
-                      "absolute top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary",
-                      isArabic ? "left-4" : "right-4"
+                      "absolute top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/15",
+                      isArabic ? "left-3" : "right-3"
                     )}
+                    aria-label={isArabic ? "مسح البحث" : "Clear search"}
                   >
                     <X className="h-4 w-4" />
                   </button>
                 )}
               </div>
 
-              <div className="h-px w-full bg-border md:h-7 md:w-px" />
+              <div className="hidden bg-border md:block md:h-7 md:w-px" />
 
               <Select
                 value={statusFilter || "all"}
@@ -1285,7 +1312,7 @@ export default function ReportsPage() {
                 }}
                 dir={isArabic ? "rtl" : "ltr"}
               >
-                <SelectTrigger className="h-12 w-full rounded-none border-0 bg-transparent px-4 text-sm font-bold text-primary shadow-none transition-none hover:bg-primary/5 hover:text-primary focus:ring-0 focus:ring-offset-0 md:w-[230px]">
+                <SelectTrigger className="h-12 w-full rounded-2xl border-0 bg-primary/10 px-4 text-sm font-bold text-primary shadow-none transition-colors hover:bg-primary/15 hover:text-primary focus:ring-0 focus:ring-offset-0 md:w-[230px] md:rounded-none md:bg-transparent md:hover:bg-primary/5">
                   <SelectValue placeholder={labels.statusPlaceholder} />
                 </SelectTrigger>
 
@@ -1943,7 +1970,6 @@ export default function ReportsPage() {
                         ) : (
                           <div className="flex items-center gap-2">
                             <Save className="h-4 w-4" />
-
                             {labels.saveReview}
                           </div>
                         )}

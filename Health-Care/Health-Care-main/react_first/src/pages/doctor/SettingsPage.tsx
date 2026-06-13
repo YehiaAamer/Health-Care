@@ -22,17 +22,17 @@ export default function SettingsPage() {
   const isArabic = i18n.language === "ar";
 
   const inputClassName =
-    "h-12 rounded-2xl border-border bg-background font-semibold text-foreground shadow-sm focus-visible:ring-4 focus-visible:ring-primary/10";
+    "h-12 w-full rounded-2xl border-border bg-background font-semibold text-foreground shadow-sm focus-visible:ring-4 focus-visible:ring-primary/10 focus-visible:ring-offset-0";
 
   const labelClassName = "text-xs font-bold text-muted-foreground";
 
   return (
     <div
       dir={isArabic ? "rtl" : "ltr"}
-      className="min-h-full pb-8 pt-8 text-foreground animate-in fade-in duration-700 md:pt-0"
+      className="min-h-full w-full max-w-none overflow-x-hidden pb-8 pt-8 text-foreground animate-in fade-in duration-700 md:pt-0"
     >
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
-        <div>
+      <div className="flex w-full max-w-none min-w-0 flex-col gap-6">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             {t("doctorDashboard.sidebar.settings")}
           </h1>
@@ -44,12 +44,12 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        <Tabs defaultValue="profile" className="w-full">
-          <div className="mb-6 w-full overflow-x-auto">
-            <TabsList className="h-12 rounded-full border border-primary/20 bg-card p-1 shadow-sm">
+        <Tabs defaultValue="profile" className="w-full min-w-0">
+          <div className="mb-6 w-full min-w-0 overflow-x-auto overflow-y-hidden pb-1">
+            <TabsList className="h-12 w-max min-w-max rounded-full border border-primary/20 bg-card p-1 shadow-sm">
               <TabsTrigger
                 value="profile"
-                className="rounded-full px-6 text-sm font-semibold text-primary transition-none hover:bg-primary/10 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="rounded-full px-5 text-sm font-semibold text-primary transition-none hover:bg-primary/10 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground sm:px-6"
               >
                 <User className={cn("h-4 w-4", isArabic ? "ml-2" : "mr-2")} />
                 {isArabic ? "الملف الشخصي" : "Profile"}
@@ -57,7 +57,7 @@ export default function SettingsPage() {
 
               <TabsTrigger
                 value="security"
-                className="rounded-full px-6 text-sm font-semibold text-primary transition-none hover:bg-primary/10 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="rounded-full px-5 text-sm font-semibold text-primary transition-none hover:bg-primary/10 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground sm:px-6"
               >
                 <Shield className={cn("h-4 w-4", isArabic ? "ml-2" : "mr-2")} />
                 {isArabic ? "الأمان" : "Security"}
@@ -67,10 +67,10 @@ export default function SettingsPage() {
 
           <TabsContent
             value="profile"
-            className="mt-0 focus-visible:outline-none"
+            className="mt-0 w-full min-w-0 focus-visible:outline-none"
           >
-            <div className="flex flex-col gap-6">
-              <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
+            <div className="flex w-full min-w-0 flex-col gap-6">
+              <Card className="w-full min-w-0 overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
                 <CardHeader className="border-b border-border bg-muted/30 p-5">
                   <CardTitle className="text-lg font-bold tracking-tight text-foreground">
                     {t("doctorDashboard.settings.profileTitle")}
@@ -82,8 +82,8 @@ export default function SettingsPage() {
                 </CardHeader>
 
                 <CardContent className="space-y-6 p-5">
-                  <div className="flex flex-col gap-6 md:flex-row md:items-start">
-                    <div className="relative w-fit">
+                  <div className="flex min-w-0 flex-col gap-6 md:flex-row md:items-start">
+                    <div className="relative w-fit shrink-0">
                       <Avatar className="h-28 w-28 border-4 border-background shadow-sm ring-4 ring-primary/10">
                         <AvatarImage src={user?.profile?.profile_picture} />
 
@@ -106,8 +106,8 @@ export default function SettingsPage() {
                       </button>
                     </div>
 
-                    <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
+                    <div className="grid w-full min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="min-w-0 space-y-2">
                         <Label className={labelClassName}>
                           {t("doctorDashboard.settings.fullName")}
                         </Label>
@@ -120,7 +120,7 @@ export default function SettingsPage() {
                         />
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="min-w-0 space-y-2">
                         <Label className={labelClassName}>
                           {t("doctorDashboard.settings.email")}
                         </Label>
@@ -128,11 +128,11 @@ export default function SettingsPage() {
                         <Input
                           defaultValue={user?.email}
                           disabled
-                          className="h-12 rounded-2xl border-border bg-muted/40 font-semibold text-muted-foreground shadow-sm disabled:cursor-not-allowed disabled:opacity-80"
+                          className="h-12 w-full rounded-2xl border-border bg-muted/40 font-semibold text-muted-foreground shadow-sm disabled:cursor-not-allowed disabled:opacity-80"
                         />
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="min-w-0 space-y-2">
                         <Label className={labelClassName}>
                           {t("doctorDashboard.settings.phone")}
                         </Label>
@@ -145,7 +145,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="min-w-0 space-y-2">
                     <Label className={labelClassName}>
                       {t("doctorDashboard.settings.bio")}
                     </Label>
@@ -157,7 +157,7 @@ export default function SettingsPage() {
                           ? "اكتب نبذة مهنية عنك..."
                           : "Tell us about your professional background..."
                       }
-                      className="min-h-[120px] rounded-3xl border-border bg-background p-4 font-semibold text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-4 focus-visible:ring-primary/10"
+                      className="min-h-[120px] w-full rounded-3xl border-border bg-background p-4 font-semibold text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-4 focus-visible:ring-primary/10 focus-visible:ring-offset-0"
                     />
                   </div>
 
@@ -173,10 +173,10 @@ export default function SettingsPage() {
 
           <TabsContent
             value="security"
-            className="mt-0 focus-visible:outline-none"
+            className="mt-0 w-full min-w-0 focus-visible:outline-none"
           >
-            <div className="flex flex-col gap-6">
-              <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
+            <div className="flex w-full min-w-0 flex-col gap-6">
+              <Card className="w-full min-w-0 overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
                 <CardHeader className="border-b border-border bg-muted/30 p-5">
                   <CardTitle className="text-lg font-bold tracking-tight text-foreground">
                     {t("doctorDashboard.settings.passwordChange")}
@@ -190,7 +190,7 @@ export default function SettingsPage() {
                 </CardHeader>
 
                 <CardContent className="space-y-5 p-5">
-                  <div className="space-y-2">
+                  <div className="min-w-0 space-y-2">
                     <Label className={labelClassName}>
                       {isArabic ? "كلمة المرور الحالية" : "Current Password"}
                     </Label>
@@ -202,7 +202,7 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="min-w-0 space-y-2">
                     <Label className={labelClassName}>
                       {isArabic ? "كلمة المرور الجديدة" : "New Password"}
                     </Label>
@@ -214,7 +214,7 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="min-w-0 space-y-2">
                     <Label className={labelClassName}>
                       {isArabic
                         ? "تأكيد كلمة المرور الجديدة"
@@ -239,7 +239,7 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
 
-              <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
+              <Card className="w-full min-w-0 overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
                 <CardHeader className="border-b border-border bg-muted/30 p-5">
                   <CardTitle className="text-lg font-bold tracking-tight text-foreground">
                     {t("doctorDashboard.settings.twoFactor")}

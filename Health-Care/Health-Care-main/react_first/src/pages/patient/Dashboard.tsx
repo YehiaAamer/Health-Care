@@ -52,6 +52,20 @@ type CardiovascularPrediction = {
   isFallback?: boolean;
 };
 
+type PredictionExtraFields = {
+  gender?: string;
+  weight?: number;
+  height?: number;
+  systolic_bp?: number;
+  diastolic_bp?: number;
+  systolic_blood_pressure?: number;
+  diastolic_blood_pressure?: number;
+  cholesterol?: number;
+  smoke?: boolean;
+  alcohol?: boolean;
+  physical_activity?: boolean;
+};
+
 interface Prediction {
   id: number;
   pregnancies: number;
@@ -81,6 +95,8 @@ interface Prediction {
   cardiovascular_risk_level?: string;
   cardiovascular_message?: string;
   cardiovascular_z_score?: number;
+
+  extra_fields?: PredictionExtraFields;
 }
 
 type RiskDistributionItem = {
@@ -244,8 +260,94 @@ const normalizeGenderValue = (gender?: string) => {
   return "unknown";
 };
 
+const getExtraNumber = (
+  prediction: Prediction,
+  keys: string[],
+  fallback: number
+) => {
+  const predictionRecord = prediction as unknown as Record<string, unknown>;
+  const extraRecord = (prediction.extra_fields || {}) as Record<
+    string,
+    unknown
+  >;
+
+  for (const key of keys) {
+    const directValue = predictionRecord[key];
+    const extraValue = extraRecord[key];
+
+    const directNumber = Number(directValue);
+    if (Number.isFinite(directNumber) && directNumber > 0) {
+      return directNumber;
+    }
+
+    const extraNumber = Number(extraValue);
+    if (Number.isFinite(extraNumber) && extraNumber > 0) {
+      return extraNumber;
+    }
+  }
+
+  return fallback;
+};
+
+const getExtraString = (
+  prediction: Prediction,
+  keys: string[],
+  fallback: string
+) => {
+  const predictionRecord = prediction as unknown as Record<string, unknown>;
+  const extraRecord = (prediction.extra_fields || {}) as Record<
+    string,
+    unknown
+  >;
+
+  for (const key of keys) {
+    const directValue = predictionRecord[key];
+    const extraValue = extraRecord[key];
+
+    if (typeof directValue === "string" && directValue.trim()) {
+      return directValue;
+    }
+
+    if (typeof extraValue === "string" && extraValue.trim()) {
+      return extraValue;
+    }
+  }
+
+  return fallback;
+};
+
+const getCardioStoredInputs = (prediction: Prediction) => {
+  const height = getExtraNumber(prediction, ["height"], 170);
+  const weight = getExtraNumber(prediction, ["weight"], 70);
+
+  const systolicBloodPressure = getExtraNumber(
+    prediction,
+    ["systolic_blood_pressure", "systolic_bp"],
+    120
+  );
+
+  const diastolicBloodPressure = getExtraNumber(
+    prediction,
+    ["diastolic_blood_pressure", "diastolic_bp"],
+    Number(prediction.blood_pressure ?? 80)
+  );
+
+  const cholesterol = getExtraNumber(prediction, ["cholesterol"], 180);
+  const gender = getExtraString(prediction, ["gender"], "male");
+
+  return {
+    height,
+    weight,
+    systolicBloodPressure,
+    diastolicBloodPressure,
+    cholesterol,
+    gender,
+  };
+};
+
 const shouldShowPregnanciesInput = (prediction: Prediction) => {
-  const normalizedGender = normalizeGenderValue(prediction.gender);
+  const { gender } = getCardioStoredInputs(prediction);
+  const normalizedGender = normalizeGenderValue(gender);
 
   if (normalizedGender === "female") return true;
   if (normalizedGender === "male") return false;
@@ -384,27 +486,17 @@ const getCardioPrediction = (
     };
   }
 
-  const height = prediction.height ?? 170;
+  const {
+    height,
+    weight,
+    systolicBloodPressure,
+    diastolicBloodPressure,
+    cholesterol,
+    gender: rawGender,
+  } = getCardioStoredInputs(prediction);
 
-  const calculatedWeightFromBmi = Number(
-    (Number(prediction.bmi ?? 0) * Math.pow(height / 100, 2)).toFixed(1)
-  );
-
-  const weight =
-    prediction.weight ??
-    (calculatedWeightFromBmi > 0 ? calculatedWeightFromBmi : 70);
-
-  const diastolicBloodPressure =
-    prediction.diastolic_blood_pressure ?? prediction.blood_pressure ?? 80;
-
-  const systolicBloodPressure =
-    prediction.systolic_blood_pressure ??
-    Math.min(diastolicBloodPressure + 40, 260);
-
-  const cholesterol = prediction.cholesterol ?? 180;
-
-  const normalizedGender = normalizeGenderValue(prediction.gender);
-  const gender = normalizedGender === "male" ? "male" : "female";
+  const normalizedGender = normalizeGenderValue(rawGender);
+  const gender = normalizedGender === "female" ? "female" : "male";
 
   return calculateCardiovascularPredictionFromValues({
     age: prediction.age,
@@ -596,9 +688,6 @@ const Dashboard = () => {
     return normalizePercentageValue(prediction.probability) ?? 0;
   };
 
-  // مهم:
-  // هنا الريسك بتاع السكر بقى بيتحسب من النسبة الراجعة من الباك فقط،
-  // ومبقاش بياخد risk_level من الباك عشان مايحصلش تعارض زي 30.95% وتظهر Low.
   const getEffectiveDiabetesRiskLevel = (prediction: Prediction): RiskLevel => {
     const percentage = getDiabetesPercentage(prediction);
     return getRiskLevelFromPercentage(percentage);
@@ -782,25 +871,13 @@ const Dashboard = () => {
 
     const isFemale = shouldShowPregnanciesInput(latestPrediction);
 
-    const systolicBloodPressure =
-      latestPrediction.systolic_blood_pressure ??
-      Math.min((latestPrediction.blood_pressure ?? 80) + 40, 260);
-
-    const diastolicBloodPressure =
-      latestPrediction.diastolic_blood_pressure ??
-      latestPrediction.blood_pressure;
-
-    const height = latestPrediction.height ?? 170;
-
-    const calculatedWeightFromBmi = Number(
-      (Number(latestPrediction.bmi ?? 0) * Math.pow(height / 100, 2)).toFixed(1)
-    );
-
-    const weight =
-      latestPrediction.weight ??
-      (calculatedWeightFromBmi > 0 ? calculatedWeightFromBmi : 70);
-
-    const cholesterol = latestPrediction.cholesterol ?? 180;
+    const {
+      height,
+      weight,
+      systolicBloodPressure,
+      diastolicBloodPressure,
+      cholesterol,
+    } = getCardioStoredInputs(latestPrediction);
 
     return [
       ...(isFemale
@@ -907,7 +984,9 @@ const Dashboard = () => {
   }, [latestPrediction, isArabic, t]);
 
   const riskDistributionData = useMemo<RiskDistributionItem[]>(() => {
-    const sourcePredictions = selectedRange ? rangePredictions : diabetesPredictions;
+    const sourcePredictions = selectedRange
+      ? rangePredictions
+      : diabetesPredictions;
 
     const counts: Record<RiskLevel, number> = {
       low: 0,
@@ -1039,7 +1118,8 @@ const Dashboard = () => {
         const diabetesValues = weekPredictions.map(getDiabetesPercentage);
 
         const cardioValues = weekPredictions.map(
-          (prediction) => getCardioPrediction(prediction, t, predictions).percentage
+          (prediction) =>
+            getCardioPrediction(prediction, t, predictions).percentage
         );
 
         const diabetesAverage = getAverageValue(diabetesValues);
@@ -1084,7 +1164,8 @@ const Dashboard = () => {
       const diabetesValues = monthPredictions.map(getDiabetesPercentage);
 
       const cardioValues = monthPredictions.map(
-        (prediction) => getCardioPrediction(prediction, t, predictions).percentage
+        (prediction) =>
+          getCardioPrediction(prediction, t, predictions).percentage
       );
 
       const diabetesAverage = getAverageValue(diabetesValues);
@@ -1123,6 +1204,7 @@ const Dashboard = () => {
       .filter((pred) => {
         const cardio = getCardioPrediction(pred, t, predictions);
         const diabetesRiskLevel = getEffectiveDiabetesRiskLevel(pred);
+        const cardioInputs = getCardioStoredInputs(pred);
 
         const localizedDate = new Date(pred.created_at).toLocaleDateString(
           isArabic ? "ar-SA" : "en-US"
@@ -1138,8 +1220,12 @@ const Dashboard = () => {
             pred.insulin,
             pred.diabetes_pedigree_function,
             pred.age,
-            pred.weight,
-            pred.height,
+            cardioInputs.weight,
+            cardioInputs.height,
+            cardioInputs.systolicBloodPressure,
+            cardioInputs.diastolicBloodPressure,
+            cardioInputs.cholesterol,
+            cardioInputs.gender,
             getDiabetesPercentage(pred),
             diabetesRiskLevel,
             getLocalizedRiskLabel(diabetesRiskLevel),
@@ -1174,24 +1260,13 @@ const Dashboard = () => {
   const cardioLabel = t("dashboard.extra.cardiovascular");
 
   const buildRiskIndicators = (pred: Prediction) => {
-    const height = pred.height ?? 170;
-
-    const calculatedWeightFromBmi = Number(
-      (Number(pred.bmi ?? 0) * Math.pow(height / 100, 2)).toFixed(1)
-    );
-
-    const weight =
-      pred.weight ??
-      (calculatedWeightFromBmi > 0 ? calculatedWeightFromBmi : 70);
-
-    const systolicBloodPressure =
-      pred.systolic_blood_pressure ??
-      Math.min((pred.blood_pressure ?? 80) + 40, 260);
-
-    const diastolicBloodPressure =
-      pred.diastolic_blood_pressure ?? pred.blood_pressure ?? 80;
-
-    const cholesterol = pred.cholesterol ?? 180;
+    const {
+      height,
+      weight,
+      systolicBloodPressure,
+      diastolicBloodPressure,
+      cholesterol,
+    } = getCardioStoredInputs(pred);
 
     const diabetesIndicators = normalizeIndicatorsBySeverity([
       ...(shouldShowPregnanciesInput(pred)
@@ -1544,88 +1619,80 @@ const Dashboard = () => {
     );
   };
 
-const buildReportState = (pred: Prediction) => {
-  const cardio = getCardioPrediction(pred, t, predictions);
-  const diabetesPercentage = getDiabetesPercentage(pred);
-  const diabetesRiskLevel = getEffectiveDiabetesRiskLevel(pred);
+  const buildReportState = (pred: Prediction) => {
+    const cardio = getCardioPrediction(pred, t, predictions);
+    const diabetesPercentage = getDiabetesPercentage(pred);
+    const diabetesRiskLevel = getEffectiveDiabetesRiskLevel(pred);
 
-  const normalizedGender = normalizeGenderValue(pred.gender);
-
-  const reportGender =
-    normalizedGender === "male" || normalizedGender === "female"
-      ? normalizedGender
-      : Number(pred.pregnancies ?? 0) > 0
-      ? "female"
-      : "male";
-
-  const height = pred.height ?? 170;
-
-  const calculatedWeightFromBmi = Number(
-    (Number(pred.bmi ?? 0) * Math.pow(height / 100, 2)).toFixed(1)
-  );
-
-  const weight =
-    pred.weight ?? (calculatedWeightFromBmi > 0 ? calculatedWeightFromBmi : 70);
-
-  const diastolicBloodPressure =
-    pred.diastolic_blood_pressure ?? pred.blood_pressure ?? 80;
-
-  const systolicBloodPressure =
-    pred.systolic_blood_pressure ??
-    Math.min(diastolicBloodPressure + 40, 260);
-
-  const cholesterol = pred.cholesterol ?? 180;
-
-  const pregnancies =
-    reportGender === "female" ? Number(pred.pregnancies ?? 0) : 0;
-
-  return {
-    formData: {
-      gender: reportGender,
-
-      ...(reportGender === "female"
-        ? {
-            pregnancies,
-          }
-        : {}),
-
-      glucose: pred.glucose,
+    const {
+      height,
+      weight,
       systolicBloodPressure,
       diastolicBloodPressure,
-      skinThickness: pred.skin_thickness,
-      insulin: pred.insulin,
-      weight,
-      height,
       cholesterol,
-      diabetesPedigreeFunction: pred.diabetes_pedigree_function,
-      age: pred.age,
-    },
+      gender: rawGender,
+    } = getCardioStoredInputs(pred);
 
-    probability: diabetesPercentage,
-    percentage: diabetesPercentage,
-    riskLevel: diabetesRiskLevel,
-    message: pred.message,
-    predictionId: pred.id,
-    sessionId: pred.session_id,
+    const normalizedGender = normalizeGenderValue(rawGender);
 
-    diabetesPrediction: {
+    const reportGender =
+      normalizedGender === "male" || normalizedGender === "female"
+        ? normalizedGender
+        : Number(pred.pregnancies ?? 0) > 0
+        ? "female"
+        : "male";
+
+    const pregnancies =
+      reportGender === "female" ? Number(pred.pregnancies ?? 0) : 0;
+
+    return {
+      formData: {
+        gender: reportGender,
+
+        ...(reportGender === "female"
+          ? {
+              pregnancies,
+            }
+          : {}),
+
+        glucose: pred.glucose,
+        systolicBloodPressure,
+        diastolicBloodPressure,
+        skinThickness: pred.skin_thickness,
+        insulin: pred.insulin,
+        weight,
+        height,
+        cholesterol,
+        diabetesPedigreeFunction: pred.diabetes_pedigree_function,
+        age: pred.age,
+      },
+
       probability: diabetesPercentage,
       percentage: diabetesPercentage,
-      risk_level: diabetesRiskLevel,
+      riskLevel: diabetesRiskLevel,
       message: pred.message,
-      prediction_id: pred.id,
-    },
+      predictionId: pred.id,
+      sessionId: pred.session_id,
 
-    cardiovascularPrediction: {
-      ...cardio,
-      probability:
-        cardio.percentage <= 1
-          ? cardio.percentage
-          : Number((cardio.percentage / 100).toFixed(4)),
-      percentage: cardio.percentage,
-    },
+      diabetesPrediction: {
+        probability: diabetesPercentage,
+        percentage: diabetesPercentage,
+        risk_level: diabetesRiskLevel,
+        message: pred.message,
+        prediction_id: pred.id,
+      },
+
+      cardiovascularPrediction: {
+        ...cardio,
+        probability:
+          cardio.percentage <= 1
+            ? cardio.percentage
+            : Number((cardio.percentage / 100).toFixed(4)),
+        percentage: cardio.percentage,
+      },
+    };
   };
-};
+
   const visibleRiskDistributionData = riskDistributionData.filter(
     (item) => item.value > 0
   );
@@ -1884,9 +1951,7 @@ const buildReportState = (pred: Prediction) => {
                     : "--"}
                 </h3>
               </Card>
-            </section>
-
-            <section
+            </section>            <section
               className={`grid grid-cols-1 items-start gap-4 ${smoothSectionClass}`}
             >
               <Card className="rounded-[22px] border border-border bg-card p-4 text-card-foreground shadow-sm md:p-5">
@@ -1907,7 +1972,9 @@ const buildReportState = (pred: Prediction) => {
                     )}
 
                     <Button
-                      variant={selectedRange === "weekly" ? "default" : "outline"}
+                      variant={
+                        selectedRange === "weekly" ? "default" : "outline"
+                      }
                       size="sm"
                       onClick={() =>
                         setSelectedRange((prev) =>
@@ -1919,7 +1986,9 @@ const buildReportState = (pred: Prediction) => {
                     </Button>
 
                     <Button
-                      variant={selectedRange === "monthly" ? "default" : "outline"}
+                      variant={
+                        selectedRange === "monthly" ? "default" : "outline"
+                      }
                       size="sm"
                       onClick={() =>
                         setSelectedRange((prev) =>
@@ -2006,7 +2075,9 @@ const buildReportState = (pred: Prediction) => {
 
                                     <div
                                       className={`min-w-0 ${
-                                        isArabic ? "sm:text-left" : "sm:text-right"
+                                        isArabic
+                                          ? "sm:text-left"
+                                          : "sm:text-right"
                                       }`}
                                     >
                                       <p className="truncate text-xs font-medium text-muted-foreground">
@@ -2030,7 +2101,9 @@ const buildReportState = (pred: Prediction) => {
                                   <p className="text-xs font-semibold text-primary">
                                     {selectedRange === "weekly"
                                       ? t("dashboard.extra.reportsThisWeek")
-                                      : t("dashboard.extra.reportsDisplayedMonths")}
+                                      : t(
+                                          "dashboard.extra.reportsDisplayedMonths"
+                                        )}
                                   </p>
 
                                   <h5 className="mt-1 text-2xl font-bold text-foreground">
@@ -2078,7 +2151,9 @@ const buildReportState = (pred: Prediction) => {
 
                                     <div
                                       className={`min-w-0 ${
-                                        isArabic ? "sm:text-left" : "sm:text-right"
+                                        isArabic
+                                          ? "sm:text-left"
+                                          : "sm:text-right"
                                       }`}
                                     >
                                       <p className="truncate text-xs font-medium text-muted-foreground">
@@ -2209,17 +2284,13 @@ const buildReportState = (pred: Prediction) => {
                                       }}
                                       contentStyle={{
                                         borderRadius: "14px",
-                                        border: "1px solid hsl(var(--border))",
+                                        border:
+                                          "1px solid hsl(var(--border))",
                                         background: "hsl(var(--card))",
-                                        color: "hsl(var(--card-foreground))",
+                                        color:
+                                          "hsl(var(--card-foreground))",
                                         boxShadow:
                                           "0 14px 35px rgba(15,23,42,0.18)",
-                                      }}
-                                      labelStyle={{
-                                        color: "hsl(var(--foreground))",
-                                      }}
-                                      itemStyle={{
-                                        color: "hsl(var(--foreground))",
                                       }}
                                       formatter={(
                                         value: number | null,
@@ -2239,19 +2310,6 @@ const buildReportState = (pred: Prediction) => {
                                               "dashboard.extra.analysisAverage"
                                             ),
                                       ]}
-                                      labelFormatter={(label) => {
-                                        const point = rangeTrendChartData.find(
-                                          (item) => item.label === label
-                                        );
-
-                                        if (!point) return label;
-
-                                        return `${label} - ${t(
-                                          "dashboard.extra.analysisAverage"
-                                        )}: ${point.averageLabel} - ${t(
-                                          "dashboard.extra.reports"
-                                        )}: ${formatNumber(point.reports)}`;
-                                      }}
                                     />
 
                                     <Area
@@ -2260,10 +2318,6 @@ const buildReportState = (pred: Prediction) => {
                                       stroke="none"
                                       fill="url(#diabetesRiskShadow)"
                                       connectNulls
-                                      isAnimationActive={true}
-                                      animationBegin={80}
-                                      animationDuration={650}
-                                      animationEasing="ease-out"
                                     />
 
                                     <Area
@@ -2272,10 +2326,6 @@ const buildReportState = (pred: Prediction) => {
                                       stroke="none"
                                       fill="url(#cardioRiskShadow)"
                                       connectNulls
-                                      isAnimationActive={true}
-                                      animationBegin={120}
-                                      animationDuration={650}
-                                      animationEasing="ease-out"
                                     />
 
                                     <Line
@@ -2284,18 +2334,8 @@ const buildReportState = (pred: Prediction) => {
                                       stroke={DIABETES_CHART_COLOR}
                                       strokeWidth={3}
                                       connectNulls
-                                      isAnimationActive={true}
-                                      animationBegin={140}
-                                      animationDuration={650}
-                                      animationEasing="ease-out"
                                       dot={{
                                         r: 3,
-                                        strokeWidth: 2,
-                                        fill: "hsl(var(--background))",
-                                        stroke: DIABETES_CHART_COLOR,
-                                      }}
-                                      activeDot={{
-                                        r: 5,
                                         strokeWidth: 2,
                                         fill: "hsl(var(--background))",
                                         stroke: DIABETES_CHART_COLOR,
@@ -2308,18 +2348,8 @@ const buildReportState = (pred: Prediction) => {
                                       stroke={CARDIO_CHART_COLOR}
                                       strokeWidth={3}
                                       connectNulls
-                                      isAnimationActive={true}
-                                      animationBegin={180}
-                                      animationDuration={650}
-                                      animationEasing="ease-out"
                                       dot={{
                                         r: 3,
-                                        strokeWidth: 2,
-                                        fill: "hsl(var(--background))",
-                                        stroke: CARDIO_CHART_COLOR,
-                                      }}
-                                      activeDot={{
-                                        r: 5,
                                         strokeWidth: 2,
                                         fill: "hsl(var(--background))",
                                         stroke: CARDIO_CHART_COLOR,
@@ -2381,56 +2411,6 @@ const buildReportState = (pred: Prediction) => {
                                       bottom: 38,
                                     }}
                                   >
-                                    <defs>
-                                      <linearGradient
-                                        id="diabetesInputShadow"
-                                        x1="0"
-                                        y1="0"
-                                        x2="0"
-                                        y2="1"
-                                      >
-                                        <stop
-                                          offset="0%"
-                                          stopColor={DIABETES_CHART_COLOR}
-                                          stopOpacity={0.24}
-                                        />
-                                        <stop
-                                          offset="80%"
-                                          stopColor={DIABETES_CHART_COLOR}
-                                          stopOpacity={0.04}
-                                        />
-                                        <stop
-                                          offset="100%"
-                                          stopColor={DIABETES_CHART_COLOR}
-                                          stopOpacity={0}
-                                        />
-                                      </linearGradient>
-
-                                      <linearGradient
-                                        id="cardioInputShadow"
-                                        x1="0"
-                                        y1="0"
-                                        x2="0"
-                                        y2="1"
-                                      >
-                                        <stop
-                                          offset="0%"
-                                          stopColor={CARDIO_CHART_COLOR}
-                                          stopOpacity={0.22}
-                                        />
-                                        <stop
-                                          offset="80%"
-                                          stopColor={CARDIO_CHART_COLOR}
-                                          stopOpacity={0.04}
-                                        />
-                                        <stop
-                                          offset="100%"
-                                          stopColor={CARDIO_CHART_COLOR}
-                                          stopOpacity={0}
-                                        />
-                                      </linearGradient>
-                                    </defs>
-
                                     <CartesianGrid
                                       strokeDasharray="4 4"
                                       vertical={false}
@@ -2465,17 +2445,13 @@ const buildReportState = (pred: Prediction) => {
                                       }}
                                       contentStyle={{
                                         borderRadius: "14px",
-                                        border: "1px solid hsl(var(--border))",
+                                        border:
+                                          "1px solid hsl(var(--border))",
                                         background: "hsl(var(--card))",
-                                        color: "hsl(var(--card-foreground))",
+                                        color:
+                                          "hsl(var(--card-foreground))",
                                         boxShadow:
                                           "0 14px 35px rgba(15,23,42,0.18)",
-                                      }}
-                                      labelStyle={{
-                                        color: "hsl(var(--foreground))",
-                                      }}
-                                      itemStyle={{
-                                        color: "hsl(var(--foreground))",
                                       }}
                                       formatter={(
                                         value: number,
@@ -2504,24 +2480,18 @@ const buildReportState = (pred: Prediction) => {
                                       type="monotone"
                                       dataKey="diabetesValue"
                                       stroke="none"
-                                      fill="url(#diabetesInputShadow)"
+                                      fill={DIABETES_CHART_COLOR}
+                                      fillOpacity={0.1}
                                       connectNulls
-                                      isAnimationActive={true}
-                                      animationBegin={80}
-                                      animationDuration={650}
-                                      animationEasing="ease-out"
                                     />
 
                                     <Area
                                       type="monotone"
                                       dataKey="cardioValue"
                                       stroke="none"
-                                      fill="url(#cardioInputShadow)"
+                                      fill={CARDIO_CHART_COLOR}
+                                      fillOpacity={0.1}
                                       connectNulls
-                                      isAnimationActive={true}
-                                      animationBegin={120}
-                                      animationDuration={650}
-                                      animationEasing="ease-out"
                                     />
 
                                     <Line
@@ -2530,18 +2500,8 @@ const buildReportState = (pred: Prediction) => {
                                       stroke={DIABETES_CHART_COLOR}
                                       strokeWidth={3}
                                       connectNulls
-                                      isAnimationActive={true}
-                                      animationBegin={140}
-                                      animationDuration={650}
-                                      animationEasing="ease-out"
                                       dot={{
                                         r: 3,
-                                        strokeWidth: 2,
-                                        fill: "hsl(var(--background))",
-                                        stroke: DIABETES_CHART_COLOR,
-                                      }}
-                                      activeDot={{
-                                        r: 5,
                                         strokeWidth: 2,
                                         fill: "hsl(var(--background))",
                                         stroke: DIABETES_CHART_COLOR,
@@ -2554,18 +2514,8 @@ const buildReportState = (pred: Prediction) => {
                                       stroke={CARDIO_CHART_COLOR}
                                       strokeWidth={3}
                                       connectNulls
-                                      isAnimationActive={true}
-                                      animationBegin={180}
-                                      animationDuration={650}
-                                      animationEasing="ease-out"
                                       dot={{
                                         r: 3,
-                                        strokeWidth: 2,
-                                        fill: "hsl(var(--background))",
-                                        stroke: CARDIO_CHART_COLOR,
-                                      }}
-                                      activeDot={{
-                                        r: 5,
                                         strokeWidth: 2,
                                         fill: "hsl(var(--background))",
                                         stroke: CARDIO_CHART_COLOR,
@@ -2576,9 +2526,7 @@ const buildReportState = (pred: Prediction) => {
                               </div>
                             </>
                           )}
-                        </div>
-
-                        <div className="flex h-full flex-col rounded-[20px] border border-border bg-card p-3 text-card-foreground shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-4 md:p-5">
+                        </div>                        <div className="flex h-full flex-col rounded-[20px] border border-border bg-card p-3 text-card-foreground shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-4 md:p-5">
                           <div className="mb-3 flex items-center justify-between gap-3">
                             <div>
                               <h4 className="font-semibold text-foreground">
@@ -2719,9 +2667,11 @@ const buildReportState = (pred: Prediction) => {
                     <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10">
                       <AlertTriangle className="h-6 w-6 text-red-500" />
                     </div>
+
                     <h4 className="mb-2 font-semibold text-foreground">
                       {t("dashboard.unableToLoadAnalyses")}
                     </h4>
+
                     <p className="text-sm text-red-500">{error}</p>
                   </div>
                 ) : diabetesPredictions.length === 0 ? (
@@ -2729,12 +2679,15 @@ const buildReportState = (pred: Prediction) => {
                     <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
                       <Beaker className="h-7 w-7 text-primary" />
                     </div>
+
                     <h4 className="mb-2 text-lg font-semibold text-foreground">
                       {t("dashboard.noPreviousAnalyses")}
                     </h4>
+
                     <p className="mx-auto mb-6 max-w-md text-muted-foreground">
                       {t("dashboard.healthTipText")}
                     </p>
+
                     <Link to="/diagnosis">
                       <Button>{t("dashboard.firstTestNow")}</Button>
                     </Link>
@@ -2744,9 +2697,11 @@ const buildReportState = (pred: Prediction) => {
                     <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
                       <Search className="h-7 w-7 text-primary" />
                     </div>
+
                     <h4 className="mb-2 text-lg font-semibold text-foreground">
                       {t("dashboard.noData")}
                     </h4>
+
                     <p className="text-muted-foreground">{searchTerm}</p>
                   </div>
                 ) : (
@@ -2769,7 +2724,11 @@ const buildReportState = (pred: Prediction) => {
                         </div>
 
                         {displayedPredictions.map((pred) => {
-                          const cardio = getCardioPrediction(pred, t, predictions);
+                          const cardio = getCardioPrediction(
+                            pred,
+                            t,
+                            predictions
+                          );
                           const diabetesPercentage =
                             getDiabetesPercentage(pred);
                           const diabetesRiskLevel =
@@ -2940,7 +2899,11 @@ const buildReportState = (pred: Prediction) => {
 
                     <div className="grid gap-3 lg:hidden">
                       {displayedPredictions.map((pred) => {
-                        const cardio = getCardioPrediction(pred, t, predictions);
+                        const cardio = getCardioPrediction(
+                          pred,
+                          t,
+                          predictions
+                        );
                         const diabetesPercentage = getDiabetesPercentage(pred);
                         const diabetesRiskLevel =
                           getEffectiveDiabetesRiskLevel(pred);

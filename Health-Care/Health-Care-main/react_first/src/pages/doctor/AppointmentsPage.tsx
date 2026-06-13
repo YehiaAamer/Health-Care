@@ -114,64 +114,6 @@ export default function AppointmentsPage() {
     "04:00 PM",
   ];
 
-  const dummyAppointments: Appointment[] = [
-    {
-      id: 1,
-      patient_name: isArabic ? "يوسف إبراهيم" : "Youssef Ibrahim",
-      patient_id: "PID-2241",
-      patient_user: 2241,
-      time: "10:00 AM - 10:30 AM",
-      reason: isArabic ? "طلب متابعة السكري" : "Diabetes follow-up request",
-      status: "Pending",
-      appointment_date: new Date().toISOString(),
-      source: "patient",
-    },
-    {
-      id: 2,
-      patient_name: isArabic ? "مريم محمود" : "Mariam Mahmoud",
-      patient_id: "PID-1152",
-      patient_user: 1152,
-      time: "11:00 AM - 11:30 AM",
-      reason: isArabic ? "طلب مراجعة ضغط الدم" : "Blood pressure review request",
-      status: "Pending",
-      appointment_date: new Date().toISOString(),
-      source: "patient",
-    },
-    {
-      id: 3,
-      patient_name: isArabic ? "عمر خالد" : "Omar Khaled",
-      patient_id: "PID-3367",
-      patient_user: 3367,
-      time: "12:00 PM - 12:30 PM",
-      reason: isArabic ? "استشارة غذائية" : "Nutritional Consultation",
-      status: "Upcoming",
-      appointment_date: new Date().toISOString(),
-      source: "doctor",
-    },
-    {
-      id: 4,
-      patient_name: isArabic ? "هناء سعيد" : "Hana Saeed",
-      patient_id: "PID-4489",
-      patient_user: 4489,
-      time: "02:00 PM - 02:30 PM",
-      reason: isArabic ? "فحص سنوي" : "Annual Checkup",
-      status: "Completed",
-      appointment_date: new Date().toISOString(),
-      source: "doctor",
-    },
-    {
-      id: 5,
-      patient_name: isArabic ? "كريم علي" : "Karim Ali",
-      patient_id: "PID-5590",
-      patient_user: 5590,
-      time: "03:00 PM - 03:30 PM",
-      reason: isArabic ? "مراجعة نتائج التحاليل" : "Lab Results Review",
-      status: "In Progress",
-      appointment_date: new Date().toISOString(),
-      source: "doctor",
-    },
-  ];
-
   const tableColumns = [
     {
       key: "patient",
@@ -374,55 +316,87 @@ export default function AppointmentsPage() {
 
       const data: any = await apiCall(API_ENDPOINTS.DOCTOR_APPOINTMENTS_TODAY);
 
-      if (data?.appointments?.length > 0) {
-        const mapped = data.appointments.map((apt: any) => {
-          const rawStatus = String(apt.status || "").toLowerCase();
+      const appointmentsList = Array.isArray(data)
+        ? data
+        : data?.appointments ||
+          data?.today_appointments ||
+          data?.doctor_appointments ||
+          data?.results ||
+          data?.data ||
+          [];
 
-          return {
-            id: apt.id,
-            patient_name:
-              apt.patient_name ||
-              apt.patient?.name ||
-              apt.patient?.full_name ||
-              "Unknown Patient",
-            patient_id:
-              apt.patient_id ||
-              apt.patient_user ||
-              apt.patient?.id ||
-              `PID-${Math.floor(1000 + Math.random() * 9000)}`,
-            patient_user: apt.patient_user || apt.patient?.id || apt.user_id,
-            time: formatAppointmentTime(apt.time || apt.appointment_time),
-            reason: apt.reason || apt.condition || "Medical Consultation",
-            status:
-              rawStatus === "pending" || rawStatus === "requested"
-                ? "Pending"
-                : rawStatus === "completed"
-                ? "Completed"
-                : rawStatus === "cancelled" || rawStatus === "rejected"
-                ? "Cancelled"
-                : rawStatus === "in_progress"
-                ? "In Progress"
-                : "Upcoming",
-            profile_picture:
-              apt.profile_picture || apt.patient?.profile_picture || "",
-            meeting_url: apt.meeting_url,
-            call_url: apt.call_url,
-            video_link: apt.video_link,
-            appointment_date: apt.appointment_date || apt.date || apt.created_at,
-            source:
-              rawStatus === "pending" || rawStatus === "requested"
-                ? "patient"
-                : "doctor",
-          } as Appointment;
-        });
-
-        setAppointments(mapped);
-      } else {
-        setAppointments(dummyAppointments);
+      if (!Array.isArray(appointmentsList) || appointmentsList.length === 0) {
+        setAppointments([]);
+        return;
       }
+
+      const mapped = appointmentsList.map((apt: any) => {
+        const rawStatus = String(apt.status || "").toLowerCase();
+
+        return {
+          id: apt.id,
+          patient_name:
+            apt.patient_name ||
+            apt.patient?.name ||
+            apt.patient?.full_name ||
+            [apt.patient?.first_name, apt.patient?.last_name]
+              .filter(Boolean)
+              .join(" ")
+              .trim() ||
+            "Unknown Patient",
+          patient_id:
+            apt.patient_id ||
+            apt.patient_user ||
+            apt.patient?.id ||
+            `PID-${apt.id || "Unknown"}`,
+          patient_user: apt.patient_user || apt.patient?.id || apt.user_id,
+          time: formatAppointmentTime(
+            apt.time ||
+              apt.appointment_time ||
+              apt.appointment_datetime ||
+              apt.datetime ||
+              apt.scheduled_at ||
+              apt.start_time
+          ),
+          reason: apt.reason || apt.condition || "Medical Consultation",
+          status:
+            rawStatus === "pending" || rawStatus === "requested"
+              ? "Pending"
+              : rawStatus === "completed"
+              ? "Completed"
+              : rawStatus === "cancelled" || rawStatus === "rejected"
+              ? "Cancelled"
+              : rawStatus === "in_progress"
+              ? "In Progress"
+              : "Upcoming",
+          profile_picture:
+            apt.profile_picture || apt.patient?.profile_picture || "",
+          meeting_url: apt.meeting_url,
+          call_url: apt.call_url,
+          video_link: apt.video_link,
+          appointment_date:
+            apt.appointment_date ||
+            apt.date ||
+            apt.appointment_datetime ||
+            apt.datetime ||
+            apt.created_at,
+          source:
+            rawStatus === "pending" || rawStatus === "requested"
+              ? "patient"
+              : "doctor",
+        } as Appointment;
+      });
+
+      setAppointments(mapped);
     } catch (error) {
       console.error("Failed to fetch appointments", error);
-      setAppointments(dummyAppointments);
+      setAppointments([]);
+
+      toast.error(
+        isArabic
+          ? "فشل تحميل المواعيد من الخادم"
+          : "Failed to load appointments from server"
+      );
     } finally {
       setLoading(false);
     }

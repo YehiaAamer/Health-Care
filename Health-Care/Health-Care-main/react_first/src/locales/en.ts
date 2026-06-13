@@ -665,62 +665,70 @@ report: {
     copyright: "© 2026 HealthCare. All rights reserved."
   },
 
-  landing: {
-    heroTitle: "AI-Powered Medical Diagnosis at Your Fingertips",
-    heroSubtitle:
-      "Get fast, accurate, and confidential health insights with our AI-driven diagnostic tool.",
-    startCheckup: "Start Your Checkup",
-    scrollNext: "Scroll to Next Section",
-doctorHeroTitle: "An Integrated Medical Portal for Patient Follow-up and Analysis Review",
-doctorHeroSubtitle:
-  "Review patient analyses, monitor risk levels, and organize appointments and reports through a clear and secure doctor dashboard designed for efficient medical follow-up.",
-goToDoctorDashboard: "Go to Doctor Dashboard",
-    howItWorksTitle: "How It Works",
-    howItWorksSubtitle:
-      "A simple, three-step process to get your personalized health report.",
-    step1Title: "1. Input Symptoms",
-    step1Desc:
-      "Describe your symptoms in detail using our intuitive interface.",
-    step2Title: "2. AI Analysis",
-    step2Desc:
-      "Our AI analyzes your input using advanced algorithms and medical data.",
-    step3Title: "3. Personalized Report",
-    step3Desc:
-      "Receive a comprehensive report with insights and recommendations.",
+landing: {
+  heroTitle: "AI-Powered Medical Diagnosis and Clinical Decision Support",
+  heroSubtitle:
+    "Smart health insights to help you monitor your health with confidence.",
+  startCheckup: "Start Your Checkup",
+  scrollNext: "Scroll to Next Section",
 
-    benefitsTitle: "Key Benefits",
-    benefitsSubtitle:
-      "Experience the power of AI in healthcare with our advanced features.",
-    benefit1Title: "Fast & Accurate Results",
-    benefit1Desc: "Get results in minutes with high accuracy.",
-    benefit2Title: "Secure & Confidential Data",
-    benefit2Desc: "Your data is encrypted and kept private.",
-    benefit3Title: "Easy-to-Use Interface",
-    benefit3Desc: "Simple and intuitive design for all users.",
-    benefit4Title: "Supports Multiple Conditions",
-    benefit4Desc: "Diagnose a wide range of health issues.",
-    benefit5Title: "24/7 Availability",
-    benefit5Desc: "Access our service anytime, anywhere.",
-    benefit6Title: "Doctor Verified",
-    benefit6Desc: "Information is reviewed by professionals.",
+  doctorHeroTitle:
+    "An Integrated Medical Portal for Patient Follow-up and Analysis Review",
+  doctorHeroSubtitle:
+    "Review patient analyses, monitor risk levels, and organize appointments and reports through a clear and secure doctor dashboard designed for efficient medical follow-up.",
+  goToDoctorDashboard: "Go to Doctor Dashboard",
 
-    testimonialsTitle: "What Our Users Say",
-    testimonialsSubtitle:
-      "Real stories from patients and doctors who trust HealthCare.",
-    testimonial1Text:
-      '"HealthCare revolutionized my practice. It provides quick and reliable insights, making diagnosis faster for my patients."',
-    testimonial1Name: "Dr. Sam Carter",
-    testimonial1Role: "General Practitioner",
-    testimonial2Text:
-      '"I was amazed by the accuracy and speed of the diagnosis. It gave me peace of mind and helped me understand my health better."',
-    testimonial2Name: "Mark Thompson",
-    testimonial2Role: "Patient",
+  heroCard1Title: "Diabetes Risk",
+  heroCard1Desc:
+    "Assess your diabetes risk through simple and organized health inputs.",
 
-    ctaTitle: "Take control of your health today.",
-    ctaSubtitle:
-      "Join thousands of users who are making smarter health decisions with AI-powered insights.",
-    ctaButton: "Start Diagnosis Now"
-  },
+  heroCard2Title: "Cardiovascular Risk",
+  heroCard2Desc:
+    "Monitor heart and blood vessel health indicators to support early risk awareness.",
+
+  heroCard3Title: "Doctor Review",
+  heroCard3Desc:
+    "Organized reports help doctors review cases and follow up with patients efficiently.",
+
+  ctaHealthTitle: "Take Control of Your Diabetes and Cardiovascular Health",
+  ctaHealthSubtitle:
+    "Start with a simple assessment to better understand your diabetes and heart-related health risks.",
+  startDiagnosisNow: "Start Diagnosis Now",
+
+  howItWorksTitle: "How It Works",
+  howItWorksSubtitle:
+    "A simple, three-step process to get your personalized health report.",
+  step1Title: "1. Input Health Data",
+  step1Desc:
+    "Enter your basic health information through a simple and organized interface.",
+  step2Title: "2. Smart Data Analysis",
+  step2Desc:
+    "The system analyzes your inputs to evaluate diabetes and cardiovascular health indicators.",
+  step3Title: "3. Personalized Report",
+  step3Desc:
+    "Receive a clear report with results, health indicators, and suitable recommendations.",
+
+  benefitsTitle: "Key Benefits",
+  benefitsSubtitle:
+    "A medical platform that helps patients and doctors monitor health indicators easily and securely.",
+  benefit1Title: "Fast & Clear Results",
+  benefit1Desc: "Get an organized health assessment within minutes.",
+  benefit2Title: "Secure & Confidential Data",
+  benefit2Desc: "Your data is encrypted and kept private.",
+  benefit3Title: "Easy-to-Use Interface",
+  benefit3Desc: "Simple and intuitive design for all users.",
+  benefit4Title: "Supports Multiple Assessments",
+  benefit4Desc: "Supports diabetes and cardiovascular risk assessment.",
+  benefit5Title: "Available Anytime",
+  benefit5Desc: "Use the service anytime and anywhere.",
+  benefit6Title: "Suitable for Medical Follow-up",
+  benefit6Desc: "Organized reports help doctors review patient cases.",
+
+  ctaTitle: "Take control of your health today.",
+  ctaSubtitle:
+    "Start your health assessment and make clearer decisions based on organized indicators.",
+  ctaButton: "Start Diagnosis Now",
+},
 
   contactPage: {
     pageTitle: "Contact Us",

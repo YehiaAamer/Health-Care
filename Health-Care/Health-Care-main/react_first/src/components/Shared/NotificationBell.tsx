@@ -167,15 +167,14 @@ export default function NotificationBell({
 
   return (
     <div ref={wrapperRef} className={cn("relative", className)}>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        onClick={handleToggleOpen}
-        className="relative h-10 w-10 rounded-full text-primary hover:bg-primary/10 hover:text-primary"
-        aria-label={isArabic ? "الإشعارات" : "Notifications"}
-      >
-        <Bell className="h-5 w-5" />
+   <Button
+  type="button"
+  variant="ghost"
+  size="icon"
+  onClick={handleToggleOpen}
+  className="relative h-12 w-12 shrink-0 rounded-full bg-card text-primary shadow-sm transition-colors hover:rounded-full hover:bg-primary/10 hover:text-primary"
+  aria-label={isArabic ? "الإشعارات" : "Notifications"}
+><Bell className="h-5 w-5" />
 
         {unreadCount > 0 && (
           <span

@@ -4,6 +4,7 @@ import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -31,7 +32,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, Lock } from "lucide-react";
+
+import { Activity, Loader2 } from "lucide-react";
 import { FaGoogle } from "react-icons/fa";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import { toast } from "sonner";
@@ -221,12 +223,12 @@ export default function Auth() {
             <CardHeader className="text-center pb-3 pt-8">
               <div className="flex justify-center mb-4">
                 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
-                  <Lock className="h-9 w-9 text-primary" />
+                  <Activity className="h-10 w-10 text-primary" />
                 </div>
               </div>
 
-              <CardTitle className="text-3xl font-bold">
-                {t("authPage.secureAccess")}
+              <CardTitle className="text-3xl font-bold text-primary">
+                HealthCare
               </CardTitle>
 
               <CardDescription className="text-base mt-1">
@@ -509,6 +511,7 @@ export default function Auth() {
                           )}
                         />
                       )}
+
                       <FormField
                         control={signupForm.control}
                         name="firstName"
