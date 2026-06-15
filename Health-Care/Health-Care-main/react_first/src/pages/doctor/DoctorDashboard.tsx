@@ -84,7 +84,6 @@ export default function DoctorDashboard() {
       activity?.id;
 
     const numericId = Number(possibleId);
-
     return Number.isNaN(numericId) ? null : numericId;
   };
 
@@ -123,7 +122,6 @@ export default function DoctorDashboard() {
     const activityType = normalizeText(activity?.type);
     const title = normalizeText(activity?.title);
     const description = normalizeText(activity?.description);
-
     const combinedText = `${activityType} ${title} ${description}`;
 
     return (
@@ -168,9 +166,7 @@ export default function DoctorDashboard() {
       response?.payload?.items,
     ];
 
-    const matchedArray = possibleArrays.find((item) => Array.isArray(item));
-
-    return matchedArray || [];
+    return possibleArrays.find((item) => Array.isArray(item)) || [];
   };
 
   const normalizeAppointmentForDashboard = (appointment: any) => {
@@ -192,6 +188,9 @@ export default function DoctorDashboard() {
       appointment?.datetime ||
       appointment?.scheduled_at ||
       appointment?.start_time ||
+      (appointment?.appointment_date && appointment?.appointment_time
+        ? `${appointment.appointment_date}T${appointment.appointment_time}`
+        : null) ||
       appointment?.appointment_date ||
       appointment?.date ||
       appointment?.created_at;
@@ -266,6 +265,23 @@ export default function DoctorDashboard() {
         appointment?.description ||
         "Medical Consultation",
     };
+  };
+
+  const getAppointmentSortTime = (appointment: any) => {
+    const dateValue =
+      appointment?.appointment_datetime ||
+      (appointment?.appointment_date && appointment?.appointment_time
+        ? `${appointment.appointment_date}T${appointment.appointment_time}`
+        : null) ||
+      appointment?.datetime ||
+      appointment?.scheduled_at ||
+      appointment?.start_time ||
+      appointment?.appointment_date ||
+      appointment?.date ||
+      appointment?.created_at;
+
+    const time = new Date(dateValue || "").getTime();
+    return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;
   };
 
   useEffect(() => {
@@ -358,9 +374,11 @@ export default function DoctorDashboard() {
       }
 
       try {
-        const appointmentsRes: any = await apiCall(
-          API_ENDPOINTS.DOCTOR_APPOINTMENTS_TODAY
-        );
+        const appointmentsEndpoint =
+          (API_ENDPOINTS as any).DOCTOR_APPOINTMENTS ||
+          API_ENDPOINTS.DOCTOR_APPOINTMENTS_TODAY;
+
+        const appointmentsRes: any = await apiCall(appointmentsEndpoint);
 
         if (!isMounted) return;
 
@@ -368,13 +386,44 @@ export default function DoctorDashboard() {
 
         const extractedAppointments = extractAppointmentsArray(appointmentsRes);
 
-        const normalizedAppointments = extractedAppointments.map(
-          normalizeAppointmentForDashboard
-        );
+const now = Date.now();
+
+const normalizedAppointments = extractedAppointments
+  .map(normalizeAppointmentForDashboard)
+  .filter((appointment: any) => {
+    const appointmentTime = getAppointmentSortTime(appointment);
+    const status = normalizeText(appointment?.status);
+
+    return (
+      appointmentTime >= now &&
+      status !== "cancelled" &&
+      status !== "canceled" &&
+      status !== "completed" &&
+      status !== "no show" &&
+      status !== "no_show"
+    );
+  })
+  .sort((a: any, b: any) => {
+    const aTime = getAppointmentSortTime(a);
+    const bTime = getAppointmentSortTime(b);
+
+    if (
+      aTime === Number.MAX_SAFE_INTEGER &&
+      bTime === Number.MAX_SAFE_INTEGER
+    ) {
+      return 0;
+    }
+
+    if (aTime === Number.MAX_SAFE_INTEGER) return 1;
+    if (bTime === Number.MAX_SAFE_INTEGER) return -1;
+
+    return aTime - bTime;
+  })
+  .slice(0, 5);
 
         setAppointments(normalizedAppointments);
       } catch (error) {
-        console.error("Failed to load today's appointments", error);
+        console.error("Failed to load appointments", error);
         setAppointments([]);
       } finally {
         if (isMounted) {
@@ -418,7 +467,6 @@ export default function DoctorDashboard() {
   const dashboardActivities = useMemo(() => {
     const pendingPredictionsOnly = predictions.filter((prediction) => {
       const status = normalizeText(prediction.review_status || "pending");
-
       return status === "pending";
     });
 
@@ -456,7 +504,6 @@ export default function DoctorDashboard() {
 
       if (isPredictionRelatedActivity(activity)) {
         if (!relatedId) return false;
-
         return pendingPredictionIds.has(relatedId);
       }
 
@@ -599,22 +646,15 @@ export default function DoctorDashboard() {
       setDecision("pending");
 
       setPredictions((prev) =>
-        prev.filter(
-          (prediction) => Number(prediction.id) !== reviewedReportId
-        )
+        prev.filter((prediction) => Number(prediction.id) !== reviewedReportId)
       );
 
       setActivities((prev) =>
         prev.filter((activity) => {
           const activityRelatedId = getActivityRelatedId(activity);
 
-          if (activityRelatedId === reviewedReportId) {
-            return false;
-          }
-
-          if (isFinalReviewActivity(activity)) {
-            return false;
-          }
+          if (activityRelatedId === reviewedReportId) return false;
+          if (isFinalReviewActivity(activity)) return false;
 
           const title = normalizeText(activity?.title);
           const description = normalizeText(activity?.description);
@@ -671,50 +711,6 @@ export default function DoctorDashboard() {
             value: selectedReport.age,
             unit: isArabic ? "سنة" : "Years",
           },
-          {
-            label: isArabic ? "التدخين" : "Smoking",
-            value:
-              selectedReport.extra_fields?.smoke !== undefined
-                ? selectedReport.extra_fields?.smoke
-                  ? isArabic
-                    ? "نعم"
-                    : "Yes"
-                  : isArabic
-                    ? "لا"
-                    : "No"
-                : selectedReport.extra_fields?.smoking !== undefined
-                  ? selectedReport.extra_fields?.smoking
-                    ? isArabic
-                      ? "نعم"
-                      : "Yes"
-                    : isArabic
-                      ? "لا"
-                      : "No"
-                  : "N/A",
-            unit: "",
-          },
-          {
-            label: isArabic ? "النشاط البدني" : "Physical Activity",
-            value:
-              selectedReport.extra_fields?.physical_activity !== undefined
-                ? selectedReport.extra_fields?.physical_activity
-                  ? isArabic
-                    ? "نشط"
-                    : "Active"
-                  : isArabic
-                    ? "غير نشط"
-                    : "Inactive"
-                : selectedReport.extra_fields?.active !== undefined
-                  ? selectedReport.extra_fields?.active
-                    ? isArabic
-                      ? "نشط"
-                      : "Active"
-                    : isArabic
-                      ? "غير نشط"
-                      : "Inactive"
-                  : "N/A",
-            unit: "",
-          },
         ]
       : [
           {
@@ -745,7 +741,7 @@ export default function DoctorDashboard() {
           {
             label: t("dashboard.age"),
             value: selectedReport.age,
-            unit: "Years",
+            unit: isArabic ? "سنة" : "Years",
           },
           {
             label: t("dashboard.diabetesPedigree"),
@@ -778,50 +774,6 @@ export default function DoctorDashboard() {
                   label: isArabic ? "الطول" : "Height",
                   value: selectedReport.extra_fields.height || "N/A",
                   unit: "cm",
-                },
-                {
-                  label: isArabic ? "التدخين" : "Smoking",
-                  value:
-                    selectedReport.extra_fields.smoke !== undefined
-                      ? selectedReport.extra_fields.smoke
-                        ? isArabic
-                          ? "نعم"
-                          : "Yes"
-                        : isArabic
-                          ? "لا"
-                          : "No"
-                      : selectedReport.extra_fields.smoking !== undefined
-                        ? selectedReport.extra_fields.smoking
-                          ? isArabic
-                            ? "نعم"
-                            : "Yes"
-                          : isArabic
-                            ? "لا"
-                            : "No"
-                        : "N/A",
-                  unit: "",
-                },
-                {
-                  label: isArabic ? "النشاط البدني" : "Physical Activity",
-                  value:
-                    selectedReport.extra_fields.physical_activity !== undefined
-                      ? selectedReport.extra_fields.physical_activity
-                        ? isArabic
-                          ? "نشط"
-                          : "Active"
-                        : isArabic
-                          ? "غير نشط"
-                          : "Inactive"
-                      : selectedReport.extra_fields.active !== undefined
-                        ? selectedReport.extra_fields.active
-                          ? isArabic
-                            ? "نشط"
-                            : "Active"
-                          : isArabic
-                            ? "غير نشط"
-                            : "Inactive"
-                        : "N/A",
-                  unit: "",
                 },
               ]
             : []),
@@ -917,15 +869,15 @@ export default function DoctorDashboard() {
               )}
             </div>
 
-       <Button
-  type="button"
-  variant="ghost"
-  size="icon"
-  onClick={handleChangeLanguage}
-  className="h-12 w-12 shrink-0 rounded-full bg-card text-primary shadow-sm transition-colors hover:rounded-full hover:bg-primary/10 hover:text-primary"
->
-  <Globe className="h-5 w-5" />
-</Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleChangeLanguage}
+              className="h-12 w-12 shrink-0 rounded-full bg-card text-primary shadow-sm transition-colors hover:rounded-full hover:bg-primary/10 hover:text-primary"
+            >
+              <Globe className="h-5 w-5" />
+            </Button>
 
             <NotificationBell isArabic={isArabic} />
           </div>

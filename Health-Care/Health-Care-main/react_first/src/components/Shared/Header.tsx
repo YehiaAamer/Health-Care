@@ -31,8 +31,10 @@ const Header = ({ variant = "default" }: HeaderProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>("light");
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
   const menuRef = useRef<HTMLDivElement>(null);
+  const lastScrollYRef = useRef(0);
 
   const isArabic = i18n.language.startsWith("ar");
   const isDoctor = user?.role === "doctor";
@@ -52,6 +54,43 @@ const Header = ({ variant = "default" }: HeaderProps) => {
       setTheme("light");
     }
   }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      if (currentScrollY <= 20) {
+        setIsHeaderVisible(true);
+        lastScrollYRef.current = currentScrollY;
+        return;
+      }
+
+      if (menuOpen || mobileNavOpen) {
+        setIsHeaderVisible(true);
+        lastScrollYRef.current = currentScrollY;
+        return;
+      }
+
+      if (currentScrollY > lastScrollYRef.current) {
+        setIsHeaderVisible(false);
+      } else {
+        setIsHeaderVisible(true);
+      }
+
+      lastScrollYRef.current = currentScrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [menuOpen, mobileNavOpen]);
+
+  useEffect(() => {
+    setIsHeaderVisible(true);
+    lastScrollYRef.current = window.scrollY;
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -342,20 +381,6 @@ const Header = ({ variant = "default" }: HeaderProps) => {
             {t("settings")}
           </button>
 
-          {isPatient && (
-            <button
-              onClick={() => {
-                setMenuOpen(false);
-                navigate("/messages");
-              }}
-              className={`flex w-full items-center gap-2 px-4 py-3 text-sm text-foreground transition hover:bg-accent hover:text-primary ${
-                isArabic ? "flex-row-reverse text-right" : "text-left"
-              }`}
-            >
-              <span>{isArabic ? "الرسائل" : "Messages"}</span>
-            </button>
-          )}
-
           <button
             onClick={handleToggleLanguage}
             className={`flex w-full items-center gap-2 px-4 py-3 text-sm text-foreground transition hover:bg-accent hover:text-primary ${
@@ -383,7 +408,9 @@ const Header = ({ variant = "default" }: HeaderProps) => {
   return (
     <>
       <header
-        className="fixed left-0 right-0 top-0 z-50 w-full border-b border-border bg-background/95 text-foreground backdrop-blur supports-[backdrop-filter]:bg-background/80"
+        className={`fixed left-0 right-0 top-0 z-50 w-full border-b border-border bg-background/95 text-foreground backdrop-blur transition-transform duration-300 ease-in-out supports-[backdrop-filter]:bg-background/80 ${
+          isHeaderVisible ? "translate-y-0" : "-translate-y-full"
+        }`}
         dir={isArabic ? "rtl" : "ltr"}
       >
         <div className="h-[72px] w-full max-w-none px-4 sm:px-5 lg:px-6">

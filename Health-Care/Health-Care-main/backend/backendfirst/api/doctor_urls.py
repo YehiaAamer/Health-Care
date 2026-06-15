@@ -9,6 +9,7 @@ from .views.doctor_views import (
     risk_distribution,
     doctor_patients,
     doctor_patient_profile,
+    doctor_appointments,
     today_appointments,
     recent_messages,
     thread_messages,
@@ -17,7 +18,6 @@ from .views.doctor_views import (
     doctor_profile,
     doctor_notifications,
     all_patient_predictions,
-    send_message,          # من تعديلاتك
 )
 
 urlpatterns = [
@@ -49,6 +49,11 @@ urlpatterns = [
     # ────────────────────────────────────────────────
     path("patients/", doctor_patients, name="doctor_patients"),
     path(
+        "patients/available-for-appointments/",
+        doctor_patients,
+        name="doctor_patients_available_for_appointments",
+    ),
+    path(
         "patients/<int:patient_id>/profile/",
         doctor_patient_profile,
         name="doctor_patient_profile",
@@ -57,14 +62,13 @@ urlpatterns = [
     # ────────────────────────────────────────────────
     # Appointments
     # ────────────────────────────────────────────────
+    path("appointments/", doctor_appointments, name="doctor_appointments"),
     path("appointments/today/", today_appointments, name="today_appointments"),
 
     # ────────────────────────────────────────────────
     # Messages
     # ────────────────────────────────────────────────
     path("messages/recent/", recent_messages, name="recent_messages"),
-    
-    # دمج الطريقتين (القديمة + الجديدة)
     path(
         "messages/<int:thread_id>/messages/",
         thread_messages,
@@ -75,8 +79,6 @@ urlpatterns = [
         send_thread_message,
         name="send_thread_message",
     ),
-    # تعديلك الإضافي
-    path('messages/recent/<int:thread_id>/send/', send_message, name='send_message'),
 
     # ────────────────────────────────────────────────
     # Activity

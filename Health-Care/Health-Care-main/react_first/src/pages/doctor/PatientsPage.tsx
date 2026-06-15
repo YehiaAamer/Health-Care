@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { patientsApi } from "@/api/patients";
+import { useApiCall } from "@/hooks/useApiCall";
+import { API_ENDPOINTS } from "@/lib/api";
 import type { User, Prediction } from "@/types/api";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -102,8 +104,12 @@ const PAGE_SIZE = 8;
 export default function PatientsPage() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
+  const { execute: apiCall } = useApiCall();
 
   const [patients, setPatients] = useState<PatientWithExtras[]>([]);
+  const [dashboardTotalPatients, setDashboardTotalPatients] =
+    useState<number | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
@@ -311,6 +317,24 @@ export default function PatientsPage() {
     );
   };
 
+  const fetchDashboardTotalPatients = async () => {
+    try {
+      const statsRes: any = await apiCall(API_ENDPOINTS.DOCTOR_DASHBOARD);
+
+      const dashboardStats =
+        statsRes?.stats || statsRes?.dashboard || statsRes || null;
+
+      const totalPatients = Number(dashboardStats?.total_patients);
+
+      setDashboardTotalPatients(
+        Number.isNaN(totalPatients) ? null : totalPatients
+      );
+    } catch (error) {
+      console.error("Failed to fetch dashboard total patients", error);
+      setDashboardTotalPatients(null);
+    }
+  };
+
   const fetchPatients = async () => {
     try {
       setLoading(true);
@@ -336,6 +360,7 @@ export default function PatientsPage() {
 
   useEffect(() => {
     fetchPatients();
+    fetchDashboardTotalPatients();
   }, []);
 
   useEffect(() => {
@@ -456,13 +481,13 @@ export default function PatientsPage() {
     ).length;
 
     return {
-      total: patients.length,
+      total: dashboardTotalPatients ?? patients.length,
       veryHigh,
       high,
       medium,
       low,
     };
-  }, [patients]);
+  }, [patients, dashboardTotalPatients]);
 
   const filteredPatients = useMemo(() => {
     const searchValue = search.trim().toLowerCase();
@@ -523,7 +548,9 @@ export default function PatientsPage() {
 
       setOpenCreate(false);
       setNewPatient(emptyPatientForm);
+
       await fetchPatients();
+      await fetchDashboardTotalPatients();
     } catch (error) {
       console.error("Failed to create patient", error);
       toast.error(isArabic ? "فشل إضافة المريض" : "Failed to create patient");

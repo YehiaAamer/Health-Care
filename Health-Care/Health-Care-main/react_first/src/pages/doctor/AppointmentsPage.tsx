@@ -52,6 +52,15 @@ interface Appointment {
   source?: "doctor" | "patient";
 }
 
+interface DoctorPatient {
+  id: string | number;
+  name?: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  profile_picture?: string;
+}
+
 type PatientDetails = User & {
   predictions?: Prediction[];
 };
@@ -62,10 +71,12 @@ export default function AppointmentsPage() {
   const isArabic = i18n.language === "ar";
 
   const [loading, setLoading] = useState(true);
+  const [creatingAppointment, setCreatingAppointment] = useState(false);
   const [search, setSearch] = useState("");
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [selectedTime, setSelectedTime] = useState("");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [doctorPatients, setDoctorPatients] = useState<DoctorPatient[]>([]);
 
   const [requestsPage, setRequestsPage] = useState(1);
   const [appointmentsPage, setAppointmentsPage] = useState(1);
@@ -115,26 +126,11 @@ export default function AppointmentsPage() {
   ];
 
   const tableColumns = [
-    {
-      key: "patient",
-      label: isArabic ? "اسم المريض" : "Patient Name",
-    },
-    {
-      key: "time",
-      label: isArabic ? "وقت الموعد" : "Appointment Time",
-    },
-    {
-      key: "reason",
-      label: isArabic ? "سبب الزيارة" : "Visit Reason",
-    },
-    {
-      key: "status",
-      label: isArabic ? "حالة الموعد" : "Appointment Status",
-    },
-    {
-      key: "actions",
-      label: isArabic ? "الإجراءات" : "Actions",
-    },
+    { key: "patient", label: isArabic ? "اسم المريض" : "Patient Name" },
+    { key: "time", label: isArabic ? "وقت الموعد" : "Appointment Time" },
+    { key: "reason", label: isArabic ? "سبب الزيارة" : "Visit Reason" },
+    { key: "status", label: isArabic ? "حالة الموعد" : "Appointment Status" },
+    { key: "actions", label: isArabic ? "الإجراءات" : "Actions" },
   ];
 
   const formatAppointmentTime = (value?: string) => {
@@ -183,6 +179,47 @@ export default function AppointmentsPage() {
     return cleanValue;
   };
 
+  const formatTimeForApi = (value: string) => {
+    const cleanValue = String(value).trim();
+
+    if (!cleanValue) return "";
+
+    if (/am|pm/i.test(cleanValue)) {
+      const [timePart, periodPart] = cleanValue.split(" ");
+      const [rawHour, rawMinute] = timePart.split(":");
+
+      let hour = Number(rawHour);
+      const minute = Number(rawMinute || 0);
+      const period = periodPart.toUpperCase();
+
+      if (period === "PM" && hour !== 12) hour += 12;
+      if (period === "AM" && hour === 12) hour = 0;
+
+      return `${String(hour).padStart(2, "0")}:${String(minute).padStart(
+        2,
+        "0"
+      )}`;
+    }
+
+    const timeMatch = cleanValue.match(/^(\d{1,2}):(\d{2})/);
+
+    if (timeMatch) {
+      return `${String(Number(timeMatch[1])).padStart(2, "0")}:${
+        timeMatch[2]
+      }`;
+    }
+
+    return cleanValue;
+  };
+
+  const formatDateForApi = (selectedDate: Date) => {
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+    const day = String(selectedDate.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+
   const formatSelectedDate = (selectedDate?: Date) => {
     if (!selectedDate) return "--";
 
@@ -196,6 +233,15 @@ export default function AppointmentsPage() {
 
   const formattedSelectedDate = formatSelectedDate(date);
 
+  const getPatientDisplayName = (patient: DoctorPatient) => {
+    return (
+      patient.name ||
+      `${patient.first_name || ""} ${patient.last_name || ""}`.trim() ||
+      patient.email ||
+      (isArabic ? "مريض بدون اسم" : "Unnamed Patient")
+    );
+  };
+
   const getPatientNumericId = (appt: Appointment) => {
     if (appt.patient_user) return Number(appt.patient_user);
 
@@ -208,6 +254,126 @@ export default function AppointmentsPage() {
   const getMeetingUrl = (appt: Appointment) => {
     return appt.meeting_url || appt.call_url || appt.video_link || "";
   };
+
+  const mapAppointment = (apt: any): Appointment => {
+    const rawStatus = String(apt.status || "").toLowerCase();
+
+    return {
+      id: apt.id,
+      patient_name:
+        apt.patient_name ||
+        apt.patient?.name ||
+        apt.patient?.full_name ||
+        [apt.patient?.first_name, apt.patient?.last_name]
+          .filter(Boolean)
+          .join(" ")
+          .trim() ||
+        "Unknown Patient",
+      patient_id:
+        apt.patient_id ||
+        apt.patient_user ||
+        apt.patient?.id ||
+        `PID-${apt.id || "Unknown"}`,
+      patient_user: apt.patient_user || apt.patient?.id || apt.user_id,
+      time: formatAppointmentTime(
+        apt.time ||
+          apt.appointment_time ||
+          apt.appointment_datetime ||
+          apt.datetime ||
+          apt.scheduled_at ||
+          apt.start_time
+      ),
+      reason:
+        apt.reason ||
+        apt.notes ||
+        apt.condition ||
+        apt.type ||
+        apt.appointment_type ||
+        "Medical Consultation",
+      status:
+        rawStatus === "pending" || rawStatus === "requested"
+          ? "Pending"
+          : rawStatus === "completed"
+          ? "Completed"
+          : rawStatus === "cancelled" || rawStatus === "rejected"
+          ? "Cancelled"
+          : rawStatus === "in_progress"
+          ? "In Progress"
+          : "Upcoming",
+      profile_picture: apt.profile_picture || apt.patient?.profile_picture || "",
+      meeting_url: apt.meeting_url,
+      call_url: apt.call_url,
+      video_link: apt.video_link,
+      appointment_date:
+        apt.appointment_date ||
+        apt.date ||
+        apt.appointment_datetime ||
+        apt.datetime ||
+        apt.created_at,
+      source:
+        rawStatus === "pending" || rawStatus === "requested"
+          ? "patient"
+          : "doctor",
+    };
+  };
+
+  const fetchAppointments = async () => {
+    try {
+      setLoading(true);
+
+      const data: any = await apiCall(API_ENDPOINTS.DOCTOR_APPOINTMENTS);
+
+      const appointmentsList = Array.isArray(data)
+        ? data
+        : data?.appointments ||
+          data?.today_appointments ||
+          data?.doctor_appointments ||
+          data?.results ||
+          data?.data ||
+          [];
+
+      setAppointments(
+        Array.isArray(appointmentsList) ? appointmentsList.map(mapAppointment) : []
+      );
+    } catch (error) {
+      console.error("Failed to fetch appointments", error);
+      setAppointments([]);
+
+      toast.error(
+        isArabic
+          ? "فشل تحميل المواعيد من الخادم"
+          : "Failed to load appointments from server"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDoctorPatients = async () => {
+    try {
+      const data: any = await apiCall(API_ENDPOINTS.DOCTOR_PATIENTS);
+
+      const patientsList = Array.isArray(data)
+        ? data
+        : data?.patients || data?.results || data?.data || [];
+
+      setDoctorPatients(Array.isArray(patientsList) ? patientsList : []);
+    } catch (error) {
+      console.error("Failed to fetch doctor patients", error);
+      setDoctorPatients([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchAppointments();
+    fetchDoctorPatients();
+  }, [apiCall, isArabic]);
+
+  useEffect(() => {
+    setRequestsPage(1);
+    setAppointmentsPage(1);
+    setNextPage(1);
+  }, [search]);
 
   const handleJoinCall = (appt: Appointment) => {
     const meetingUrl = getMeetingUrl(appt);
@@ -228,11 +394,7 @@ export default function AppointmentsPage() {
     setAppointments((prev) =>
       prev.map((item) =>
         item.id === appt.id
-          ? {
-              ...item,
-              status: "Upcoming",
-              source: "doctor",
-            }
+          ? { ...item, status: "Upcoming", source: "doctor" }
           : item
       )
     );
@@ -247,12 +409,7 @@ export default function AppointmentsPage() {
   const handleRejectAppointment = (appt: Appointment) => {
     setAppointments((prev) =>
       prev.map((item) =>
-        item.id === appt.id
-          ? {
-              ...item,
-              status: "Cancelled",
-            }
-          : item
+        item.id === appt.id ? { ...item, status: "Cancelled" } : item
       )
     );
 
@@ -309,108 +466,6 @@ export default function AppointmentsPage() {
       setProfileLoading(false);
     }
   };
-
-  const fetchAppointments = async () => {
-    try {
-      setLoading(true);
-
-      const data: any = await apiCall(API_ENDPOINTS.DOCTOR_APPOINTMENTS_TODAY);
-
-      const appointmentsList = Array.isArray(data)
-        ? data
-        : data?.appointments ||
-          data?.today_appointments ||
-          data?.doctor_appointments ||
-          data?.results ||
-          data?.data ||
-          [];
-
-      if (!Array.isArray(appointmentsList) || appointmentsList.length === 0) {
-        setAppointments([]);
-        return;
-      }
-
-      const mapped = appointmentsList.map((apt: any) => {
-        const rawStatus = String(apt.status || "").toLowerCase();
-
-        return {
-          id: apt.id,
-          patient_name:
-            apt.patient_name ||
-            apt.patient?.name ||
-            apt.patient?.full_name ||
-            [apt.patient?.first_name, apt.patient?.last_name]
-              .filter(Boolean)
-              .join(" ")
-              .trim() ||
-            "Unknown Patient",
-          patient_id:
-            apt.patient_id ||
-            apt.patient_user ||
-            apt.patient?.id ||
-            `PID-${apt.id || "Unknown"}`,
-          patient_user: apt.patient_user || apt.patient?.id || apt.user_id,
-          time: formatAppointmentTime(
-            apt.time ||
-              apt.appointment_time ||
-              apt.appointment_datetime ||
-              apt.datetime ||
-              apt.scheduled_at ||
-              apt.start_time
-          ),
-          reason: apt.reason || apt.condition || "Medical Consultation",
-          status:
-            rawStatus === "pending" || rawStatus === "requested"
-              ? "Pending"
-              : rawStatus === "completed"
-              ? "Completed"
-              : rawStatus === "cancelled" || rawStatus === "rejected"
-              ? "Cancelled"
-              : rawStatus === "in_progress"
-              ? "In Progress"
-              : "Upcoming",
-          profile_picture:
-            apt.profile_picture || apt.patient?.profile_picture || "",
-          meeting_url: apt.meeting_url,
-          call_url: apt.call_url,
-          video_link: apt.video_link,
-          appointment_date:
-            apt.appointment_date ||
-            apt.date ||
-            apt.appointment_datetime ||
-            apt.datetime ||
-            apt.created_at,
-          source:
-            rawStatus === "pending" || rawStatus === "requested"
-              ? "patient"
-              : "doctor",
-        } as Appointment;
-      });
-
-      setAppointments(mapped);
-    } catch (error) {
-      console.error("Failed to fetch appointments", error);
-      setAppointments([]);
-
-      toast.error(
-        isArabic
-          ? "فشل تحميل المواعيد من الخادم"
-          : "Failed to load appointments from server"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAppointments();
-  }, [apiCall, isArabic]);
-
-  useEffect(() => {
-    setRequestsPage(1);
-    setAppointmentsPage(1);
-    setNextPage(1);
-  }, [search]);
 
   const filteredAppointments = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -478,8 +533,8 @@ export default function AppointmentsPage() {
 
   const firstNextAppointment = confirmedAppointments[0] || null;
 
-  const getStatusStyles = (status: Appointment["status"]) => {
-    switch (status) {
+  const getStatusStyles = (statusValue: Appointment["status"]) => {
+    switch (statusValue) {
       case "Pending":
         return "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-slate-300";
       case "In Progress":
@@ -493,12 +548,14 @@ export default function AppointmentsPage() {
     }
   };
 
-  const getStatusText = (status: Appointment["status"]) => {
-    if (status === "Pending") return isArabic ? "في انتظار التأكيد" : "Pending";
-    if (status === "In Progress") return isArabic ? "الآن" : "Now";
-    if (status === "Completed")
+  const getStatusText = (statusValue: Appointment["status"]) => {
+    if (statusValue === "Pending")
+      return isArabic ? "في انتظار التأكيد" : "Pending";
+    if (statusValue === "In Progress") return isArabic ? "الآن" : "Now";
+    if (statusValue === "Completed")
       return t("doctorDashboard.appointments.statusCompleted");
-    if (status === "Cancelled") return isArabic ? "مرفوض / ملغي" : "Rejected";
+    if (statusValue === "Cancelled")
+      return isArabic ? "مرفوض / ملغي" : "Rejected";
     return t("doctorDashboard.appointments.statusUpcoming");
   };
 
@@ -508,53 +565,70 @@ export default function AppointmentsPage() {
 
   const handleOpenNewAppointment = () => {
     setShowNewAppointment(true);
+    fetchDoctorPatients();
   };
 
-  const handleCreateAppointment = () => {
+  const handleCreateAppointment = async () => {
     if (
-      !newAppointment.patient_name.trim() ||
+      !newAppointment.patient_id ||
       !selectedTime.trim() ||
       !newAppointment.reason.trim() ||
       !date
     ) {
       toast.info(
         isArabic
-          ? "كمّل اسم المريض، سبب الزيارة، التاريخ والوقت"
-          : "Complete patient name, visit reason, date and time"
+          ? "اختاري المريض، سبب الزيارة، التاريخ والوقت"
+          : "Select patient, visit reason, date and time"
       );
       return;
     }
 
-    const createdAppointment: Appointment = {
-      id: Date.now(),
-      patient_name: newAppointment.patient_name,
-      patient_id:
-        newAppointment.patient_id ||
-        `PID-${Math.floor(1000 + Math.random() * 9000)}`,
-      time: formatAppointmentTime(selectedTime),
-      reason: newAppointment.reason,
-      status: "Upcoming",
-      appointment_date: date.toISOString(),
-      source: "doctor",
-    };
+    try {
+      setCreatingAppointment(true);
 
-    setAppointments((prev) => [createdAppointment, ...prev]);
+      const payload = {
+        patient_id: Number(newAppointment.patient_id),
+        appointment_date: formatDateForApi(date),
+        appointment_time: formatTimeForApi(selectedTime),
+        reason: newAppointment.reason.trim(),
+        appointment_type: "consultation",
+      };
 
-    setNewAppointment({
-      patient_name: "",
-      patient_id: "",
-      reason: "",
-    });
+      const created: any = await apiCall(API_ENDPOINTS.DOCTOR_APPOINTMENTS, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
 
-    setSelectedTime("");
-    setDate(new Date());
-    setShowNewAppointment(false);
-    setAppointmentsPage(1);
-    setNextPage(1);
+      setAppointments((prev) => [mapAppointment(created), ...prev]);
 
-    toast.success(
-      isArabic ? "تم إنشاء الحجز بنجاح" : "Appointment created successfully"
-    );
+      setNewAppointment({
+        patient_name: "",
+        patient_id: "",
+        reason: "",
+      });
+
+      setSelectedTime("");
+      setDate(new Date());
+      setShowNewAppointment(false);
+      setAppointmentsPage(1);
+      setNextPage(1);
+
+      toast.success(
+        isArabic ? "تم إنشاء الحجز بنجاح" : "Appointment created successfully"
+      );
+
+      await fetchAppointments();
+    } catch (error) {
+      console.error("Failed to create appointment", error);
+
+      toast.error(
+        isArabic
+          ? "فشل إنشاء الحجز. اتأكدي إن المريض مربوط بالدكتور"
+          : "Failed to create appointment"
+      );
+    } finally {
+      setCreatingAppointment(false);
+    }
   };
 
   const renderPager = ({
@@ -918,8 +992,7 @@ export default function AppointmentsPage() {
                 </div>
 
                 <span className="w-fit rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-slate-300">
-                  {patientRequests.length}{" "}
-                  {isArabic ? "طلب معلق" : "Pending"}
+                  {patientRequests.length} {isArabic ? "طلب معلق" : "Pending"}
                 </span>
               </div>
 
@@ -1261,8 +1334,8 @@ export default function AppointmentsPage() {
 
                   <p className="mt-1 text-sm font-medium text-muted-foreground">
                     {isArabic
-                      ? "أدخل بيانات المريض ثم اختر التاريخ والوقت."
-                      : "Enter patient details, then choose date and time."}
+                      ? "اختاري المريض ثم التاريخ والوقت."
+                      : "Select patient, then choose date and time."}
                   </p>
                 </div>
               </div>
@@ -1276,41 +1349,45 @@ export default function AppointmentsPage() {
 
                     <div>
                       <h4 className="text-sm font-bold text-foreground">
-                        {isArabic ? "بيانات المريض" : "Patient Details"}
+                        {isArabic ? "بيانات الحجز" : "Appointment Details"}
                       </h4>
 
                       <p className="text-xs font-medium text-muted-foreground">
                         {isArabic
-                          ? "املأ البيانات الأساسية للحجز"
-                          : "Fill in the basic appointment details"}
+                          ? "الحجز لازم يكون لمريض مربوط بالدكتور"
+                          : "Appointment must be for an assigned patient"}
                       </p>
                     </div>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
-                    <Input
-                      placeholder={isArabic ? "اسم المريض" : "Patient name"}
-                      className="h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground"
-                      value={newAppointment.patient_name}
-                      onChange={(e) =>
-                        setNewAppointment((prev) => ({
-                          ...prev,
-                          patient_name: e.target.value,
-                        }))
-                      }
-                    />
-
-                    <Input
-                      placeholder={isArabic ? "رقم المريض" : "Patient ID"}
-                      className="h-12 rounded-xl border-border bg-background text-foreground placeholder:text-muted-foreground"
+                    <select
+                      className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none focus:ring-4 focus:ring-primary/10 md:col-span-2"
                       value={newAppointment.patient_id}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const selectedDoctorPatient = doctorPatients.find(
+                          (patient) => String(patient.id) === e.target.value
+                        );
+
                         setNewAppointment((prev) => ({
                           ...prev,
                           patient_id: e.target.value,
-                        }))
-                      }
-                    />
+                          patient_name: selectedDoctorPatient
+                            ? getPatientDisplayName(selectedDoctorPatient)
+                            : "",
+                        }));
+                      }}
+                    >
+                      <option value="">
+                        {isArabic ? "اختاري المريض" : "Select patient"}
+                      </option>
+
+                      {doctorPatients.map((patient) => (
+                        <option key={patient.id} value={patient.id}>
+                          {getPatientDisplayName(patient)}
+                        </option>
+                      ))}
+                    </select>
 
                     <Input
                       placeholder={isArabic ? "سبب الزيارة" : "Visit reason"}
@@ -1332,6 +1409,13 @@ export default function AppointmentsPage() {
                   </p>
 
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-sm font-bold text-foreground">
+                    <span>
+                      {newAppointment.patient_name ||
+                        (isArabic
+                          ? "لم يتم اختيار مريض"
+                          : "No patient selected")}
+                    </span>
+
                     <span>{formattedSelectedDate || "--"}</span>
 
                     <span className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground">
@@ -1459,14 +1543,21 @@ export default function AppointmentsPage() {
                 <Button
                   onClick={handleCreateAppointment}
                   disabled={
-                    !newAppointment.patient_name.trim() ||
+                    creatingAppointment ||
+                    !newAppointment.patient_id ||
                     !newAppointment.reason.trim() ||
                     !selectedTime ||
                     !date
                   }
                   className="h-11 rounded-full bg-primary px-5 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
-                  {isArabic ? "إنشاء الحجز" : "Create Appointment"}
+                  {creatingAppointment
+                    ? isArabic
+                      ? "جاري الحفظ..."
+                      : "Saving..."
+                    : isArabic
+                    ? "إنشاء الحجز"
+                    : "Create Appointment"}
                 </Button>
               </div>
             </div>

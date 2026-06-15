@@ -1190,7 +1190,9 @@ const Dashboard = () => {
         reports: monthPredictions.length,
       };
     });
-  }, [diabetesPredictions, selectedRange, isArabic, predictions, t]);  const searchedPredictions = useMemo(() => {
+  }, [diabetesPredictions, selectedRange, isArabic, predictions, t]);
+
+  const searchedPredictions = useMemo(() => {
     const query = normalizeSearchText(searchTerm);
 
     const sortedPredictions = [...diabetesPredictions].sort(
@@ -1536,19 +1538,26 @@ const Dashboard = () => {
 
     if (!item) return null;
 
+    const shortLabel =
+      item.inputLabel.length > 10
+        ? `${item.inputLabel.slice(0, 9)}…`
+        : item.inputLabel;
+
     return (
       <g transform={`translate(${x},${y})`}>
         <text
           x={0}
           y={0}
-          textAnchor="middle"
+          textAnchor="end"
           fill="hsl(var(--muted-foreground))"
           fontSize={9}
+          transform="rotate(-35)"
         >
           <tspan x="0" dy="0">
-            {item.inputLabel}
+            {shortLabel}
           </tspan>
-          <tspan x="0" dy="14" fontWeight={700} fill="hsl(var(--foreground))">
+
+          <tspan x="0" dy="13" fontWeight={700} fill="hsl(var(--foreground))">
             {item.displayValue}
           </tspan>
         </text>
@@ -1581,6 +1590,62 @@ const Dashboard = () => {
       </g>
     );
   };
+
+  const renderUniqueTooltip = ({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: any[];
+  label?: string;
+}) => {
+  if (!active || !payload?.length) return null;
+
+  const uniquePayload = payload.filter(
+    (item, index, self) =>
+      index === self.findIndex((p) => p.dataKey === item.dataKey)
+  );
+
+  return (
+    <div className="rounded-[14px] border border-border bg-card p-3 text-sm text-card-foreground shadow-lg">
+      <p className="mb-2 font-bold text-foreground">{label}</p>
+
+      <div className="space-y-1.5">
+        {uniquePayload.map((item) => {
+          const isDiabetes = item.dataKey === "diabetesRisk";
+          const isCardio = item.dataKey === "cardioRisk";
+
+          if (!isDiabetes && !isCardio) return null;
+
+          return (
+            <div key={item.dataKey} className="flex items-center gap-2">
+              <span
+                className="font-semibold"
+                style={{
+                  color: isDiabetes
+                    ? DIABETES_CHART_COLOR
+                    : CARDIO_CHART_COLOR,
+                }}
+              >
+                {isDiabetes ? diabetesLabel : cardioLabel}:
+              </span>
+
+              <span className="text-muted-foreground">
+                {item.value === null || item.value === undefined
+                  ? "--"
+                  : `${formatNumber(Number(item.value), {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}%`}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
   const renderRiskPieLabel = ({
     cx,
@@ -1695,9 +1760,7 @@ const Dashboard = () => {
 
   const visibleRiskDistributionData = riskDistributionData.filter(
     (item) => item.value > 0
-  );
-
-  return (
+  );  return (
     <div
       className="flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground"
       dir={isArabic ? "rtl" : "ltr"}
@@ -1831,9 +1894,12 @@ const Dashboard = () => {
 
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium text-muted-foreground">
-                      {diabetesLabel}
-                    </p>
+                  <p
+  className="truncate text-xs font-medium"
+  style={{ color: DIABETES_CHART_COLOR }}
+>
+  {diabetesLabel}
+</p>
 
                     <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
                       {diabetesPredictions.length
@@ -1852,9 +1918,12 @@ const Dashboard = () => {
                       isArabic ? "text-left" : "text-right"
                     }`}
                   >
-                    <p className="truncate text-xs font-medium text-muted-foreground">
-                      {cardioLabel}
-                    </p>
+                <p
+  className="truncate text-xs font-medium"
+  style={{ color: CARDIO_CHART_COLOR }}
+>
+  {cardioLabel}
+</p>
 
                     <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
                       {diabetesPredictions.length
@@ -1881,9 +1950,12 @@ const Dashboard = () => {
 
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium text-muted-foreground">
-                      {diabetesLabel}
-                    </p>
+                  <p
+  className="truncate text-xs font-medium"
+  style={{ color: DIABETES_CHART_COLOR }}
+>
+  {diabetesLabel}
+</p>
 
                     <p
                       className={`mt-1 truncate text-2xl font-bold tracking-tight ${latestRiskTextColor}`}
@@ -1901,9 +1973,12 @@ const Dashboard = () => {
                       isArabic ? "text-left" : "text-right"
                     }`}
                   >
-                    <p className="truncate text-xs font-medium text-muted-foreground">
-                      {cardioLabel}
-                    </p>
+                 <p
+  className="truncate text-xs font-medium"
+  style={{ color: CARDIO_CHART_COLOR }}
+>
+  {cardioLabel}
+</p>
 
                     <p
                       className={`mt-1 truncate text-2xl font-bold tracking-tight ${latestCardioRiskTextColor}`}
@@ -1951,7 +2026,9 @@ const Dashboard = () => {
                     : "--"}
                 </h3>
               </Card>
-            </section>            <section
+            </section>
+
+            <section
               className={`grid grid-cols-1 items-start gap-4 ${smoothSectionClass}`}
             >
               <Card className="rounded-[22px] border border-border bg-card p-4 text-card-foreground shadow-sm md:p-5">
@@ -2019,7 +2096,9 @@ const Dashboard = () => {
                                   <p className="text-xs text-muted-foreground">
                                     {selectedRange === "weekly"
                                       ? t("dashboard.extra.weeklyRiskTrendDesc")
-                                      : t("dashboard.extra.monthlyRiskTrendDesc")}
+                                      : t(
+                                          "dashboard.extra.monthlyRiskTrendDesc"
+                                        )}
                                   </p>
                                 </div>
 
@@ -2056,9 +2135,12 @@ const Dashboard = () => {
 
                                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
                                     <div className="min-w-0">
-                                      <p className="truncate text-xs font-medium text-muted-foreground">
-                                        {diabetesLabel}
-                                      </p>
+                                     <p
+  className="truncate text-xs font-medium"
+  style={{ color: DIABETES_CHART_COLOR }}
+>
+  {diabetesLabel}
+</p>
 
                                       <h5 className="mt-1 whitespace-nowrap text-xl font-bold text-foreground sm:text-2xl">
                                         {`${formatNumber(
@@ -2080,9 +2162,12 @@ const Dashboard = () => {
                                           : "sm:text-right"
                                       }`}
                                     >
-                                      <p className="truncate text-xs font-medium text-muted-foreground">
-                                        {cardioLabel}
-                                      </p>
+                                   <p
+  className="truncate text-xs font-medium"
+  style={{ color: CARDIO_CHART_COLOR }}
+>
+  {cardioLabel}
+</p>
 
                                       <h5 className="mt-1 whitespace-nowrap text-xl font-bold text-foreground sm:text-2xl">
                                         {`${formatNumber(
@@ -2115,14 +2200,19 @@ const Dashboard = () => {
                                   <p className="mb-3 text-xs font-semibold text-primary">
                                     {selectedRange === "weekly"
                                       ? t("dashboard.extra.highestWeeklyRisk")
-                                      : t("dashboard.extra.highestDisplayedRisk")}
+                                      : t(
+                                          "dashboard.extra.highestDisplayedRisk"
+                                        )}
                                   </p>
 
                                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-start">
                                     <div className="min-w-0">
-                                      <p className="truncate text-xs font-medium text-muted-foreground">
-                                        {diabetesLabel}
-                                      </p>
+                                     <p
+  className="truncate text-xs font-medium"
+  style={{ color: DIABETES_CHART_COLOR }}
+>
+  {diabetesLabel}
+</p>
 
                                       <div className="mt-1">
                                         <h5 className="whitespace-nowrap text-xl font-bold text-foreground sm:text-2xl">
@@ -2156,9 +2246,12 @@ const Dashboard = () => {
                                           : "sm:text-right"
                                       }`}
                                     >
-                                      <p className="truncate text-xs font-medium text-muted-foreground">
-                                        {cardioLabel}
-                                      </p>
+                                     <p
+  className="truncate text-xs font-medium"
+  style={{ color: CARDIO_CHART_COLOR }}
+>
+  {cardioLabel}
+</p>
 
                                       <div className="mt-1">
                                         <h5 className="whitespace-nowrap text-xl font-bold text-foreground sm:text-2xl">
@@ -2277,40 +2370,7 @@ const Dashboard = () => {
                                       tickFormatter={(value) => `${value}%`}
                                     />
 
-                                    <Tooltip
-                                      cursor={{
-                                        stroke: "hsl(var(--border))",
-                                        strokeDasharray: "4 4",
-                                      }}
-                                      contentStyle={{
-                                        borderRadius: "14px",
-                                        border:
-                                          "1px solid hsl(var(--border))",
-                                        background: "hsl(var(--card))",
-                                        color:
-                                          "hsl(var(--card-foreground))",
-                                        boxShadow:
-                                          "0 14px 35px rgba(15,23,42,0.18)",
-                                      }}
-                                      formatter={(
-                                        value: number | null,
-                                        name: string
-                                      ) => [
-                                        value === null
-                                          ? "--"
-                                          : `${formatNumber(Number(value), {
-                                              minimumFractionDigits: 2,
-                                              maximumFractionDigits: 2,
-                                            })}%`,
-                                        name === "cardioRisk"
-                                          ? cardioLabel
-                                          : name === "diabetesRisk"
-                                          ? diabetesLabel
-                                          : t(
-                                              "dashboard.extra.analysisAverage"
-                                            ),
-                                      ]}
-                                    />
+                                    <Tooltip content={renderUniqueTooltip} />
 
                                     <Area
                                       type="monotone"
@@ -2408,7 +2468,7 @@ const Dashboard = () => {
                                       top: 18,
                                       right: 30,
                                       left: 18,
-                                      bottom: 38,
+                                      bottom: 48,
                                     }}
                                   >
                                     <CartesianGrid
@@ -2422,8 +2482,9 @@ const Dashboard = () => {
                                       tickLine={false}
                                       axisLine={false}
                                       interval={0}
-                                      height={78}
-                                      tickMargin={10}
+                                      height={95}
+                                      tickMargin={18}
+                                      minTickGap={8}
                                       tick={renderInputAxisTick}
                                     />
 
@@ -2438,43 +2499,7 @@ const Dashboard = () => {
                                       }}
                                     />
 
-                                    <Tooltip
-                                      cursor={{
-                                        stroke: "hsl(var(--border))",
-                                        strokeDasharray: "4 4",
-                                      }}
-                                      contentStyle={{
-                                        borderRadius: "14px",
-                                        border:
-                                          "1px solid hsl(var(--border))",
-                                        background: "hsl(var(--card))",
-                                        color:
-                                          "hsl(var(--card-foreground))",
-                                        boxShadow:
-                                          "0 14px 35px rgba(15,23,42,0.18)",
-                                      }}
-                                      formatter={(
-                                        value: number,
-                                        name: string
-                                      ) => [
-                                        formatNumber(Number(value), {
-                                          minimumFractionDigits: 0,
-                                          maximumFractionDigits: 3,
-                                        }),
-                                        name === "cardioValue"
-                                          ? cardioLabel
-                                          : diabetesLabel,
-                                      ]}
-                                      labelFormatter={(key) => {
-                                        const item = inputsChartData.find(
-                                          (input) => input.key === key
-                                        );
-
-                                        return item
-                                          ? `${item.inputLabel}: ${item.displayValue}`
-                                          : "";
-                                      }}
-                                    />
+                                    <Tooltip content={renderUniqueTooltip} />
 
                                     <Area
                                       type="monotone"
@@ -2526,7 +2551,9 @@ const Dashboard = () => {
                               </div>
                             </>
                           )}
-                        </div>                        <div className="flex h-full flex-col rounded-[20px] border border-border bg-card p-3 text-card-foreground shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-4 md:p-5">
+                        </div>
+
+                        <div className="flex h-full flex-col rounded-[20px] border border-border bg-card p-3 text-card-foreground shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-4 md:p-5">
                           <div className="mb-3 flex items-center justify-between gap-3">
                             <div>
                               <h4 className="font-semibold text-foreground">

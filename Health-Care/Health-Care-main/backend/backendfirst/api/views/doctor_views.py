@@ -1,5 +1,7 @@
 # api/doctor_views.py - Doctor Dashboard API Views
 
+from datetime import datetime
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
@@ -18,22 +20,125 @@ from ..models import (
     Notification,
     Appointment,
     MedicationRecommendation,
+    UserProfile,
 )
 from ..doctor_permissions import IsApprovedDoctor
-from ..services.notification_service import create_notification
 
 
-# ═══════════════════════════════════════════════════════════════
-# Dashboard Statistics
-# ═══════════════════════════════════════════════════════════════
+def _patient_name(patient):
+    return (
+        f"{patient.first_name} {patient.last_name}".strip()
+        or patient.username
+        or patient.email
+    )
+
+
+def _date_to_iso(value):
+    if not value:
+        return None
+
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+
+    return str(value)
+
+
+def _time_to_hhmm(value):
+    if not value:
+        return None
+
+    if hasattr(value, "strftime"):
+        return value.strftime("%H:%M")
+
+    return str(value)[:5]
+
+
+def _parse_date(value):
+    if not value:
+        return None
+
+    if hasattr(value, "year") and hasattr(value, "month") and hasattr(value, "day"):
+        return value
+
+    value = str(value).strip()
+
+    try:
+        return datetime.strptime(value[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _parse_time(value):
+    if not value:
+        return None
+
+    if hasattr(value, "hour") and hasattr(value, "minute"):
+        return value
+
+    value = str(value).strip().upper()
+
+    for fmt in ("%H:%M", "%H:%M:%S", "%I:%M %p"):
+        try:
+            return datetime.strptime(value, fmt).time()
+        except ValueError:
+            continue
+
+    return None
+
+
+def _clean_prediction_extra_fields(pred):
+    extra_fields = dict(pred.extra_fields or {})
+
+    extra_fields.pop("smoke", None)
+    extra_fields.pop("alcohol", None)
+    extra_fields.pop("physical_activity", None)
+
+    extra_fields.update({
+        "pregnancies": pred.pregnancies,
+        "blood_pressure": pred.blood_pressure,
+        "skin_thickness": pred.skin_thickness,
+        "insulin": pred.insulin,
+        "diabetes_pedigree_function": pred.diabetes_pedigree_function,
+    })
+
+    return extra_fields
+
+
+def _serialize_appointment(appt):
+    patient = appt.patient_user
+    profile = getattr(patient, "profile", None)
+    patient_name = _patient_name(patient)
+    appointment_date = _date_to_iso(appt.appointment_date)
+    appointment_time = _time_to_hhmm(appt.appointment_time)
+
+    return {
+        "id": appt.id,
+        "patient_id": patient.id,
+        "patient_user": patient.id,
+        "patient_name": patient_name,
+        "patient": {
+            "id": patient.id,
+            "name": patient_name,
+            "email": patient.email,
+            "profile_picture": profile.profile_picture if profile else None,
+        },
+        "appointment_date": appointment_date,
+        "appointment_time": appointment_time,
+        "time": appointment_time,
+        "status": appt.status,
+        "type": appt.appointment_type,
+        "appointment_type": appt.appointment_type,
+        "reason": appt.notes or appt.appointment_type or "Medical Consultation",
+        "notes": appt.notes,
+        "prediction_id": appt.prediction_id,
+        "created_at": appt.created_at.isoformat() if appt.created_at else None,
+        "updated_at": appt.updated_at.isoformat() if appt.updated_at else None,
+    }
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def doctor_dashboard_stats(request):
-    """
-    GET /api/doctor/dashboard/
-    Returns aggregated stats for the doctor dashboard cards.
-    """
     doctor = request.user
     doctor_profile_obj = getattr(doctor, "doctorprofile", None)
     specialties = (
@@ -48,65 +153,40 @@ def doctor_dashboard_stats(request):
     ).select_related("patient_user")
 
     patient_ids = assignments.values_list("patient_user_id", flat=True)
-    patient_count = len(patient_ids)
 
     predictions = Prediction.objects.filter(
         patient_user_id__in=patient_ids,
         disease_type__in=specialties,
     )
 
-    total_predictions = predictions.count()
-    pending_reviews = predictions.filter(review_status="pending").count()
-
     today = timezone.localdate()
-    today_appointments = Appointment.objects.filter(
-        doctor_user=doctor,
-        appointment_date=today,
-        status="scheduled",
-    ).count()
-
-    unread_notifications = Notification.objects.filter(
-        user=doctor,
-        is_read=False,
-    ).count()
-
-    threads = DoctorPatientChatThread.objects.filter(
-        assignment__doctor_user=doctor,
-        assignment__status="active",
-    )
-
-    unread_messages = (
-        DoctorPatientChatMessage.objects
-        .filter(thread__in=threads, read_at__isnull=True)
-        .exclude(sender_user=doctor)
-        .count()
-    )
-
-    high_risk_count = predictions.filter(probability__gte=75).count()
 
     return Response({
-        "total_patients": patient_count,
-        "total_predictions": total_predictions,
-        "pending_reviews": pending_reviews,
-        "today_appointments": today_appointments,
-        "high_risk_count": high_risk_count,
-        "unread_notifications": unread_notifications,
-        "unread_messages": unread_messages,
+        "total_patients": assignments.count(),
+        "total_predictions": predictions.count(),
+        "pending_reviews": predictions.filter(review_status="pending").count(),
+        "today_appointments": Appointment.objects.filter(
+            doctor_user=doctor,
+            appointment_date__gte=today,
+            status="scheduled",
+        ).count(),
+        "high_risk_count": predictions.filter(probability__gte=75).count(),
+        "unread_notifications": Notification.objects.filter(
+            user=doctor,
+            is_read=False,
+        ).count(),
+        "unread_messages": DoctorPatientChatMessage.objects.filter(
+            thread__assignment__doctor_user=doctor,
+            thread__assignment__status="active",
+            read_at__isnull=True,
+        ).exclude(sender_user=doctor).count(),
         "specialties": specialties,
     })
 
 
-# ═══════════════════════════════════════════════════════════════
-# Pending Predictions
-# ═══════════════════════════════════════════════════════════════
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def pending_predictions(request):
-    """
-    GET /api/doctor/predictions/pending/
-    Returns predictions from assigned patients that need review.
-    """
     doctor = request.user
     doctor_profile_obj = getattr(doctor, "doctorprofile", None)
     specialties = (
@@ -128,7 +208,7 @@ def pending_predictions(request):
             disease_type__in=specialties,
         )
         .select_related("patient_user", "patient_user__profile")
-        .order_by("-created_at")[:20]
+        .order_by("-created_at")
     )
 
     data = []
@@ -136,11 +216,8 @@ def pending_predictions(request):
     for pred in predictions:
         patient = pred.patient_user
         profile = getattr(patient, "profile", None)
-        patient_name = (
-            f"{patient.first_name} {patient.last_name}".strip()
-            or patient.username
-            or patient.email
-        )
+        patient_name = _patient_name(patient)
+        extra_fields = _clean_prediction_extra_fields(pred)
 
         data.append({
             "id": pred.id,
@@ -155,9 +232,14 @@ def pending_predictions(request):
             "glucose": pred.glucose,
             "bmi": pred.bmi,
             "age": pred.age,
+            "pregnancies": pred.pregnancies,
+            "blood_pressure": pred.blood_pressure,
+            "skin_thickness": pred.skin_thickness,
+            "insulin": pred.insulin,
+            "diabetes_pedigree_function": pred.diabetes_pedigree_function,
             "review_status": pred.review_status,
             "disease_type": pred.disease_type,
-            "extra_fields": pred.extra_fields,
+            "extra_fields": extra_fields,
             "created_at": pred.created_at.isoformat(),
             "patient_name": patient_name,
         })
@@ -168,10 +250,6 @@ def pending_predictions(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def all_patient_predictions(request):
-    """
-    GET /api/doctor/predictions/?risk_level=...&review_status=...
-    Returns all predictions from assigned patients with optional filtering.
-    """
     doctor = request.user
     doctor_profile_obj = getattr(doctor, "doctorprofile", None)
     specialties = (
@@ -198,6 +276,7 @@ def all_patient_predictions(request):
             disease_type__in=active_specialties,
         )
         .select_related("patient_user")
+        .order_by("-created_at")
     )
 
     if risk_level:
@@ -206,20 +285,16 @@ def all_patient_predictions(request):
     if review_status:
         predictions = predictions.filter(review_status=review_status)
 
-    predictions = predictions.order_by("-created_at")
-
     data = []
 
     for pred in predictions:
         patient = pred.patient_user
-        patient_name = (
-            f"{patient.first_name} {patient.last_name}".strip()
-            or patient.username
-            or patient.email
-        )
+        patient_name = _patient_name(patient)
+        extra_fields = _clean_prediction_extra_fields(pred)
 
         data.append({
             "id": pred.id,
+            "patient_id": patient.id,
             "patient_name": patient_name,
             "age": pred.age,
             "glucose": pred.glucose,
@@ -233,7 +308,7 @@ def all_patient_predictions(request):
             "risk_level": pred.risk_level,
             "review_status": pred.review_status,
             "disease_type": pred.disease_type,
-            "extra_fields": pred.extra_fields,
+            "extra_fields": extra_fields,
             "created_at": pred.created_at.isoformat(),
             "message": pred.message,
         })
@@ -241,20 +316,9 @@ def all_patient_predictions(request):
     return Response({"count": len(data), "predictions": data})
 
 
-# ═══════════════════════════════════════════════════════════════
-# Review a Prediction
-# ═══════════════════════════════════════════════════════════════
-
 @api_view(["POST"])
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def review_prediction(request, prediction_id):
-    """
-    POST /api/doctor/predictions/<id>/review/
-    {
-        "decision": "approved|rejected|needs_followup",
-        "notes": "optional notes"
-    }
-    """
     doctor = request.user
     decision = request.data.get("decision")
     notes = request.data.get("notes", "")
@@ -289,7 +353,7 @@ def review_prediction(request, prediction_id):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    review, created = PredictionReview.objects.update_or_create(
+    review, _ = PredictionReview.objects.update_or_create(
         prediction=prediction,
         doctor_user=doctor,
         defaults={"decision": decision, "notes": notes},
@@ -298,7 +362,6 @@ def review_prediction(request, prediction_id):
     prediction.review_status = decision
     prediction.save(update_fields=["review_status"])
 
-    # Create notification for patient
     Notification.objects.create(
         user=prediction.patient_user,
         type="prediction_reviewed",
@@ -316,17 +379,9 @@ def review_prediction(request, prediction_id):
     })
 
 
-# ═══════════════════════════════════════════════════════════════
-# Risk Distribution
-# ═══════════════════════════════════════════════════════════════
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def risk_distribution(request):
-    """
-    GET /api/doctor/risk-distribution/?disease_type=diabetes
-    Returns aggregated risk level counts for the donut chart.
-    """
     doctor = request.user
     doctor_profile_obj = getattr(doctor, "doctorprofile", None)
     specialties = (
@@ -335,12 +390,7 @@ def risk_distribution(request):
         else ["diabetes"]
     )
 
-    raw_disease_type = request.query_params.get("disease_type")
-
-    if not raw_disease_type:
-        disease_type = specialties[0] if specialties else Prediction.DISEASE_DIABETES
-    else:
-        disease_type = raw_disease_type
+    disease_type = request.query_params.get("disease_type") or specialties[0]
 
     patient_ids = DoctorPatientAssignment.objects.filter(
         doctor_user=doctor,
@@ -369,24 +419,103 @@ def risk_distribution(request):
     })
 
 
-# ═══════════════════════════════════════════════════════════════
-# Patient List
-# ═══════════════════════════════════════════════════════════════
-
-@api_view(["GET"])
+@api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def doctor_patients(request):
-    """
-    GET /api/doctor/patients/?search=...
-    Returns list of assigned patients with latest prediction info.
-    """
     doctor = request.user
+
+    if request.method == "POST":
+        first_name = str(request.data.get("first_name", "")).strip()
+        last_name = str(request.data.get("last_name", "")).strip()
+        email = str(request.data.get("email", "")).strip().lower()
+        phone = str(request.data.get("phone", "")).strip()
+
+        if not first_name or not last_name or not email:
+            return Response(
+                {"error": "الاسم الأول واسم العائلة والبريد الإلكتروني مطلوبين"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        patient = User.objects.filter(email=email).first()
+
+        if patient:
+            patient.first_name = first_name
+            patient.last_name = last_name
+            patient.email = email
+            patient.save(update_fields=["first_name", "last_name", "email"])
+
+            profile, _ = UserProfile.objects.get_or_create(user=patient)
+            profile.role = UserProfile.ROLE_PATIENT
+            if phone:
+                profile.phone = phone
+            profile.save()
+        else:
+            username_base = (
+                email.split("@")[0]
+                .replace(".", "_")
+                .replace("-", "_")
+                .replace("+", "_")
+            )
+
+            username = username_base
+            counter = 1
+
+            while User.objects.filter(username=username).exists():
+                username = f"{username_base}_{counter}"
+                counter += 1
+
+            patient = User.objects.create_user(
+                username=username,
+                email=email,
+                password="password123",
+                first_name=first_name,
+                last_name=last_name,
+            )
+
+            profile, _ = UserProfile.objects.get_or_create(user=patient)
+            profile.role = UserProfile.ROLE_PATIENT
+            profile.phone = phone or None
+            profile.save()
+
+        assignment, created = DoctorPatientAssignment.objects.get_or_create(
+            doctor_user=doctor,
+            patient_user=patient,
+            defaults={"status": "active"},
+        )
+
+        if not created:
+            assignment.status = "active"
+            assignment.save(update_fields=["status"])
+
+        DoctorPatientChatThread.objects.get_or_create(assignment=assignment)
+
+        patient_name = _patient_name(patient)
+
+        return Response(
+            {
+                "id": patient.id,
+                "username": patient.username,
+                "first_name": patient.first_name,
+                "last_name": patient.last_name,
+                "name": patient_name,
+                "email": patient.email,
+                "phone": profile.phone if profile else None,
+                "assignment_status": "active",
+                "latest_prediction": None,
+                "predictions": [],
+                "temporary_password": "password123",
+                "message": "تم إضافة المريض وربطه بالدكتور بنجاح",
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
     search = request.query_params.get("search", "").strip()
 
     assignments = (
         DoctorPatientAssignment.objects
         .filter(doctor_user=doctor, status="active")
         .select_related("patient_user", "patient_user__profile")
+        .order_by("-created_at")
     )
 
     if search:
@@ -398,7 +527,7 @@ def doctor_patients(request):
 
     data = []
 
-    for assignment in assignments[:50]:
+    for assignment in assignments:
         patient = assignment.patient_user
         profile = getattr(patient, "profile", None)
 
@@ -409,15 +538,17 @@ def doctor_patients(request):
             .first()
         )
 
-        patient_name = (
-            f"{patient.first_name} {patient.last_name}".strip()
-            or patient.username
-            or patient.email
-        )
+        patient_name = _patient_name(patient)
 
         data.append({
             "id": patient.id,
+            "patient_id": patient.id,
+            "patient_user": patient.id,
+            "username": patient.username,
+            "first_name": patient.first_name,
+            "last_name": patient.last_name,
             "name": patient_name,
+            "patient_name": patient_name,
             "email": patient.email,
             "phone": profile.phone if profile else None,
             "profile_picture": profile.profile_picture if profile else None,
@@ -439,10 +570,6 @@ def doctor_patients(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def doctor_patient_profile(request, patient_id):
-    """
-    GET /api/doctor/patients/<patient_id>/profile/
-    Returns patient profile with latest predictions.
-    """
     doctor = request.user
 
     assignment_exists = DoctorPatientAssignment.objects.filter(
@@ -476,6 +603,8 @@ def doctor_patient_profile(request, patient_id):
     predictions = []
 
     for pred in predictions_qs:
+        extra_fields = _clean_prediction_extra_fields(pred)
+
         predictions.append({
             "id": pred.id,
             "probability": pred.probability,
@@ -490,16 +619,12 @@ def doctor_patient_profile(request, patient_id):
             "age": pred.age,
             "review_status": pred.review_status,
             "disease_type": pred.disease_type,
-            "extra_fields": pred.extra_fields,
+            "extra_fields": extra_fields,
             "message": pred.message,
             "created_at": pred.created_at.isoformat(),
         })
 
-    patient_name = (
-        f"{patient.first_name} {patient.last_name}".strip()
-        or patient.username
-        or patient.email
-    )
+    patient_name = _patient_name(patient)
 
     return Response({
         "id": patient.id,
@@ -515,59 +640,115 @@ def doctor_patient_profile(request, patient_id):
     })
 
 
-# ═══════════════════════════════════════════════════════════════
-# Today's Appointments
-# ═══════════════════════════════════════════════════════════════
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated, IsApprovedDoctor])
+def doctor_appointments(request):
+    doctor = request.user
+
+    if request.method == "POST":
+        patient_id = request.data.get("patient_id")
+        appointment_date_raw = request.data.get("appointment_date")
+        appointment_time_raw = request.data.get("appointment_time")
+        reason = str(request.data.get("reason", "")).strip()
+        appointment_type = str(
+            request.data.get("appointment_type", "consultation")
+        ).strip() or "consultation"
+
+        appointment_date = _parse_date(appointment_date_raw)
+        appointment_time = _parse_time(appointment_time_raw)
+
+        if not patient_id or not appointment_date or not appointment_time:
+            return Response(
+                {
+                    "error": (
+                        "patient_id, appointment_date and appointment_time "
+                        "are required in valid format"
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        assignment_exists = DoctorPatientAssignment.objects.filter(
+            doctor_user=doctor,
+            patient_user_id=patient_id,
+            status="active",
+        ).exists()
+
+        if not assignment_exists:
+            return Response(
+                {"error": "هذا المريض غير مربوط بهذا الدكتور"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            patient = User.objects.get(id=patient_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "المريض غير موجود"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        appointment = Appointment.objects.create(
+            doctor_user=doctor,
+            patient_user=patient,
+            appointment_date=appointment_date,
+            appointment_time=appointment_time,
+            appointment_type=appointment_type,
+            notes=reason,
+            status="scheduled",
+        )
+
+        Notification.objects.create(
+            user=patient,
+            type="appointment",
+            title="تم حجز موعد جديد",
+            body=(
+                f"قام الطبيب بحجز موعد لك بتاريخ "
+                f"{appointment_date.isoformat()} الساعة "
+                f"{appointment_time.strftime('%H:%M')}."
+            ),
+            related_object_id=appointment.id,
+            related_object_type="appointment",
+        )
+
+        return Response(
+            _serialize_appointment(appointment),
+            status=status.HTTP_201_CREATED,
+        )
+
+    appointments = (
+        Appointment.objects
+        .filter(doctor_user=doctor)
+        .select_related("patient_user", "patient_user__profile", "prediction")
+        .order_by("appointment_date", "appointment_time")
+    )
+
+    data = [_serialize_appointment(appt) for appt in appointments]
+
+    return Response({"count": len(data), "appointments": data})
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def today_appointments(request):
-    """
-    GET /api/doctor/appointments/today/
-    Returns today's appointments for the doctor.
-    """
     doctor = request.user
     today = timezone.localdate()
 
     appointments = (
         Appointment.objects
-        .filter(doctor_user=doctor, appointment_date=today)
+        .filter(
+            doctor_user=doctor,
+            appointment_date__gte=today,
+            status="scheduled",
+        )
         .select_related("patient_user", "patient_user__profile", "prediction")
-        .order_by("appointment_time")
+        .order_by("appointment_date", "appointment_time")[:5]
     )
 
-    data = []
-
-    for appt in appointments:
-        patient = appt.patient_user
-        profile = getattr(patient, "profile", None)
-        patient_name = (
-            f"{patient.first_name} {patient.last_name}".strip()
-            or patient.username
-            or patient.email
-        )
-
-        data.append({
-            "id": appt.id,
-            "patient": {
-                "id": patient.id,
-                "name": patient_name,
-                "profile_picture": profile.profile_picture if profile else None,
-            },
-            "time": appt.appointment_time.strftime("%H:%M"),
-            "status": appt.status,
-            "type": appt.appointment_type,
-            "prediction_id": appt.prediction_id,
-            "notes": appt.notes,
-            "patient_name": patient_name,
-        })
+    data = [_serialize_appointment(appt) for appt in appointments]
 
     return Response({"count": len(data), "appointments": data})
 
-
-# ═══════════════════════════════════════════════════════════════
-# Messages / Chat Threads
-# ═══════════════════════════════════════════════════════════════
 
 def _serialize_chat_message(message):
     return {
@@ -583,16 +764,6 @@ def _serialize_chat_message(message):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def recent_messages(request):
-    """
-    GET /api/doctor/messages/recent/
-    Returns all active chat threads for the doctor.
-    It returns threads even if they do not have messages yet.
-
-    Important:
-    If the doctor has active DoctorPatientAssignment records but no
-    DoctorPatientChatThread records yet, this endpoint creates the missing
-    threads automatically.
-    """
     doctor = request.user
 
     assignments = DoctorPatientAssignment.objects.filter(
@@ -601,9 +772,7 @@ def recent_messages(request):
     )
 
     for assignment in assignments:
-        DoctorPatientChatThread.objects.get_or_create(
-            assignment=assignment
-        )
+        DoctorPatientChatThread.objects.get_or_create(assignment=assignment)
 
     threads = (
         DoctorPatientChatThread.objects
@@ -644,11 +813,7 @@ def recent_messages(request):
             .count()
         )
 
-        patient_name = (
-            f"{patient.first_name} {patient.last_name}".strip()
-            or patient.username
-            or patient.email
-        )
+        patient_name = _patient_name(patient)
 
         data.append({
             "id": thread.id,
@@ -685,10 +850,6 @@ def recent_messages(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def thread_messages(request, thread_id):
-    """
-    GET /api/doctor/messages/<thread_id>/messages/
-    Returns full message history for the selected thread.
-    """
     doctor = request.user
 
     try:
@@ -722,22 +883,12 @@ def thread_messages(request, thread_id):
 
     data = [_serialize_chat_message(message) for message in messages]
 
-    return Response({
-        "count": len(data),
-        "messages": data,
-    })
+    return Response({"count": len(data), "messages": data})
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def send_thread_message(request, thread_id):
-    """
-    POST /api/doctor/messages/<thread_id>/send/
-    Body:
-    {
-        "content": "message text"
-    }
-    """
     doctor = request.user
     content = str(request.data.get("content", "")).strip()
 
@@ -784,17 +935,9 @@ def send_thread_message(request, thread_id):
     )
 
 
-# ═══════════════════════════════════════════════════════════════
-# Recent Activity
-# ═══════════════════════════════════════════════════════════════
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def recent_activity(request):
-    """
-    GET /api/doctor/activity/
-    Returns a combined feed of recent events.
-    """
     doctor = request.user
     doctor_profile_obj = getattr(doctor, "doctorprofile", None)
     specialties = (
@@ -821,10 +964,7 @@ def recent_activity(request):
     )
 
     for pred in recent_predictions:
-        patient_name = (
-            f"{pred.patient_user.first_name} {pred.patient_user.last_name}".strip()
-            or pred.patient_user.email
-        )
+        patient_name = _patient_name(pred.patient_user)
 
         activities.append({
             "type": "prediction",
@@ -832,46 +972,10 @@ def recent_activity(request):
             "title": "تحليل جديد",
             "description": f"تحليل جديد من {patient_name}",
             "related_id": pred.id,
+            "prediction_id": pred.id,
+            "patient_id": pred.patient_user.id,
+            "patient_name": patient_name,
             "created_at": pred.created_at.isoformat(),
-        })
-
-    recent_reviews = (
-        PredictionReview.objects
-        .filter(doctor_user=doctor)
-        .select_related("prediction", "prediction__patient_user")
-        .order_by("-created_at")[:5]
-    )
-
-    for review in recent_reviews:
-        activities.append({
-            "type": "review",
-            "icon": "check",
-            "title": "مراجعة تحليل",
-            "description": f"تمت مراجعة تحليل #{review.prediction_id}",
-            "related_id": review.prediction_id,
-            "created_at": review.created_at.isoformat(),
-        })
-
-    recent_appts = (
-        Appointment.objects
-        .filter(doctor_user=doctor)
-        .select_related("patient_user")
-        .order_by("-created_at")[:5]
-    )
-
-    for appt in recent_appts:
-        patient_name = (
-            f"{appt.patient_user.first_name} {appt.patient_user.last_name}".strip()
-            or appt.patient_user.email
-        )
-
-        activities.append({
-            "type": "appointment",
-            "icon": "calendar",
-            "title": "موعد جديد",
-            "description": f"موعد مع {patient_name}",
-            "related_id": appt.id,
-            "created_at": appt.created_at.isoformat(),
         })
 
     recent_msgs = (
@@ -883,10 +987,7 @@ def recent_activity(request):
     )
 
     for msg in recent_msgs:
-        patient_name = (
-            f"{msg.sender_user.first_name} {msg.sender_user.last_name}".strip()
-            or msg.sender_user.email
-        )
+        patient_name = _patient_name(msg.sender_user)
 
         activities.append({
             "type": "message",
@@ -894,62 +995,23 @@ def recent_activity(request):
             "title": "رسالة جديدة",
             "description": f"رسالة من {patient_name}",
             "related_id": msg.thread_id,
+            "message_id": msg.thread_id,
+            "patient_id": msg.sender_user.id,
+            "patient_name": patient_name,
             "created_at": msg.created_at.isoformat(),
-        })
-
-    recent_meds = (
-        MedicationRecommendation.objects
-        .filter(review__doctor_user=doctor)
-        .select_related("medication", "review__prediction__patient_user")
-        .order_by("-review__created_at")[:5]
-    )
-
-    for med_rec in recent_meds:
-        patient_name = (
-            f"{med_rec.review.prediction.patient_user.first_name} "
-            f"{med_rec.review.prediction.patient_user.last_name}"
-        ).strip()
-
-        activities.append({
-            "type": "review",
-            "icon": "pill",
-            "title": "توصية دواء",
-            "description": f"تم وصف {med_rec.medication.name} للمريض {patient_name}",
-            "related_id": med_rec.review.prediction_id,
-            "created_at": med_rec.review.created_at.isoformat(),
         })
 
     activities.sort(key=lambda item: item["created_at"], reverse=True)
 
-    return Response({
-        "count": len(activities[:15]),
-        "activities": activities[:15],
-    })
+    return Response({"count": len(activities[:15]), "activities": activities[:15]})
 
-
-# ═══════════════════════════════════════════════════════════════
-# Doctor Profile
-# ═══════════════════════════════════════════════════════════════
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def doctor_profile(request):
-    """
-    GET /api/doctor/profile/
-    Returns the doctor's own profile info.
-    """
     doctor = request.user
     profile = getattr(doctor, "profile", None)
     doctor_profile_obj = getattr(doctor, "doctorprofile", None)
-
-    patient_count = DoctorPatientAssignment.objects.filter(
-        doctor_user=doctor,
-        status="active",
-    ).count()
-
-    review_count = PredictionReview.objects.filter(
-        doctor_user=doctor
-    ).count()
 
     return Response({
         "id": doctor.id,
@@ -967,23 +1029,20 @@ def doctor_profile(request):
             if doctor_profile_obj
             else ["diabetes"]
         ),
-        "patient_count": patient_count,
-        "review_count": review_count,
+        "patient_count": DoctorPatientAssignment.objects.filter(
+            doctor_user=doctor,
+            status="active",
+        ).count(),
+        "review_count": PredictionReview.objects.filter(
+            doctor_user=doctor
+        ).count(),
         "date_joined": doctor.date_joined.isoformat(),
     })
 
 
-# ═══════════════════════════════════════════════════════════════
-# Doctor Notifications
-# ═══════════════════════════════════════════════════════════════
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsApprovedDoctor])
 def doctor_notifications(request):
-    """
-    GET /api/doctor/notifications/
-    Returns notifications for the doctor.
-    """
     notifications = (
         Notification.objects
         .filter(user=request.user)

@@ -199,6 +199,76 @@ export default function PendingPredictions({
     close: isRTL ? "إغلاق" : "Close",
   };
 
+  const isEmptyValue = (value: unknown) => {
+    return value === null || value === undefined || value === "";
+  };
+
+  const isInvalidNumberValue = (value: unknown) => {
+    if (typeof value === "number") return Number.isNaN(value);
+
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      return normalized === "nan" || normalized === "nana";
+    }
+
+    return false;
+  };
+
+  const safeDisplayValue = (value: unknown, fallback = "N/A") => {
+    if (isEmptyValue(value) || isInvalidNumberValue(value)) return fallback;
+    return value as string | number;
+  };
+
+  const toNumber = (value: unknown) => {
+    if (isEmptyValue(value) || isInvalidNumberValue(value)) return 0;
+
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : 0;
+  };
+
+  const getProbabilityValue = (value: unknown) => {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : 0;
+  };
+
+  const getValueFromReport = (
+    report: Prediction,
+    keys: string[],
+    fallback = "N/A"
+  ) => {
+    const item = report as any;
+
+    const sources = [
+      item,
+      item.extra_fields,
+      item.extraFields,
+      item.inputs,
+      item.input,
+      item.input_values,
+      item.inputValues,
+      item.patient_values,
+      item.patientValues,
+      item.values,
+      item.data,
+      item.result,
+      item.prediction,
+    ];
+
+    for (const source of sources) {
+      if (!source || typeof source !== "object") continue;
+
+      for (const key of keys) {
+        const value = source[key];
+
+        if (!isEmptyValue(value) && !isInvalidNumberValue(value)) {
+          return value;
+        }
+      }
+    }
+
+    return fallback;
+  };
+
   const normalizeRiskLevel = (level?: string) => {
     return (level || "")
       .toLowerCase()
@@ -208,35 +278,8 @@ export default function PendingPredictions({
       .trim();
   };
 
-  const toNumber = (value: unknown) => {
-    if (value === null || value === undefined || value === "") return 0;
-
-    const numericValue = Number(value);
-
-    return Number.isNaN(numericValue) ? 0 : numericValue;
-  };
-
-  const getExtraValue = (
-    report: Prediction,
-    keys: string[],
-    fallback = "N/A"
-  ) => {
-    const item = report as any;
-    const extra = report.extra_fields || {};
-
-    for (const key of keys) {
-      const value = extra?.[key] ?? item?.[key];
-
-      if (value !== undefined && value !== null && value !== "") {
-        return value;
-      }
-    }
-
-    return fallback;
-  };
-
   const getGenderValue = (report: Prediction) => {
-    return getExtraValue(report, ["gender", "sex"], "N/A");
+    return getValueFromReport(report, ["gender", "sex"], "N/A");
   };
 
   const isFemaleGender = (value: unknown) => {
@@ -254,9 +297,9 @@ export default function PendingPredictions({
   };
 
   const getPregnanciesValue = (report: Prediction) => {
-    return getExtraValue(
+    return getValueFromReport(
       report,
-      ["pregnancies", "pregnancy"],
+      ["pregnancies", "pregnancy", "Pregnancies", "preg"],
       report.pregnancies ?? "N/A"
     );
   };
@@ -348,7 +391,7 @@ export default function PendingPredictions({
   };
 
   const formatRiskLabel = (level?: string) => {
-    if (!level) return isRTL ? "غير محدد" : "Unknown";
+    if (!level || isInvalidNumberValue(level)) return isRTL ? "غير محدد" : "Unknown";
 
     return level
       .replace(/_/g, " ")
@@ -367,23 +410,6 @@ export default function PendingPredictions({
       });
     } catch {
       return "";
-    }
-  };
-
-  const getStatusLabel = (status?: string) => {
-    switch (status) {
-      case "pending":
-        return isRTL ? "قيد المراجعة" : "Pending";
-      case "reviewed":
-        return isRTL ? "تمت المراجعة" : "Reviewed";
-      case "needs_followup":
-        return isRTL ? "يحتاج متابعة" : "Needs Follow-up";
-      case "approved":
-        return isRTL ? "معتمد" : "Approved";
-      case "rejected":
-        return isRTL ? "مرفوض" : "Rejected";
-      default:
-        return status || (isRTL ? "غير محدد" : "Unknown");
     }
   };
 
@@ -467,74 +493,97 @@ export default function PendingPredictions({
     const gender = getGenderValue(report);
     const showPregnancies = isFemaleGender(gender);
 
+    const glucoseValue = getValueFromReport(report, ["glucose", "gluc", "Glucose"]);
+    const insulinValue = getValueFromReport(report, ["insulin", "Insulin"]);
+    const skinValue = getValueFromReport(report, [
+      "skin_thickness",
+      "skinThickness",
+      "skin_thickness_mm",
+      "SkinThickness",
+      "skin",
+    ]);
+    const pedigreeValue = getValueFromReport(report, [
+      "diabetes_pedigree_function",
+      "diabetesPedigreeFunction",
+      "DiabetesPedigreeFunction",
+      "pedigree",
+      "dpf",
+    ]);
+    const ageValue = getValueFromReport(report, ["age", "Age"]);
+    const weightValue = getValueFromReport(report, ["weight", "Weight"]);
+    const cholesterolValue = getValueFromReport(report, [
+      "cholesterol",
+      "Cholesterol",
+      "chol",
+    ]);
+    const systolicValue = getValueFromReport(report, [
+      "systolic_bp",
+      "systolicBloodPressure",
+      "systolic_blood_pressure",
+      "ap_hi",
+      "systolic",
+      "sys",
+    ]);
+    const diastolicValue = getValueFromReport(
+      report,
+      [
+        "diastolic_bp",
+        "diastolicBloodPressure",
+        "diastolic_blood_pressure",
+        "blood_pressure",
+        "bloodPressure",
+        "ap_lo",
+        "diastolic",
+        "dia",
+      ],
+      (report as any).blood_pressure ?? "N/A"
+    );
+
     const diabetesIndicators: KeyIndicator[] = [
       {
         label: "Dia BP",
-        value:
-          getExtraValue(report, [
-            "diastolic_bp",
-            "diastolicBloodPressure",
-            "diastolic_blood_pressure",
-          ]) ||
-          report.blood_pressure ||
-          "N/A",
+        value: safeDisplayValue(diastolicValue),
         unit: "mmHg",
         severity: getIndicatorSeverity(
           isRTL ? "الضغط الانبساطي" : "Diastolic BP",
-          getExtraValue(report, [
-            "diastolic_bp",
-            "diastolicBloodPressure",
-            "diastolic_blood_pressure",
-          ]) || report.blood_pressure
+          diastolicValue
         ),
       },
       {
         label: "Glu",
-        value: report.glucose || "N/A",
+        value: safeDisplayValue(glucoseValue),
         unit: "mg/dL",
-        severity: getIndicatorSeverity(
-          isRTL ? "الجلوكوز" : "Glucose",
-          report.glucose
-        ),
+        severity: getIndicatorSeverity(isRTL ? "الجلوكوز" : "Glucose", glucoseValue),
       },
       {
         label: "Insulin",
-        value: report.insulin || "N/A",
+        value: safeDisplayValue(insulinValue),
         unit: "",
-        severity: getIndicatorSeverity(
-          isRTL ? "الإنسولين" : "Insulin",
-          report.insulin
-        ),
+        severity: getIndicatorSeverity(isRTL ? "الإنسولين" : "Insulin", insulinValue),
       },
       {
         label: "Skin",
-        value: report.skin_thickness || "N/A",
+        value: safeDisplayValue(skinValue),
         unit: "",
-        severity: getIndicatorSeverity(
-          isRTL ? "سماكة الجلد" : "Skin Thickness",
-          report.skin_thickness
-        ),
+        severity: getIndicatorSeverity(isRTL ? "سماكة الجلد" : "Skin Thickness", skinValue),
       },
       {
         label: "Pedigree",
-        value: report.diabetes_pedigree_function || "N/A",
+        value: safeDisplayValue(pedigreeValue),
         unit: "",
-        severity: getIndicatorSeverity(
-          isRTL ? "العامل الوراثي" : "Pedigree",
-          report.diabetes_pedigree_function
-        ),
+        severity: getIndicatorSeverity(isRTL ? "العامل الوراثي" : "Pedigree", pedigreeValue),
       },
       {
         label: "Age",
-        value: report.age || "N/A",
+        value: safeDisplayValue(ageValue),
         unit: "",
-        severity: getIndicatorSeverity(isRTL ? "العمر" : "Age", report.age),
+        severity: getIndicatorSeverity(isRTL ? "العمر" : "Age", ageValue),
       },
       ...(showPregnancies
         ? [
             {
               label: "Preg",
-              value: getPregnanciesValue(report),
+              value: safeDisplayValue(getPregnanciesValue(report)),
               unit: "",
               severity: getIndicatorSeverity(
                 isRTL ? "الحمل" : "Pregnancies",
@@ -548,70 +597,48 @@ export default function PendingPredictions({
     const cardiovascularIndicators: KeyIndicator[] = [
       {
         label: "Sys BP",
-        value: getExtraValue(report, [
-          "systolic_bp",
-          "systolicBloodPressure",
-          "systolic_blood_pressure",
-        ]),
+        value: safeDisplayValue(systolicValue),
         unit: "mmHg",
         severity: getIndicatorSeverity(
           isRTL ? "الضغط الانقباضي" : "Systolic BP",
-          getExtraValue(report, [
-            "systolic_bp",
-            "systolicBloodPressure",
-            "systolic_blood_pressure",
-          ])
+          systolicValue
         ),
       },
       {
         label: "Dia BP",
-        value: getExtraValue(report, [
-          "diastolic_bp",
-          "diastolicBloodPressure",
-          "diastolic_blood_pressure",
-        ]),
+        value: safeDisplayValue(diastolicValue),
         unit: "mmHg",
         severity: getIndicatorSeverity(
           isRTL ? "الضغط الانبساطي" : "Diastolic BP",
-          getExtraValue(report, [
-            "diastolic_bp",
-            "diastolicBloodPressure",
-            "diastolic_blood_pressure",
-          ])
+          diastolicValue
         ),
       },
       {
         label: "Chol",
-        value: getExtraValue(report, ["cholesterol"]),
+        value: safeDisplayValue(cholesterolValue),
         unit: "mg/dL",
         severity: getIndicatorSeverity(
           isRTL ? "الكوليسترول" : "Cholesterol",
-          getExtraValue(report, ["cholesterol"])
+          cholesterolValue
         ),
       },
       {
         label: "Glu",
-        value: report.glucose || "N/A",
+        value: safeDisplayValue(glucoseValue),
         unit: "mg/dL",
-        severity: getIndicatorSeverity(
-          isRTL ? "الجلوكوز" : "Glucose",
-          report.glucose
-        ),
+        severity: getIndicatorSeverity(isRTL ? "الجلوكوز" : "Glucose", glucoseValue),
       },
       {
         label: "Age",
-        value: report.age || "N/A",
+        value: safeDisplayValue(ageValue),
         unit: "",
-        severity: getIndicatorSeverity(isRTL ? "العمر" : "Age", report.age),
+        severity: getIndicatorSeverity(isRTL ? "العمر" : "Age", ageValue),
       },
       {
         label: "Weight",
-        value: getExtraValue(report, ["weight"]),
+        value: safeDisplayValue(weightValue),
         unit: "kg",
-        severity: getIndicatorSeverity(
-          isRTL ? "الوزن" : "Weight",
-          getExtraValue(report, ["weight"])
-        ),
+        severity: getIndicatorSeverity(isRTL ? "الوزن" : "Weight", weightValue),
       },
     ];
 
@@ -659,17 +686,71 @@ export default function PendingPredictions({
         const gender = getGenderValue(selectedReport);
         const showPregnancies = isFemaleGender(gender);
 
+        const glucoseValue = getValueFromReport(selectedReport, [
+          "glucose",
+          "gluc",
+          "Glucose",
+        ]);
+        const insulinValue = getValueFromReport(selectedReport, [
+          "insulin",
+          "Insulin",
+        ]);
+        const skinValue = getValueFromReport(selectedReport, [
+          "skin_thickness",
+          "skinThickness",
+          "skin_thickness_mm",
+          "SkinThickness",
+          "skin",
+        ]);
+        const pedigreeValue = getValueFromReport(selectedReport, [
+          "diabetes_pedigree_function",
+          "diabetesPedigreeFunction",
+          "DiabetesPedigreeFunction",
+          "pedigree",
+          "dpf",
+        ]);
+        const ageValue = getValueFromReport(selectedReport, ["age", "Age"]);
+        const weightValue = getValueFromReport(selectedReport, ["weight", "Weight"]);
+        const heightValue = getValueFromReport(selectedReport, ["height", "Height"]);
+        const cholesterolValue = getValueFromReport(selectedReport, [
+          "cholesterol",
+          "Cholesterol",
+          "chol",
+        ]);
+        const systolicValue = getValueFromReport(selectedReport, [
+          "systolic_bp",
+          "systolicBloodPressure",
+          "systolic_blood_pressure",
+          "ap_hi",
+          "systolic",
+          "sys",
+        ]);
+        const diastolicValue = getValueFromReport(
+          selectedReport,
+          [
+            "diastolic_bp",
+            "diastolicBloodPressure",
+            "diastolic_blood_pressure",
+            "blood_pressure",
+            "bloodPressure",
+            "ap_lo",
+            "diastolic",
+            "dia",
+          ],
+          (selectedReport as any).blood_pressure ?? "N/A"
+        );
+
         const baseIdentityIndicators = [
           {
             label: isRTL ? "النوع" : "Gender",
-            value: gender,
+            value: safeDisplayValue(gender),
             unit: "",
           },
           ...(showPregnancies
             ? [
                 {
                   label: isRTL ? "عدد مرات الحمل" : "Pregnancies",
-                  value: getPregnanciesValue(selectedReport),
+                  value: safeDisplayValue(getPregnanciesValue(selectedReport)),
                   unit: "",
                 },
               ]
@@ -681,45 +762,37 @@ export default function PendingPredictions({
             ...baseIdentityIndicators,
             {
               label: isRTL ? "الجلوكوز" : "Glucose",
-              value: selectedReport.glucose || "N/A",
+              value: safeDisplayValue(glucoseValue),
               unit: "mg/dL",
             },
             {
               label: isRTL ? "الكوليسترول" : "Cholesterol",
-              value: getExtraValue(selectedReport, ["cholesterol"]),
+              value: safeDisplayValue(cholesterolValue),
               unit: "mg/dL",
             },
             {
               label: isRTL ? "الضغط الانقباضي" : "Systolic BP",
-              value: getExtraValue(selectedReport, [
-                "systolic_bp",
-                "systolicBloodPressure",
-                "systolic_blood_pressure",
-              ]),
+              value: safeDisplayValue(systolicValue),
               unit: "mmHg",
             },
             {
               label: isRTL ? "الضغط الانبساطي" : "Diastolic BP",
-              value: getExtraValue(selectedReport, [
-                "diastolic_bp",
-                "diastolicBloodPressure",
-                "diastolic_blood_pressure",
-              ]),
+              value: safeDisplayValue(diastolicValue),
               unit: "mmHg",
             },
             {
               label: isRTL ? "الوزن" : "Weight",
-              value: getExtraValue(selectedReport, ["weight"]),
+              value: safeDisplayValue(weightValue),
               unit: "kg",
             },
             {
               label: isRTL ? "الطول" : "Height",
-              value: getExtraValue(selectedReport, ["height"]),
+              value: safeDisplayValue(heightValue),
               unit: "cm",
             },
             {
               label: isRTL ? "العمر" : "Age",
-              value: selectedReport.age,
+              value: safeDisplayValue(ageValue),
               unit: isRTL ? "سنة" : "Years",
             },
           ];
@@ -729,51 +802,44 @@ export default function PendingPredictions({
           ...baseIdentityIndicators,
           {
             label: isRTL ? "الجلوكوز" : "Glucose",
-            value: selectedReport.glucose || "N/A",
+            value: safeDisplayValue(glucoseValue),
             unit: "mg/dL",
           },
           {
             label: isRTL ? "الضغط الانبساطي" : "Diastolic BP",
-            value:
-              getExtraValue(selectedReport, [
-                "diastolic_bp",
-                "diastolicBloodPressure",
-                "diastolic_blood_pressure",
-              ]) ||
-              selectedReport.blood_pressure ||
-              "N/A",
+            value: safeDisplayValue(diastolicValue),
             unit: "mmHg",
           },
           {
             label: isRTL ? "الإنسولين" : "Insulin",
-            value: selectedReport.insulin || "N/A",
+            value: safeDisplayValue(insulinValue),
             unit: "mu U/ml",
           },
           {
             label: isRTL ? "سماكة الجلد" : "Skin Thickness",
-            value: selectedReport.skin_thickness || "N/A",
+            value: safeDisplayValue(skinValue),
             unit: "mm",
           },
           {
             label: isRTL ? "العمر" : "Age",
-            value: selectedReport.age,
+            value: safeDisplayValue(ageValue),
             unit: isRTL ? "سنة" : "Years",
           },
           {
             label: isRTL
               ? "العامل الوراثي للسكري"
               : "Diabetes Pedigree Function",
-            value: selectedReport.diabetes_pedigree_function || "N/A",
+            value: safeDisplayValue(pedigreeValue),
             unit: "",
           },
           {
             label: isRTL ? "الوزن" : "Weight",
-            value: getExtraValue(selectedReport, ["weight"]),
+            value: safeDisplayValue(weightValue),
             unit: "kg",
           },
           {
             label: isRTL ? "الطول" : "Height",
-            value: getExtraValue(selectedReport, ["height"]),
+            value: safeDisplayValue(heightValue),
             unit: "cm",
           },
         ];
@@ -827,6 +893,11 @@ export default function PendingPredictions({
   ) => {
     event?.preventDefault();
     event?.stopPropagation();
+
+    console.log("SELECTED REPORT FULL DATA:", report);
+    console.log("SELECTED REPORT KEYS:", Object.keys(report as any));
+    console.log("EXTRA FIELDS:", (report as any).extra_fields);
+    console.log("EXTRA FIELD KEYS:", Object.keys((report as any).extra_fields || {}));
 
     setSelectedReport(report);
     setDecision((report.review_status as ReviewStatus) || "pending");
@@ -1000,12 +1071,14 @@ export default function PendingPredictions({
                 <>
                   {displayedPredictions.map((pred) => {
                     const riskClasses = getRiskClasses(pred.risk_level);
+                    const probability = getProbabilityValue(pred.probability);
 
                     return (
                       <div
                         key={pred.id}
                         role="button"
                         tabIndex={0}
+                        onClick={(event) => openReviewDrawer(pred, event)}
                         onKeyDown={(event) => handleRowKeyDown(event, pred)}
                         className="grid min-h-[42px] grid-cols-[36%_28%_20%_16%] items-center px-2 py-1.5 transition-colors duration-200 hover:bg-muted/30 focus:bg-muted/30 focus:outline-none sm:min-h-[48px] sm:grid-cols-[40%_26%_20%_14%] sm:px-6 sm:py-2"
                       >
@@ -1036,7 +1109,7 @@ export default function PendingPredictions({
                           >
                             <span className="truncate">
                               {formatRiskLabel(pred.risk_level)} (
-                              {Math.round(pred.probability || 0)}%)
+                              {Math.round(probability)}%)
                             </span>
                           </Badge>
                         </div>
@@ -1125,7 +1198,10 @@ export default function PendingPredictions({
 
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
                           <span>
-                            {selectedReport.age} {isRTL ? "سنة" : "Years"}
+                            {safeDisplayValue(
+                              getValueFromReport(selectedReport, ["age", "Age"])
+                            )}{" "}
+                            {isRTL ? "سنة" : "Years"}
                           </span>
 
                           <span>•</span>
@@ -1154,7 +1230,10 @@ export default function PendingPredictions({
                         </span>
 
                         <span className="ml-2 text-lg font-bold text-primary">
-                          {Math.round(selectedReport.probability || 0)}%
+                          {Math.round(
+                            getProbabilityValue(selectedReport.probability)
+                          )}
+                          %
                         </span>
                       </div>
 
@@ -1175,7 +1254,7 @@ export default function PendingPredictions({
                             selectedRiskClasses.text
                           )}
                         >
-                          {selectedReport.risk_level}
+                          {safeDisplayValue(selectedReport.risk_level)}
                         </span>
                       </div>
                     </div>
@@ -1206,11 +1285,9 @@ export default function PendingPredictions({
                     className="m-0 space-y-5 p-5 animate-in fade-in duration-300 md:p-6"
                   >
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                          {labels.fullPatientValues}
-                        </h4>
-                      </div>
+                      <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        {labels.fullPatientValues}
+                      </h4>
 
                       <div className="overflow-hidden rounded-2xl border border-border bg-background/40">
                         <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">

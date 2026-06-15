@@ -27,16 +27,19 @@ export default function AppointmentsToday({
 
   const getAppointmentTimestamp = (appt: any) => {
     const possibleDate =
-      appt?.created_at ||
-      appt?.updated_at ||
       appt?.appointment_datetime ||
+      (appt?.appointment_date && appt?.appointment_time
+        ? `${appt.appointment_date}T${appt.appointment_time}`
+        : null) ||
       appt?.datetime ||
       appt?.scheduled_at ||
       appt?.start_time ||
       appt?.date ||
       appt?.appointment_date ||
       appt?.time ||
-      appt?.appointment_time;
+      appt?.appointment_time ||
+      appt?.created_at ||
+      appt?.updated_at;
 
     if (!possibleDate) return 0;
 
@@ -56,8 +59,10 @@ export default function AppointmentsToday({
         const bTime = getAppointmentTimestamp(b);
 
         if (aTime === 0 && bTime === 0) return 0;
+        if (aTime === 0) return 1;
+        if (bTime === 0) return -1;
 
-        return bTime - aTime;
+        return aTime - bTime;
       })
       .slice(0, MAX_DASHBOARD_APPOINTMENTS);
   }, [safeAppointments]);
@@ -269,8 +274,8 @@ export default function AppointmentsToday({
 
                   <p className="mt-0.5 truncate text-[10px] leading-3 text-muted-foreground sm:text-[11px]">
                     {isArabic
-                      ? "ستظهر حجوزات اليوم هنا"
-                      : "Today's appointments will appear here"}
+                      ? "ستظهر الحجوزات القادمة هنا"
+                      : "Upcoming appointments will appear here"}
                   </p>
                 </div>
               </div>

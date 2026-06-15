@@ -1,3 +1,4 @@
+// src/pages/doctor/ReportsPage.tsx
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -34,10 +35,7 @@ import {
   Check,
   X,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   SlidersHorizontal,
-  Pill,
   MessageCircle,
 } from "lucide-react";
 
@@ -50,11 +48,17 @@ const PAGE_SIZE = 10;
 type ReportsLocationState = {
   openReportId?: number | string;
   filterReportId?: number | string;
+  predictionId?: number | string;
+  openPredictionId?: number | string;
+  selectedPredictionId?: number | string;
   patientId?: number | string;
+  openPatientId?: number | string;
+  selectedPatientId?: number | string;
   patientName?: string;
   diseaseType?: string;
   fromPatientArchive?: boolean;
   openDrawer?: boolean;
+  fromActivity?: boolean;
 };
 
 type KeyIndicator = {
@@ -97,7 +101,6 @@ export default function ReportsPage() {
   ) => {
     const fallback = isArabic ? arabicFallback : englishFallback;
     const translated = t(key);
-
     return translated === key ? fallback : translated;
   };
 
@@ -173,11 +176,6 @@ export default function ReportsPage() {
       "اكتب ملاحظاتك الطبية هنا...",
       "Write your medical notes here..."
     ),
-    notified: getText(
-      "doctorDashboard.reports.notified",
-      "سيتم حفظ القرار وإتاحته في سجل المريض.",
-      "The decision will be saved and reflected in the patient record."
-    ),
     saveReview: getText(
       "doctorDashboard.reports.drawer.saveReview",
       "حفظ المراجعة",
@@ -218,10 +216,30 @@ export default function ReportsPage() {
     of: isArabic ? "من" : "of",
     anonymous: isArabic ? "مريض غير محدد" : "Anonymous",
     close: isArabic ? "إغلاق" : "Close",
-    medicationTitle: isArabic ? "الأدوية / الروشتة" : "Medication / Prescription",
+    medicationTitle: isArabic
+      ? "الأدوية / الروشتة"
+      : "Medication / Prescription",
     medicationPlaceholder: isArabic
       ? "اكتب اسم الدواء، الجرعة، عدد المرات، ومدة الاستخدام..."
       : "Write medication name, dosage, frequency, and duration...",
+  };
+
+  const isEmptyValue = (value: unknown) => {
+    return value === null || value === undefined || value === "";
+  };
+
+  const isInvalidNumberValue = (value: unknown) => {
+    if (typeof value === "number") return Number.isNaN(value);
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      return normalized === "nan" || normalized === "nana";
+    }
+    return false;
+  };
+
+  const safeDisplayValue = (value: unknown, fallback = "N/A") => {
+    if (isEmptyValue(value) || isInvalidNumberValue(value)) return fallback;
+    return value as string | number;
   };
 
   const normalizeId = (value: unknown) => {
@@ -230,9 +248,15 @@ export default function ReportsPage() {
   };
 
   const toNumber = (value: unknown) => {
-    if (value === null || value === undefined || value === "") return 0;
+    if (isEmptyValue(value) || isInvalidNumberValue(value)) return 0;
+
     const numericValue = Number(value);
-    return Number.isNaN(numericValue) ? 0 : numericValue;
+    return Number.isFinite(numericValue) ? numericValue : 0;
+  };
+
+  const getProbabilityValue = (value: unknown) => {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : 0;
   };
 
   const clearTemporaryReportFilters = () => {
@@ -240,7 +264,14 @@ export default function ReportsPage() {
 
     params.delete("filterReportId");
     params.delete("openReportId");
+    params.delete("prediction_id");
+    params.delete("open_prediction_id");
+    params.delete("predictionId");
+    params.delete("openPredictionId");
     params.delete("patientId");
+    params.delete("patient_id");
+    params.delete("open_patient_id");
+    params.delete("openPatientId");
     params.delete("patientName");
     params.delete("diseaseType");
     params.delete("fromPatientArchive");
@@ -298,10 +329,7 @@ export default function ReportsPage() {
 
     for (const candidate of candidates) {
       const normalizedId = normalizeId(candidate);
-
-      if (normalizedId > 0) {
-        return normalizedId;
-      }
+      if (normalizedId > 0) return normalizedId;
     }
 
     return 0;
@@ -337,7 +365,7 @@ export default function ReportsPage() {
     }
 
     const query = patientId
-      ? `?patientId=${patientId}`
+      ? `?patientId=${patientId}&openPatientId=${patientId}`
       : `?patientName=${encodeURIComponent(patientName)}`;
 
     navigate(`/doctor-dashboard/messages${query}`, {
@@ -345,6 +373,7 @@ export default function ReportsPage() {
         patientId: patientId || undefined,
         patientName,
         openPatientId: patientId || undefined,
+        selectedPatientId: patientId || undefined,
         openPatientName: patientName,
         fromReports: true,
       },
@@ -362,7 +391,7 @@ export default function ReportsPage() {
     for (const key of keys) {
       const value = extra?.[key] ?? item?.[key];
 
-      if (value !== undefined && value !== null && value !== "") {
+      if (!isEmptyValue(value) && !isInvalidNumberValue(value)) {
         return value;
       }
     }
@@ -422,11 +451,18 @@ export default function ReportsPage() {
 
       const patientIdFromState = shouldIgnoreRouteFilters
         ? 0
-        : normalizeId(state.patientId);
+        : normalizeId(
+            state.patientId || state.openPatientId || state.selectedPatientId
+          );
 
       const patientIdFromUrl = shouldIgnoreRouteFilters
         ? 0
-        : normalizeId(searchParams.get("patientId"));
+        : normalizeId(
+            searchParams.get("patientId") ||
+              searchParams.get("patient_id") ||
+              searchParams.get("open_patient_id") ||
+              searchParams.get("openPatientId")
+          );
 
       const selectedPatientId = patientIdFromState || patientIdFromUrl;
 
@@ -442,13 +478,33 @@ export default function ReportsPage() {
 
       const openReportId = shouldIgnoreRouteFilters
         ? 0
-        : normalizeId(state.openReportId) ||
-          normalizeId(searchParams.get("openReportId"));
+        : normalizeId(
+            state.openReportId ||
+              state.openPredictionId ||
+              state.selectedPredictionId ||
+              state.predictionId ||
+              searchParams.get("openReportId") ||
+              searchParams.get("openPredictionId") ||
+              searchParams.get("open_prediction_id") ||
+              searchParams.get("predictionId") ||
+              searchParams.get("prediction_id")
+          );
 
       const filterReportId = shouldIgnoreRouteFilters
         ? 0
-        : normalizeId(state.filterReportId) ||
-          normalizeId(searchParams.get("filterReportId"));
+        : normalizeId(
+            state.filterReportId ||
+              state.openReportId ||
+              state.openPredictionId ||
+              state.selectedPredictionId ||
+              state.predictionId ||
+              searchParams.get("filterReportId") ||
+              searchParams.get("openReportId") ||
+              searchParams.get("openPredictionId") ||
+              searchParams.get("open_prediction_id") ||
+              searchParams.get("predictionId") ||
+              searchParams.get("prediction_id")
+          );
 
       const fromPatientArchive = shouldIgnoreRouteFilters
         ? false
@@ -502,9 +558,13 @@ export default function ReportsPage() {
       setReports(filteredData);
 
       if (shouldOpenDrawer) {
-        const reportToOpen = filteredData.find(
-          (report) => Number(report.id) === openReportId
-        );
+        const reportToOpen =
+          filteredData.find(
+            (report) => normalizeId(report.id) === openReportId
+          ) ||
+          normalizedData.find(
+            (report) => normalizeId(report.id) === openReportId
+          );
 
         if (reportToOpen) {
           setSelectedReport(reportToOpen);
@@ -512,6 +572,12 @@ export default function ReportsPage() {
           setDoctorNotes(reportToOpen.message || "");
           setMedication(getMedicationValue(reportToOpen));
           setIsDrawerOpen(true);
+        } else {
+          toast.error(
+            isArabic
+              ? "لم يتم العثور على تحليل المريض المطلوب"
+              : "Could not find the selected patient analysis"
+          );
         }
       }
 
@@ -761,19 +827,16 @@ export default function ReportsPage() {
     const gender = getGenderValue(report);
     const showPregnancies = isFemaleGender(gender);
 
-    const diabetesDiastolicValue =
-      getExtraValue(report, [
-        "diastolic_bp",
-        "diastolicBloodPressure",
-        "diastolic_blood_pressure",
-      ]) ||
-      report.blood_pressure ||
-      "N/A";
+    const diabetesDiastolicValue = getExtraValue(
+      report,
+      ["diastolic_bp", "diastolicBloodPressure", "diastolic_blood_pressure"],
+      safeDisplayValue(report.blood_pressure) as string | number
+    );
 
     const diabetesIndicators: KeyIndicator[] = [
       {
         label: isArabic ? "الجلوكوز" : "Glu",
-        value: report.glucose || "N/A",
+        value: safeDisplayValue(report.glucose),
         unit: "",
         severity: getIndicatorSeverity("glucose", report.glucose),
       },
@@ -785,19 +848,19 @@ export default function ReportsPage() {
       },
       {
         label: isArabic ? "الإنسولين" : "Ins",
-        value: report.insulin || "N/A",
+        value: safeDisplayValue(report.insulin),
         unit: "",
         severity: getIndicatorSeverity("insulin", report.insulin),
       },
       {
         label: isArabic ? "سُمك الجلد" : "Skin",
-        value: report.skin_thickness || "N/A",
+        value: safeDisplayValue(report.skin_thickness),
         unit: "",
         severity: getIndicatorSeverity("skin", report.skin_thickness),
       },
       {
         label: isArabic ? "وراثي" : "DPF",
-        value: report.diabetes_pedigree_function || "N/A",
+        value: safeDisplayValue(report.diabetes_pedigree_function),
         unit: "",
         severity: getIndicatorSeverity(
           "pedigree",
@@ -806,7 +869,7 @@ export default function ReportsPage() {
       },
       {
         label: isArabic ? "العمر" : "Age",
-        value: report.age || "N/A",
+        value: safeDisplayValue(report.age),
         unit: "",
         severity: getIndicatorSeverity("age", report.age),
       },
@@ -814,7 +877,7 @@ export default function ReportsPage() {
         ? [
             {
               label: isArabic ? "الحمل" : "Preg",
-              value: getPregnanciesValue(report),
+              value: safeDisplayValue(getPregnanciesValue(report)),
               unit: "",
               severity: getIndicatorSeverity(
                 "pregnancies",
@@ -825,63 +888,57 @@ export default function ReportsPage() {
         : []),
     ];
 
-    const cardiovascularSystolicValue = getExtraValue(report, [
+    const systolicValue = getExtraValue(report, [
       "systolic_bp",
       "systolicBloodPressure",
       "systolic_blood_pressure",
     ]);
 
-    const cardiovascularDiastolicValue = getExtraValue(report, [
+    const diastolicValue = getExtraValue(report, [
       "diastolic_bp",
       "diastolicBloodPressure",
       "diastolic_blood_pressure",
     ]);
 
+    const cholesterolValue = getExtraValue(report, ["cholesterol"]);
+    const weightValue = getExtraValue(report, ["weight"]);
+
     const cardiovascularIndicators: KeyIndicator[] = [
       {
         label: isArabic ? "SYS BP" : "Sys BP",
-        value: cardiovascularSystolicValue,
+        value: safeDisplayValue(systolicValue),
         unit: "",
-        severity: getIndicatorSeverity("systolic", cardiovascularSystolicValue),
+        severity: getIndicatorSeverity("systolic", systolicValue),
       },
       {
         label: isArabic ? "DIA BP" : "Dia BP",
-        value: cardiovascularDiastolicValue,
+        value: safeDisplayValue(diastolicValue),
         unit: "",
-        severity: getIndicatorSeverity(
-          "diastolic",
-          cardiovascularDiastolicValue
-        ),
+        severity: getIndicatorSeverity("diastolic", diastolicValue),
       },
       {
         label: isArabic ? "الكوليسترول" : "Chol",
-        value: getExtraValue(report, ["cholesterol"]),
+        value: safeDisplayValue(cholesterolValue),
         unit: "",
-        severity: getIndicatorSeverity(
-          "cholesterol",
-          getExtraValue(report, ["cholesterol"])
-        ),
+        severity: getIndicatorSeverity("cholesterol", cholesterolValue),
       },
       {
         label: isArabic ? "الجلوكوز" : "Glu",
-        value: report.glucose || "N/A",
+        value: safeDisplayValue(report.glucose),
         unit: "",
         severity: getIndicatorSeverity("glucose", report.glucose),
       },
       {
         label: isArabic ? "العمر" : "Age",
-        value: report.age || "N/A",
+        value: safeDisplayValue(report.age),
         unit: "",
         severity: getIndicatorSeverity("age", report.age),
       },
       {
         label: isArabic ? "الوزن" : "Weight",
-        value: getExtraValue(report, ["weight"]),
+        value: safeDisplayValue(weightValue),
         unit: "",
-        severity: getIndicatorSeverity(
-          "weight",
-          getExtraValue(report, ["weight"])
-        ),
+        severity: getIndicatorSeverity("weight", weightValue),
       },
     ];
 
@@ -920,11 +977,6 @@ export default function ReportsPage() {
 
             <p className="mt-1 truncate text-xs font-bold text-foreground">
               {indicator.value}
-              {indicator.unit && (
-                <span className="ml-1 text-[9px] font-semibold text-muted-foreground">
-                  {indicator.unit}
-                </span>
-              )}
             </p>
           </div>
         ))}
@@ -940,33 +992,27 @@ export default function ReportsPage() {
             {getStatusLabel(status)}
           </Badge>
         );
-      case "reviewed":
-        return (
-          <Badge className="rounded-xl border border-primary/15 bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-primary shadow-none transition-none hover:bg-primary/10 hover:text-primary">
-            {getStatusLabel(status)}
-          </Badge>
-        );
       case "needs_followup":
         return (
-          <Badge className="rounded-xl border border-amber-100 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-600 shadow-none transition-none hover:bg-amber-50 hover:text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/10 dark:hover:text-amber-300">
+          <Badge className="rounded-xl border border-amber-100 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-600 shadow-none transition-none hover:bg-amber-50 hover:text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
             {getStatusLabel(status)}
           </Badge>
         );
       case "approved":
         return (
-          <Badge className="rounded-xl border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-600 shadow-none transition-none hover:bg-emerald-50 hover:text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-300">
+          <Badge className="rounded-xl border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-600 shadow-none transition-none hover:bg-emerald-50 hover:text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
             {getStatusLabel(status)}
           </Badge>
         );
       case "rejected":
         return (
-          <Badge className="rounded-xl border border-red-100 bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-600 shadow-none transition-none hover:bg-red-50 hover:text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-300">
+          <Badge className="rounded-xl border border-red-100 bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-600 shadow-none transition-none hover:bg-red-50 hover:text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
             {getStatusLabel(status)}
           </Badge>
         );
       default:
         return (
-          <Badge className="rounded-xl border border-border bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground shadow-none transition-none hover:bg-muted hover:text-muted-foreground">
+          <Badge className="rounded-xl border border-primary/15 bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-primary shadow-none transition-none hover:bg-primary/10 hover:text-primary">
             {getStatusLabel(status)}
           </Badge>
         );
@@ -1028,129 +1074,74 @@ export default function ReportsPage() {
   ];
 
   const clinicalIndicators = selectedReport
-    ? (() => {
-        const gender = getGenderValue(selectedReport);
-        const showPregnancies = isFemaleGender(gender);
-
-        const baseIdentityIndicators = [
-          {
-            label: isArabic ? "النوع" : "Gender",
-            value: gender,
-            unit: "",
-          },
-          ...(showPregnancies
-            ? [
-                {
-                  label: isArabic ? "عدد مرات الحمل" : "Pregnancies",
-                  value: getPregnanciesValue(selectedReport),
-                  unit: "",
-                },
-              ]
-            : []),
-        ];
-
-        if (selectedReport.disease_type === "cardiovascular") {
-          return [
-            ...baseIdentityIndicators,
-            {
-              label: isArabic ? "الجلوكوز" : "Glucose",
-              value: selectedReport.glucose || "N/A",
-              unit: "mg/dL",
-            },
-            {
-              label: isArabic ? "الكوليسترول" : "Cholesterol",
-              value: getExtraValue(selectedReport, ["cholesterol"]),
-              unit: "mg/dL",
-            },
-            {
-              label: isArabic ? "الضغط الانقباضي" : "Systolic BP",
-              value: getExtraValue(selectedReport, [
-                "systolic_bp",
-                "systolicBloodPressure",
-                "systolic_blood_pressure",
-              ]),
-              unit: "mmHg",
-            },
-            {
-              label: isArabic ? "الضغط الانبساطي" : "Diastolic BP",
-              value: getExtraValue(selectedReport, [
+    ? [
+        {
+          label: isArabic ? "النوع" : "Gender",
+          value: safeDisplayValue(getGenderValue(selectedReport)),
+          unit: "",
+        },
+        {
+          label: isArabic ? "الجلوكوز" : "Glucose",
+          value: safeDisplayValue(selectedReport.glucose),
+          unit: "mg/dL",
+        },
+        {
+          label: isArabic ? "الضغط الانقباضي" : "Systolic BP",
+          value: safeDisplayValue(
+            getExtraValue(selectedReport, [
+              "systolic_bp",
+              "systolicBloodPressure",
+              "systolic_blood_pressure",
+            ])
+          ),
+          unit: "mmHg",
+        },
+        {
+          label: isArabic ? "الضغط الانبساطي" : "Diastolic BP",
+          value: safeDisplayValue(
+            getExtraValue(
+              selectedReport,
+              [
                 "diastolic_bp",
                 "diastolicBloodPressure",
                 "diastolic_blood_pressure",
-              ]),
-              unit: "mmHg",
-            },
-            {
-              label: isArabic ? "الوزن" : "Weight",
-              value: getExtraValue(selectedReport, ["weight"]),
-              unit: "kg",
-            },
-            {
-              label: isArabic ? "الطول" : "Height",
-              value: getExtraValue(selectedReport, ["height"]),
-              unit: "cm",
-            },
-            {
-              label: isArabic ? "العمر" : "Age",
-              value: selectedReport.age,
-              unit: isArabic ? "سنة" : "Years",
-            },
-          ];
-        }
-
-        return [
-          ...baseIdentityIndicators,
-          {
-            label: isArabic ? "الجلوكوز" : "Glucose",
-            value: selectedReport.glucose || "N/A",
-            unit: "mg/dL",
-          },
-          {
-            label: isArabic ? "الضغط الانبساطي" : "Diastolic BP",
-            value:
-              getExtraValue(selectedReport, [
-                "diastolic_bp",
-                "diastolicBloodPressure",
-                "diastolic_blood_pressure",
-              ]) ||
-              selectedReport.blood_pressure ||
-              "N/A",
-            unit: "mmHg",
-          },
-          {
-            label: isArabic ? "الإنسولين" : "Insulin",
-            value: selectedReport.insulin || "N/A",
-            unit: "mu U/ml",
-          },
-          {
-            label: isArabic ? "سماكة الجلد" : "Skin Thickness",
-            value: selectedReport.skin_thickness || "N/A",
-            unit: "mm",
-          },
-          {
-            label: isArabic ? "العمر" : "Age",
-            value: selectedReport.age,
-            unit: isArabic ? "سنة" : "Years",
-          },
-          {
-            label: isArabic
-              ? "العامل الوراثي للسكري"
-              : "Diabetes Pedigree Function",
-            value: selectedReport.diabetes_pedigree_function || "N/A",
-            unit: "",
-          },
-          {
-            label: isArabic ? "الوزن" : "Weight",
-            value: getExtraValue(selectedReport, ["weight"]),
-            unit: "kg",
-          },
-          {
-            label: isArabic ? "الطول" : "Height",
-            value: getExtraValue(selectedReport, ["height"]),
-            unit: "cm",
-          },
-        ];
-      })()
+              ],
+              safeDisplayValue(selectedReport.blood_pressure) as string | number
+            )
+          ),
+          unit: "mmHg",
+        },
+        {
+          label: isArabic ? "الكوليسترول" : "Cholesterol",
+          value: safeDisplayValue(getExtraValue(selectedReport, ["cholesterol"])),
+          unit: "mg/dL",
+        },
+        {
+          label: isArabic ? "الإنسولين" : "Insulin",
+          value: safeDisplayValue(selectedReport.insulin),
+          unit: "mu U/ml",
+        },
+        {
+          label: isArabic ? "سماكة الجلد" : "Skin Thickness",
+          value: safeDisplayValue(selectedReport.skin_thickness),
+          unit: "mm",
+        },
+        {
+          label: isArabic ? "العمر" : "Age",
+          value: safeDisplayValue(selectedReport.age),
+          unit: isArabic ? "سنة" : "Years",
+        },
+        {
+          label: isArabic ? "الوزن" : "Weight",
+          value: safeDisplayValue(getExtraValue(selectedReport, ["weight"])),
+          unit: "kg",
+        },
+        {
+          label: isArabic ? "الطول" : "Height",
+          value: safeDisplayValue(getExtraValue(selectedReport, ["height"])),
+          unit: "cm",
+        },
+      ]
     : [];
 
   const reviewActions = [
@@ -1352,328 +1343,159 @@ export default function ReportsPage() {
               </p>
             </div>
           ) : (
-            <>
-              <div className="space-y-4 p-4 md:hidden">
-                {paginatedReports.map((report) => {
-                  const riskClasses = getRiskClasses(report.risk_level || "");
+            <div className="hidden overflow-x-auto md:block">
+              <table
+                className={cn(
+                  "w-full table-fixed border-collapse",
+                  isArabic ? "text-right" : "text-left"
+                )}
+                dir={isArabic ? "rtl" : "ltr"}
+              >
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="w-[24%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      {labels.tablePatient}
+                    </th>
 
-                  return (
-                    <Card
-                      key={report.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleViewReport(report)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleViewReport(report);
-                      }}
-                      className="cursor-pointer rounded-3xl border border-border bg-card p-4 text-card-foreground shadow-sm transition-all hover:border-primary/20 hover:bg-primary/[0.03]"
-                    >
-                      <div className="mb-4 flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <Avatar className="h-11 w-11 shrink-0 border border-border shadow-sm">
-                            <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
-                              {getReportPatientName(report)
-                                ?.split(" ")
-                                .filter(Boolean)
-                                .map((n) => n[0])
-                                .join("")
-                                .toUpperCase() || "P"}
-                            </AvatarFallback>
-                          </Avatar>
+                    <th className="w-[18%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      {labels.tableProbability}
+                    </th>
 
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-bold text-foreground">
-                              {getReportPatientName(report) || labels.anonymous}
-                            </p>
+                    <th className="w-[28%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      {labels.tableIndicators}
+                    </th>
+
+                    <th className="w-[14%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      {labels.tableStatus}
+                    </th>
+
+                    <th className="w-[12%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      {labels.tableDate}
+                    </th>
+
+                    <th className="w-[16%] p-5 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      {labels.tableActions}
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-border">
+                  {paginatedReports.map((report) => {
+                    const riskClasses = getRiskClasses(report.risk_level || "");
+                    const probability = getProbabilityValue(report.probability);
+
+                    return (
+                      <tr
+                        key={report.id}
+                        className="group cursor-pointer transition-colors hover:bg-muted/30"
+                        onClick={() => handleViewReport(report)}
+                      >
+                        <td className="p-5 align-middle">
+                          <div className="flex items-center gap-4">
+                            <Avatar className="h-11 w-11 border border-border shadow-sm">
+                              <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
+                                {getReportPatientName(report)
+                                  ?.split(" ")
+                                  .filter(Boolean)
+                                  .map((n) => n[0])
+                                  .join("")
+                                  .toUpperCase() || "P"}
+                              </AvatarFallback>
+                            </Avatar>
+
+                            <div className="min-w-0">
+                              <p className="truncate font-bold tracking-tight text-foreground">
+                                {getReportPatientName(report) ||
+                                  labels.anonymous}
+                              </p>
+                            </div>
                           </div>
-                        </div>
+                        </td>
 
-                        <div className="shrink-0">
-                          {getStatusBadge(report.review_status)}
-                        </div>
-                      </div>
-
-                      <div className="mb-4 rounded-2xl bg-muted/30 p-3">
-                        <div className="mb-2 flex items-center justify-between gap-3">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                            {labels.tableProbability}
-                          </p>
-
-                          <span
-                            className={cn(
-                              "text-sm font-bold tracking-tight",
-                              riskClasses.text
-                            )}
-                          >
-                            {Math.round(report.probability || 0)}%
-                          </span>
-                        </div>
-
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-background">
-                          <div
-                            className={cn(
-                              "h-full rounded-full transition-all duration-1000",
-                              riskClasses.progress
-                            )}
-                            style={{ width: `${report.probability || 0}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mb-4">{renderKeyIndicators(report)}</div>
-
-                      <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                          {new Date(report.created_at).toLocaleDateString(
-                            i18n.language,
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            }
-                          )}
-                        </p>
-
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-9 rounded-xl bg-primary/10 px-4 text-[10px] font-bold uppercase tracking-widest text-primary hover:bg-primary hover:text-primary-foreground"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewReport(report);
-                            }}
-                          >
-                            <Eye
-                              className={cn(
-                                "h-3.5 w-3.5",
-                                isArabic ? "ml-2" : "mr-2"
-                              )}
-                            />
-                            {labels.reviewBtn}
-                          </Button>
-
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title={labels.messageBtn}
-                            className="h-9 w-9 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenPatientMessages(report);
-                            }}
-                          >
-                            <MessageCircle className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-
-              <div className="hidden overflow-x-auto md:block">
-                <table
-                  className={cn(
-                    "w-full table-fixed border-collapse",
-                    isArabic ? "text-right" : "text-left"
-                  )}
-                  dir={isArabic ? "rtl" : "ltr"}
-                >
-                  <thead>
-                    <tr className="border-b border-border bg-muted/40">
-                      <th className="w-[24%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {labels.tablePatient}
-                      </th>
-
-                      <th className="w-[18%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {labels.tableProbability}
-                      </th>
-
-                      <th className="w-[28%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {labels.tableIndicators}
-                      </th>
-
-                      <th className="w-[14%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {labels.tableStatus}
-                      </th>
-
-                      <th className="w-[12%] p-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {labels.tableDate}
-                      </th>
-
-                      <th className="w-[16%] p-5 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {labels.tableActions}
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-border">
-                    {paginatedReports.map((report) => {
-                      const riskClasses = getRiskClasses(report.risk_level || "");
-
-                      return (
-                        <tr
-                          key={report.id}
-                          className="group cursor-pointer transition-colors hover:bg-muted/30"
-                          onClick={() => handleViewReport(report)}
-                        >
-                          <td className="p-5 align-middle">
-                            <div className="flex items-center gap-4">
-                              <Avatar className="h-11 w-11 border border-border shadow-sm">
-                                <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
-                                  {getReportPatientName(report)
-                                    ?.split(" ")
-                                    .filter(Boolean)
-                                    .map((n) => n[0])
-                                    .join("")
-                                    .toUpperCase() || "P"}
-                                </AvatarFallback>
-                              </Avatar>
-
-                              <div className="min-w-0">
-                                <p className="truncate font-bold tracking-tight text-foreground">
-                                  {getReportPatientName(report) ||
-                                    labels.anonymous}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-
-                          <td className="p-5 align-middle">
-                            <div className="flex items-center gap-4">
-                              <div className="h-2 max-w-[100px] flex-1 overflow-hidden rounded-full bg-muted">
-                                <div
-                                  className={cn(
-                                    "h-full rounded-full transition-all duration-1000",
-                                    riskClasses.progress
-                                  )}
-                                  style={{ width: `${report.probability || 0}%` }}
-                                />
-                              </div>
-
-                              <span
+                        <td className="p-5 align-middle">
+                          <div className="flex items-center gap-4">
+                            <div className="h-2 max-w-[100px] flex-1 overflow-hidden rounded-full bg-muted">
+                              <div
                                 className={cn(
-                                  "text-xs font-bold tracking-tight",
-                                  riskClasses.text
+                                  "h-full rounded-full transition-all duration-1000",
+                                  riskClasses.progress
                                 )}
-                              >
-                                {Math.round(report.probability || 0)}%
-                              </span>
+                                style={{ width: `${probability}%` }}
+                              />
                             </div>
-                          </td>
 
-                          <td className="p-5 align-middle">
-                            {renderKeyIndicators(report)}
-                          </td>
-
-                          <td className="p-5 align-middle">
-                            {getStatusBadge(report.review_status)}
-                          </td>
-
-                          <td className="p-5 align-middle">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              {new Date(report.created_at).toLocaleDateString(
-                                i18n.language,
-                                {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                }
+                            <span
+                              className={cn(
+                                "text-xs font-bold tracking-tight",
+                                riskClasses.text
                               )}
-                            </p>
-                          </td>
+                            >
+                              {Math.round(probability)}%
+                            </span>
+                          </div>
+                        </td>
 
-                          <td className="p-5 text-center align-middle">
-                            <div className="flex items-center justify-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-10 rounded-xl bg-primary/10 px-4 text-[10px] font-bold uppercase tracking-widest text-primary transition-all hover:bg-primary hover:text-primary-foreground"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewReport(report);
-                                }}
-                              >
-                                <Eye
-                                  className={cn(
-                                    "h-3.5 w-3.5",
-                                    isArabic ? "ml-2" : "mr-2"
-                                  )}
-                                />
-                                {labels.reviewBtn}
-                              </Button>
+                        <td className="p-5 align-middle">
+                          {renderKeyIndicators(report)}
+                        </td>
 
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                title={labels.messageBtn}
-                                className="h-10 w-10 rounded-xl bg-primary/10 text-primary transition-all hover:bg-primary hover:text-primary-foreground"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenPatientMessages(report);
-                                }}
-                              >
-                                <MessageCircle className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                        <td className="p-5 align-middle">
+                          {getStatusBadge(report.review_status)}
+                        </td>
 
-              {filteredReports.length > PAGE_SIZE && (
-                <div className="flex justify-center border-t border-border bg-card px-5 py-4">
-                  <div className="flex items-center justify-center gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      disabled={currentPage === 1}
-                      onClick={() =>
-                        setCurrentPage((prev) => Math.max(1, prev - 1))
-                      }
-                      className="h-10 w-10 rounded-2xl border-border bg-background text-muted-foreground transition-all hover:border-primary/20 hover:bg-primary/10 hover:text-primary disabled:opacity-40"
-                    >
-                      {isArabic ? (
-                        <ChevronRight className="h-4 w-4" />
-                      ) : (
-                        <ChevronLeft className="h-4 w-4" />
-                      )}
-                    </Button>
+                        <td className="p-5 align-middle">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            {new Date(report.created_at).toLocaleDateString(
+                              i18n.language,
+                              {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              }
+                            )}
+                          </p>
+                        </td>
 
-                    <div className="flex h-10 min-w-[120px] items-center justify-center rounded-2xl border border-border bg-muted/30 px-4">
-                      <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {labels.page}{" "}
-                        <span className="text-primary">{currentPage}</span>{" "}
-                        {labels.of}{" "}
-                        <span className="text-foreground">{totalPages}</span>
-                      </span>
-                    </div>
+                        <td className="p-5 text-center align-middle">
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-10 rounded-xl bg-primary/10 px-4 text-[10px] font-bold uppercase tracking-widest text-primary transition-all hover:bg-primary hover:text-primary-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewReport(report);
+                              }}
+                            >
+                              <Eye
+                                className={cn(
+                                  "h-3.5 w-3.5",
+                                  isArabic ? "ml-2" : "mr-2"
+                                )}
+                              />
+                              {labels.reviewBtn}
+                            </Button>
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      disabled={currentPage === totalPages}
-                      onClick={() =>
-                        setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-                      }
-                      className="h-10 w-10 rounded-2xl border-border bg-background text-muted-foreground transition-all hover:border-primary/20 hover:bg-primary/10 hover:text-primary disabled:opacity-40"
-                    >
-                      {isArabic ? (
-                        <ChevronLeft className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title={labels.messageBtn}
+                              className="h-10 w-10 rounded-xl bg-primary/10 text-primary transition-all hover:bg-primary hover:text-primary-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenPatientMessages(report);
+                              }}
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </Card>
@@ -1683,24 +1505,9 @@ export default function ReportsPage() {
           {selectedReport && (
             <div className="flex max-h-[88vh] flex-col overflow-hidden bg-card text-card-foreground">
               <DialogHeader className="border-b border-border bg-card px-5 py-4 md:px-6">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <FileText className="h-5 w-5" />
-                    </div>
-
-                    <div className="min-w-0">
-                      <DialogTitle className="truncate text-lg font-bold tracking-tight text-foreground md:text-xl">
-                        {labels.reportReview}
-                      </DialogTitle>
-
-                      <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
-                        {getReportPatientName(selectedReport) ||
-                          labels.anonymous}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <DialogTitle className="truncate text-lg font-bold tracking-tight text-foreground md:text-xl">
+                  {labels.reportReview}
+                </DialogTitle>
               </DialogHeader>
 
               <div className="flex-1 overflow-y-auto">
@@ -1726,7 +1533,8 @@ export default function ReportsPage() {
 
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
                           <span>
-                            {selectedReport.age} {isArabic ? "سنة" : "Years"}
+                            {safeDisplayValue(selectedReport.age)}{" "}
+                            {isArabic ? "سنة" : "Years"}
                           </span>
 
                           <span>•</span>
@@ -1768,7 +1576,10 @@ export default function ReportsPage() {
                         </span>
 
                         <span className="ml-2 text-lg font-bold text-primary">
-                          {Math.round(selectedReport.probability || 0)}%
+                          {Math.round(
+                            getProbabilityValue(selectedReport.probability)
+                          )}
+                          %
                         </span>
                       </div>
 
@@ -1789,7 +1600,7 @@ export default function ReportsPage() {
                             selectedRiskClasses.text
                           )}
                         >
-                          {selectedReport.risk_level}
+                          {safeDisplayValue(selectedReport.risk_level)}
                         </span>
                       </div>
                     </div>
@@ -1820,63 +1631,32 @@ export default function ReportsPage() {
                     className="m-0 space-y-5 p-5 animate-in fade-in duration-300 md:p-6"
                   >
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                          {labels.fullPatientValues}
-                        </h4>
-                      </div>
+                      <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        {labels.fullPatientValues}
+                      </h4>
 
                       <div className="overflow-hidden rounded-2xl border border-border bg-background/40">
                         <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-                          <div className="divide-y divide-border">
-                            {clinicalIndicators
-                              .slice(0, 4)
-                              .map((indicator, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/30"
-                                >
-                                  <p className="truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                                    {indicator.label}
-                                  </p>
+                          {clinicalIndicators.map((indicator, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/30"
+                            >
+                              <p className="truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                {indicator.label}
+                              </p>
 
-                                  <div className="shrink-0 text-right">
-                                    <span className="text-sm font-bold text-foreground">
-                                      {indicator.value}
-                                    </span>
+                              <div className="shrink-0 text-right">
+                                <span className="text-sm font-bold text-foreground">
+                                  {indicator.value}
+                                </span>
 
-                                    <span className="ml-1 text-[10px] font-semibold text-muted-foreground">
-                                      {indicator.unit}
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-
-                          <div className="divide-y divide-border">
-                            {clinicalIndicators
-                              .slice(4)
-                              .map((indicator, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/30"
-                                >
-                                  <p className="truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                                    {indicator.label}
-                                  </p>
-
-                                  <div className="shrink-0 text-right">
-                                    <span className="text-sm font-bold text-foreground">
-                                      {indicator.value}
-                                    </span>
-
-                                    <span className="ml-1 text-[10px] font-semibold text-muted-foreground">
-                                      {indicator.unit}
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
+                                <span className="ml-1 text-[10px] font-semibold text-muted-foreground">
+                                  {indicator.unit}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -1924,46 +1704,26 @@ export default function ReportsPage() {
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                          {labels.notesTitle}
-                        </h4>
+                      <textarea
+                        className="h-36 w-full resize-none rounded-2xl border border-border bg-muted/30 p-4 text-sm font-medium leading-6 text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/20 focus:bg-background focus:ring-4 focus:ring-primary/10"
+                        placeholder={labels.notesPlaceholder}
+                        value={doctorNotes}
+                        onChange={(e) => setDoctorNotes(e.target.value)}
+                      />
 
-                        <textarea
-                          className="h-36 w-full resize-none rounded-2xl border border-border bg-muted/30 p-4 text-sm font-medium leading-6 text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/20 focus:bg-background focus:ring-4 focus:ring-primary/10"
-                          placeholder={labels.notesPlaceholder}
-                          value={doctorNotes}
-                          onChange={(e) => setDoctorNotes(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Pill className="h-4 w-4 text-primary" />
-
-                          <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                            {labels.medicationTitle}
-                          </h4>
-                        </div>
-
-                        <textarea
-                          className="h-36 w-full resize-none rounded-2xl border border-border bg-muted/30 p-4 text-sm font-medium leading-6 text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/20 focus:bg-background focus:ring-4 focus:ring-primary/10"
-                          placeholder={labels.medicationPlaceholder}
-                          value={medication}
-                          onChange={(e) => setMedication(e.target.value)}
-                        />
-                      </div>
+                      <textarea
+                        className="h-36 w-full resize-none rounded-2xl border border-border bg-muted/30 p-4 text-sm font-medium leading-6 text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/20 focus:bg-background focus:ring-4 focus:ring-primary/10"
+                        placeholder={labels.medicationPlaceholder}
+                        value={medication}
+                        onChange={(e) => setMedication(e.target.value)}
+                      />
                     </div>
 
-                    <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                        {labels.notified}
-                      </p>
-
+                    <div className="flex justify-end border-t border-border pt-4">
                       <Button
                         onClick={handleSaveReview}
                         disabled={submitting || decision === "pending"}
-                        className="h-10 rounded-2xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:bg-primary/90 disabled:opacity-60"
+                        className="h-10 rounded-2xl bg-primary px-5 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
                       >
                         {submitting ? (
                           <LoadingDots color="white" />

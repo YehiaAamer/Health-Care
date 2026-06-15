@@ -15,6 +15,9 @@ export const API_ENDPOINTS = {
     `${API_BASE_URL}/api/doctor/predictions/${id}/review/`,
   DOCTOR_RISK_DISTRIBUTION: `${API_BASE_URL}/api/doctor/risk-distribution/`,
   DOCTOR_PATIENTS: `${API_BASE_URL}/api/doctor/patients/`,
+
+  // Appointments
+  DOCTOR_APPOINTMENTS: `${API_BASE_URL}/api/doctor/appointments/`,
   DOCTOR_APPOINTMENTS_TODAY: `${API_BASE_URL}/api/doctor/appointments/today/`,
 
   // Messages
